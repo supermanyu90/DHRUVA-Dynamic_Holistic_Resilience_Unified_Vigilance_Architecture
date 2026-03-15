@@ -85,7 +85,7 @@ export function NewsIntelView() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ingest-news`;
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ingest-news-intel`;
       await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -93,7 +93,7 @@ export function NewsIntelView() {
           'Content-Type': 'application/json',
         },
       });
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise(r => setTimeout(r, 3000));
       await loadArticles();
     } catch (err) {
       console.error('Refresh failed:', err);
@@ -115,9 +115,10 @@ export function NewsIntelView() {
         if (!cfg || cfg.group !== 'india') return false;
       } else if (newsGroup === 'gdelt') {
         if (article.source !== 'GDELT') return false;
-        const theme = gdeltTheme.toUpperCase();
-        const hasTheme = article.categories?.includes(theme) ||
-                         article.metadata?.theme === theme;
+        const themeUpper = gdeltTheme.toUpperCase();
+        const cats = (article.categories || []).map((c: string) => c.toUpperCase());
+        const hasTheme = cats.includes(themeUpper) ||
+                         (article.metadata?.theme || '').toUpperCase() === themeUpper;
         if (!hasTheme) return false;
       }
 
