@@ -31,15 +31,34 @@ export function Sidebar({
   layersEnabled,
   onLayerToggle,
 }: SidebarProps) {
+  const now = new Date();
+  const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+  const filterByMode = (eventTime: Date) => {
+    if (mode === 'live') {
+      return eventTime >= last24Hours;
+    }
+    return true;
+  };
+
   const allEvents = [
     ...earthquakes.map((e) => ({ ...e, type: 'earthquake', icon: '🌍', color: 'var(--quake)' })),
     ...disasters.map((d) => ({ ...d, type: 'disaster', icon: '⚠️', color: 'var(--fire)' })),
     ...news.map((n) => ({ ...n, type: 'news', icon: '📰', color: 'var(--accent)' })),
-  ].sort((a, b) => {
-    const dateA = 'event_time' in a ? new Date(a.event_time) : 'event_date' in a ? new Date(a.event_date) : new Date(a.published_at);
-    const dateB = 'event_time' in b ? new Date(b.event_time) : 'event_date' in b ? new Date(b.event_date) : new Date(b.published_at);
-    return dateB.getTime() - dateA.getTime();
-  });
+  ]
+    .filter((event) => {
+      const eventTime = 'event_time' in event
+        ? new Date(event.event_time)
+        : 'event_date' in event
+        ? new Date(event.event_date)
+        : new Date(event.published_at);
+      return filterByMode(eventTime);
+    })
+    .sort((a, b) => {
+      const dateA = 'event_time' in a ? new Date(a.event_time) : 'event_date' in a ? new Date(a.event_date) : new Date(a.published_at);
+      const dateB = 'event_time' in b ? new Date(b.event_time) : 'event_date' in b ? new Date(b.event_date) : new Date(b.published_at);
+      return dateB.getTime() - dateA.getTime();
+    });
 
   return (
     <div className="sidebar">
