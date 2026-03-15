@@ -102,7 +102,12 @@ function App() {
     geopolitical: false,
     curfews: false,
   });
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    try {
+      const saved = localStorage.getItem('dhruva-theme');
+      return (saved === 'light' || saved === 'dark') ? saved : 'dark';
+    } catch { return 'dark'; }
+  });
   const [timeFilter, setTimeFilter] = useState('24H');
   const [tooltip, setTooltip] = useState<{ x: number; y: number; content: string } | null>(null);
   const [alerts, setAlerts] = useState<Array<{ id: string; title: string; message: string }>>([]);
@@ -286,7 +291,8 @@ function App() {
   const handleThemeToggle = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(newTheme);
-    document.documentElement.setAttribute('data-theme', newTheme);
+    document.documentElement.setAttribute('data-theme', newTheme === 'light' ? 'light' : '');
+    try { localStorage.setItem('dhruva-theme', newTheme); } catch { /* noop */ }
   };
 
   const showTooltip = (x: number, y: number, content: string) => {
@@ -298,7 +304,7 @@ function App() {
   };
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : '');
   }, []);
 
   const criticalEvents = earthquakes.filter((e) => e.magnitude >= 6).length +

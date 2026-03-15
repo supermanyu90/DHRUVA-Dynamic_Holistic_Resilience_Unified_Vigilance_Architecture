@@ -2903,3 +2903,407 @@ header,
     padding: 8px;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   LIGHT THEME OVERRIDES
+   Applied when <html data-theme="light"> is set
+   ═══════════════════════════════════════════════════════════════ */
+
+[data-theme="light"] {
+  --bg: #EDEAE3;
+  --panel: #F7F5F0;
+  --border: rgba(0, 140, 100, 0.18);
+  --accent: #007A5E;
+  --text: #1C2B38;
+  --dim: #3A4F5C;
+  --danger: #C8001A;
+  --quake: #1A6FCC;
+  --fire: #D45200;
+  --volcano: #C4003A;
+  --storm: #8040CC;
+  --flood: #007AAA;
+  --dust: #AA8800;
+  --geo: #CC0030;
+  --industrial: #CC5500;
+  --civil: #B3005A;
+  --curfew: #6B0000;
+}
+
+[data-theme="light"] *,
+[data-theme="light"] html,
+[data-theme="light"] body {
+  scrollbar-color: rgba(0, 140, 100, 0.3) transparent;
+}
+
+/* Smooth transitions for theme switch */
+[data-theme="light"],
+[data-theme="light"] header,
+[data-theme="light"] .sidebar,
+[data-theme="light"] .right-panel,
+[data-theme="light"] .news-card,
+[data-theme="light"] .sewa-wrap,
+[data-theme="light"] .status-bar,
+[data-theme="light"] .view-tabs,
+[data-theme="light"] .mode-bar {
+  transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+}
+
+/* Loading screen */
+[data-theme="light"] #loading {
+  background: #EDEAE3;
+}
+[data-theme="light"] .ld-logo {
+  color: var(--accent);
+  text-shadow: none;
+}
+[data-theme="light"] .ld-bar {
+  background: rgba(0, 0, 0, 0.1);
+}
+[data-theme="light"] .ld-fill {
+  box-shadow: none;
+}
+
+/* Header */
+[data-theme="light"] header {
+  background: #E8E4DB;
+  border-color: rgba(0, 140, 100, 0.2);
+}
+[data-theme="light"] .logo {
+  color: var(--accent);
+}
+
+/* View tabs */
+[data-theme="light"] .view-tabs {
+  background: #DDD9D0;
+  border-color: rgba(0, 140, 100, 0.2);
+}
+[data-theme="light"] .view-tab {
+  color: #1C2B38;
+}
+[data-theme="light"] .view-tab.active {
+  color: var(--accent);
+  background: rgba(0, 140, 100, 0.06);
+  border-color: var(--accent);
+}
+
+/* Sidebar & right panel */
+[data-theme="light"] .sidebar,
+[data-theme="light"] .right-panel {
+  background: #F0EDE6;
+  border-color: rgba(0, 140, 100, 0.18);
+}
+[data-theme="light"] .ph {
+  border-color: rgba(0, 140, 100, 0.15);
+}
+[data-theme="light"] .mode-bar {
+  background: #E8E4DB;
+}
+[data-theme="light"] .mbtn {
+  color: #1C2B38;
+}
+[data-theme="light"] .mbtn.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(0, 122, 94, 0.08);
+}
+
+/* Live ticker */
+[data-theme="light"] .ticker-wrap {
+  background: rgba(200, 0, 26, 0.04);
+  border-color: rgba(200, 0, 26, 0.15);
+}
+[data-theme="light"] .ticker-lbl {
+  color: var(--geo);
+}
+
+/* Status bar */
+[data-theme="light"] .status-bar {
+  background: #E0DDD6;
+}
+
+/* Sound / control buttons */
+[data-theme="light"] .sound-btn {
+  background: rgba(0, 122, 94, 0.06);
+  border-color: rgba(0, 140, 100, 0.2);
+  color: #1C2B38;
+}
+[data-theme="light"] .sound-btn.on {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(0, 122, 94, 0.1);
+}
+
+/* Map controls */
+[data-theme="light"] .mzbtn {
+  background: rgba(240, 237, 230, 0.94);
+  border-color: rgba(0, 140, 100, 0.2);
+  color: var(--accent);
+}
+[data-theme="light"] .mzbtn:hover {
+  background: rgba(0, 122, 94, 0.1);
+}
+[data-theme="light"] .corner {
+  border-color: var(--accent);
+}
+[data-theme="light"] .mc {
+  background: #EDE9E1;
+}
+[data-theme="light"] .bar-list .bar-bg {
+  background: rgba(0, 0, 0, 0.08);
+}
+[data-theme="light"] #map-canvas {
+  filter: none;
+}
+
+/* Event list items */
+[data-theme="light"] .ev-item:hover {
+  background: rgba(0, 122, 94, 0.06);
+}
+[data-theme="light"] .ev-item.sel {
+  background: rgba(0, 122, 94, 0.08);
+  border-left-color: var(--accent);
+}
+
+/* Detail panel / drawer */
+[data-theme="light"] .dp-inner {
+  background: #F0EDE6;
+}
+[data-theme="light"] .detail-panel {
+  background: #F0EDE6;
+  border-color: rgba(0, 140, 100, 0.18);
+}
+
+/* Tooltip */
+[data-theme="light"] #tooltip,
+[data-theme="light"] .tooltip {
+  background: #1C2B38;
+  color: #E8E4DB;
+}
+
+/* Alert toast */
+[data-theme="light"] .toast {
+  background: #1C2B38;
+  color: #E8E4DB;
+}
+
+/* News Intel */
+[data-theme="light"] .news-card {
+  background: #F7F5F0;
+  border-color: rgba(0, 140, 100, 0.15);
+}
+[data-theme="light"] .news-card:hover {
+  background: #EDE9E1;
+  border-color: rgba(0, 140, 100, 0.35);
+}
+[data-theme="light"] .news-group-row,
+[data-theme="light"] .news-toolbar,
+[data-theme="light"] .news-search-row,
+[data-theme="light"] .news-source-bar {
+  background: #EAE7DF;
+  border-color: rgba(0, 140, 100, 0.15);
+}
+[data-theme="light"] .news-search-input {
+  background: #F7F5F0;
+  border-color: rgba(0, 140, 100, 0.2);
+  color: var(--text);
+}
+[data-theme="light"] .news-search-input::placeholder {
+  color: var(--dim);
+}
+[data-theme="light"] .news-topic-btn {
+  background: #E8E4DB;
+  border-color: rgba(0, 140, 100, 0.2);
+  color: #1C2B38;
+}
+[data-theme="light"] .news-topic-btn.active,
+[data-theme="light"] .news-topic-btn.india-active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(0, 122, 94, 0.07);
+}
+[data-theme="light"] .news-group-btn {
+  background: #E0DDD6;
+  color: #1C2B38;
+}
+[data-theme="light"] .news-group-btn.active,
+[data-theme="light"] .news-group-btn.active-india {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(0, 122, 94, 0.08);
+}
+[data-theme="light"] .nc-source {
+  background: rgba(0, 122, 94, 0.1);
+}
+[data-theme="light"] mark {
+  background: rgba(0, 122, 94, 0.2) !important;
+  color: var(--accent) !important;
+}
+[data-theme="light"] .news-retry-btn {
+  background: rgba(0, 122, 94, 0.1);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+[data-theme="light"] .news-retry-btn:hover {
+  background: rgba(0, 122, 94, 0.2);
+}
+[data-theme="light"] .gdelt-theme-btn {
+  background: #E0DDD6;
+  border-color: rgba(0, 140, 100, 0.2);
+  color: #1C2B38;
+}
+[data-theme="light"] .gdelt-theme-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(0, 122, 94, 0.1);
+}
+
+/* SEWA */
+[data-theme="light"] .sewa-wrap {
+  background: rgba(0, 0, 0, 0.02);
+}
+[data-theme="light"] .bob-hero {
+  background: linear-gradient(135deg, rgba(0, 122, 94, 0.06), rgba(180, 80, 0, 0.03));
+  border-color: rgba(0, 122, 94, 0.25);
+}
+[data-theme="light"] .bob-svc {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+[data-theme="light"] .bob-svc.up {
+  border-color: rgba(0, 122, 94, 0.3);
+}
+[data-theme="light"] .bob-svc.down {
+  border-color: rgba(200, 0, 26, 0.3);
+}
+[data-theme="light"] .peer-section {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 140, 100, 0.18);
+}
+[data-theme="light"] .sewa-error {
+  background: rgba(200, 0, 26, 0.04);
+  border-color: rgba(200, 0, 26, 0.2);
+}
+
+/* Cyber / InfoOps view panels */
+[data-theme="light"] .cyber-view,
+[data-theme="light"] .info-ops-view {
+  background: var(--bg);
+}
+[data-theme="light"] .cyber-header,
+[data-theme="light"] .infoops-header {
+  background: #E8E4DB;
+  border-color: rgba(0, 140, 100, 0.18);
+}
+[data-theme="light"] .cyber-filter-bar,
+[data-theme="light"] .infoops-filter-bar {
+  background: #EAE7DF;
+  border-color: rgba(0, 140, 100, 0.15);
+}
+[data-theme="light"] .cyber-filter-btn,
+[data-theme="light"] .infoops-filter-btn {
+  background: #E0DDD6;
+  border-color: rgba(0, 140, 100, 0.2);
+  color: #1C2B38;
+}
+[data-theme="light"] .cyber-filter-btn.active,
+[data-theme="light"] .infoops-filter-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(0, 122, 94, 0.08);
+}
+[data-theme="light"] .threat-card,
+[data-theme="light"] .op-card {
+  background: #F7F5F0;
+  border-color: rgba(0, 140, 100, 0.15);
+}
+[data-theme="light"] .threat-card:hover,
+[data-theme="light"] .op-card:hover {
+  background: #EDE9E1;
+  border-color: rgba(0, 140, 100, 0.3);
+}
+[data-theme="light"] .stat-box {
+  background: #F7F5F0;
+  border-color: rgba(0, 140, 100, 0.15);
+}
+
+/* Gov announcements */
+[data-theme="light"] .gov-view {
+  background: var(--bg);
+}
+[data-theme="light"] .gov-header {
+  background: #E8E4DB;
+  border-color: rgba(0, 140, 100, 0.18);
+}
+[data-theme="light"] .gov-filter-bar {
+  background: #EAE7DF;
+  border-color: rgba(0, 140, 100, 0.15);
+}
+[data-theme="light"] .gov-card {
+  background: #F7F5F0;
+  border-color: rgba(0, 140, 100, 0.15);
+}
+[data-theme="light"] .gov-card:hover {
+  background: #EDE9E1;
+  border-color: rgba(0, 140, 100, 0.3);
+}
+
+/* Vessel view */
+[data-theme="light"] .vessel-view {
+  background: var(--bg);
+}
+[data-theme="light"] .vessel-header {
+  background: #E8E4DB;
+  border-color: rgba(0, 140, 100, 0.18);
+}
+[data-theme="light"] .vessel-table-wrap {
+  background: #F7F5F0;
+  border-color: rgba(0, 140, 100, 0.15);
+}
+[data-theme="light"] .vessel-row:hover {
+  background: rgba(0, 122, 94, 0.05);
+}
+[data-theme="light"] .vessel-map-bg {
+  background: #EDE9E1;
+}
+
+/* Timeline view */
+[data-theme="light"] .timeline-view {
+  background: var(--bg);
+}
+[data-theme="light"] .timeline-header {
+  background: #E8E4DB;
+  border-color: rgba(0, 140, 100, 0.18);
+}
+[data-theme="light"] .timeline-chart-wrap,
+[data-theme="light"] .timeline-event-list {
+  background: #F7F5F0;
+  border-color: rgba(0, 140, 100, 0.15);
+}
+
+/* Theme toggle button */
+.theme-btn {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  padding: 4px 10px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--dim);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.theme-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+  background: rgba(0, 212, 160, 0.06);
+}
+[data-theme="light"] .theme-btn:hover {
+  background: rgba(0, 122, 94, 0.06);
+  color: var(--text);
+  border-color: var(--accent);
+}
