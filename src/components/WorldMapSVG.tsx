@@ -39,6 +39,7 @@ interface WorldMapSVGProps {
   hideTooltip: () => void;
   activeRegion?: string;
   onResetView?: () => void;
+  newEventIds?: Set<string>;
 }
 
 interface TopoJSONTransform {
@@ -81,6 +82,7 @@ export function WorldMapSVG({
   hideTooltip,
   activeRegion = 'globe',
   onResetView,
+  newEventIds = new Set(),
 }: WorldMapSVGProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -609,6 +611,12 @@ export function WorldMapSVG({
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
+          <style>{`
+            @keyframes mapPulse {
+              0%   { r: 4; opacity: 0.8; }
+              100% { r: 14; opacity: 0; }
+            }
+          `}</style>
         </defs>
 
         <rect x="0" y="0" width={MAP_WIDTH} height={MAP_HEIGHT} fill="#04101e" />
@@ -768,21 +776,29 @@ export function WorldMapSVG({
             const x = lonToX(eq.longitude);
             const y = latToY(eq.latitude);
             const radius = Math.max(2, eq.magnitude * 1.5);
+            const isNew = newEventIds.has(eq.id);
             return (
-              <circle
-                key={eq.id}
-                cx={x}
-                cy={y}
-                r={radius}
-                fill={`rgba(77, 159, 255, ${0.3 + eq.magnitude / 20})`}
-                stroke="#4D9FFF"
-                strokeWidth="0.8"
-                filter="url(#glow)"
-                style={{ cursor: 'pointer' }}
-                onClick={() => handleMarkerClick(eq.id, 'earthquake')}
-                onMouseEnter={(e) => handleMarkerHover(e, `M${eq.magnitude.toFixed(1)} - ${eq.location}`)}
-                onMouseLeave={hideTooltip}
-              />
+              <g key={eq.id} style={{ cursor: 'pointer' }} onClick={() => handleMarkerClick(eq.id, 'earthquake')}>
+                {isNew && (
+                  <circle
+                    cx={x} cy={y} r={radius + 4}
+                    fill="none" stroke="#4D9FFF" strokeWidth="1.2"
+                    opacity="0.7"
+                    style={{ animation: 'mapPulse 1.2s ease-out infinite' }}
+                  />
+                )}
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={radius}
+                  fill={`rgba(77, 159, 255, ${0.3 + eq.magnitude / 20})`}
+                  stroke={isNew ? '#FFFFFF' : '#4D9FFF'}
+                  strokeWidth={isNew ? 1.2 : 0.8}
+                  filter="url(#glow)"
+                  onMouseEnter={(e) => handleMarkerHover(e, `M${eq.magnitude.toFixed(1)} - ${eq.location}`)}
+                  onMouseLeave={hideTooltip}
+                />
+              </g>
             );
           })}
 
@@ -793,21 +809,23 @@ export function WorldMapSVG({
             const stableLon = ((hash * 49297 + 233) % 299) - 149;
             const x = lonToX(stableLon);
             const y = latToY(stableLat);
+            const isNew = newEventIds.has(disaster.id);
             return (
-              <circle
-                key={disaster.id}
-                cx={x}
-                cy={y}
-                r="3"
-                fill="rgba(255, 107, 0, 0.6)"
-                stroke="#FF6B00"
-                strokeWidth="0.7"
-                filter="url(#glow)"
-                style={{ cursor: 'pointer' }}
-                onClick={() => handleMarkerClick(disaster.id, 'disaster')}
-                onMouseEnter={(e) => handleMarkerHover(e, disaster.title)}
-                onMouseLeave={hideTooltip}
-              />
+              <g key={disaster.id} style={{ cursor: 'pointer' }} onClick={() => handleMarkerClick(disaster.id, 'disaster')}>
+                {isNew && (
+                  <circle cx={x} cy={y} r="7" fill="none" stroke="#FF6B00" strokeWidth="1.2" opacity="0.7"
+                    style={{ animation: 'mapPulse 1.2s ease-out infinite' }} />
+                )}
+                <circle
+                  cx={x} cy={y} r="3"
+                  fill="rgba(255, 107, 0, 0.6)"
+                  stroke={isNew ? '#FFFFFF' : '#FF6B00'}
+                  strokeWidth={isNew ? 1.2 : 0.7}
+                  filter="url(#glow)"
+                  onMouseEnter={(e) => handleMarkerHover(e, disaster.title)}
+                  onMouseLeave={hideTooltip}
+                />
+              </g>
             );
           })}
 

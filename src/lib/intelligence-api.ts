@@ -342,4 +342,41 @@ export class IntelligenceAPI {
       })
       .subscribe();
   }
+
+  static subscribeToVolcanoes(callback: (volcano: VolcanoEvent) => void) {
+    return supabase
+      .channel('volcanoes-channel')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'volcanoes',
+      }, (payload) => {
+        callback(payload.new as VolcanoEvent);
+      })
+      .subscribe();
+  }
+
+  static subscribeToGeopolitical(callback: (event: GeopoliticalEvent) => void) {
+    return supabase
+      .channel('geopolitical-channel')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'geopolitical_events',
+      }, (payload) => {
+        callback(payload.new as GeopoliticalEvent);
+      })
+      .subscribe();
+  }
+
+  static async getLastSyncTime(): Promise<string | null> {
+    const { data } = await supabase
+      .from('data_cache')
+      .select('data, updated_at')
+      .eq('cache_key', 'last_sync')
+      .maybeSingle();
+
+    if (!data) return null;
+    return (data.data as any)?.timestamp || data.updated_at || null;
+  }
 }

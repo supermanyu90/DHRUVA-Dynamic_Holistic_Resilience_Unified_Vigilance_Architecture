@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { IntelligenceAPI, Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from './lib/intelligence-api';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -13,8 +13,67 @@ import { NewsIntelView } from './components/NewsIntelView';
 import { TimelineView } from './components/TimelineView';
 import { AlertToast } from './components/AlertToast';
 import { Tooltip } from './components/Tooltip';
+import { LiveEventTicker, TickerEvent } from './components/LiveEventTicker';
 
 type ViewType = 'map' | 'timeline' | 'news' | 'sewa' | 'cyber' | 'infoops' | 'uae' | 'vessel';
+
+const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+
+function formatSyncCountdown(ms: number): string {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function toTickerEvent(
+  type: TickerEvent['type'],
+  item: Earthquake | Disaster | NewsEvent | VolcanoEvent | GeopoliticalEvent | Vessel
+): TickerEvent {
+  const now = new Date();
+  const timeStr = now.toUTCString().slice(17, 25) + 'Z';
+
+  if (type === 'earthquake') {
+    const eq = item as Earthquake;
+    return {
+      id: eq.id,
+      time: timeStr,
+      type,
+      title: `M${eq.magnitude.toFixed(1)} — ${eq.location}`,
+      severity: eq.magnitude >= 7 ? 'critical' : eq.magnitude >= 6 ? 'high' : eq.magnitude >= 5 ? 'medium' : 'low',
+    };
+  }
+  if (type === 'disaster') {
+    const d = item as Disaster;
+    return { id: d.id, time: timeStr, type, title: d.title, severity: 'high' };
+  }
+  if (type === 'news') {
+    const n = item as NewsEvent;
+    return { id: n.id, time: timeStr, type, title: n.title };
+  }
+  if (type === 'volcano') {
+    const v = item as VolcanoEvent;
+    return {
+      id: v.id,
+      time: timeStr,
+      type,
+      title: `${v.name}${v.country ? ` — ${v.country}` : ''} [${v.status?.toUpperCase()}]`,
+      severity: v.status === 'erupting' ? 'critical' : 'high',
+    };
+  }
+  if (type === 'geopolitical') {
+    const g = item as GeopoliticalEvent;
+    return {
+      id: g.id,
+      time: timeStr,
+      type,
+      title: `${g.title}${g.country ? ` — ${g.country}` : ''}`,
+      severity: g.severity,
+    };
+  }
+  const vessel = item as Vessel;
+  return { id: vessel.id, time: timeStr, type: 'vessel', title: `${vessel.name} [${vessel.type}]` };
+}
 
 function App() {
   const [earthquakes, setEarthquakes] = useState<Earthquake[]>([]);
@@ -47,13 +106,43 @@ function App() {
   const [timeFilter, setTimeFilter] = useState('24H');
   const [tooltip, setTooltip] = useState<{ x: number; y: number; content: string } | null>(null);
   const [alerts, setAlerts] = useState<Array<{ id: string; title: string; message: string }>>([]);
+  const [tickerEvents, setTickerEvents] = useState<TickerEvent[]>([]);
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+  const [nextSyncIn, setNextSyncIn] = useState<number>(AUTO_SYNC_INTERVAL_MS);
+  const [newEventIds, setNewEventIds] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    loadData();
-    setupRealtimeSubscriptions();
+  const autoSyncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const nextSyncAtRef = useRef<number>(Date.now() + AUTO_SYNC_INTERVAL_MS);
+
+  const pushTickerEvent = useCallback((evt: TickerEvent) => {
+    setTickerEvents((prev) => [evt, ...prev].slice(0, 40));
   }, []);
 
-  const loadData = async () => {
+  const markNewEvent = useCallback((id: string) => {
+    setNewEventIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    setTimeout(() => {
+      setNewEventIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }, 12000);
+  }, []);
+
+  const addAlert = useCallback((title: string, message: string) => {
+    const id = Date.now().toString();
+    setAlerts((prev) => [...prev, { id, title, message }]);
+    setTimeout(() => {
+      setAlerts((prev) => prev.filter((a) => a.id !== id));
+    }, 6000);
+  }, []);
+
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [earthquakesData, disastersData, newsData, vesselsData, volcanoesData, geopoliticalData] = await Promise.all([
@@ -70,38 +159,115 @@ function App() {
       setVessels(vesselsData);
       setVolcanoes(volcanoesData);
       setGeopolitical(geopoliticalData);
+
+      const syncTime = await IntelligenceAPI.getLastSyncTime();
+      if (syncTime) setLastSyncTime(syncTime);
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const setupRealtimeSubscriptions = () => {
+  const runAutoSync = useCallback(async () => {
+    setSyncing(true);
+    try {
+      await IntelligenceAPI.triggerDataSync();
+      nextSyncAtRef.current = Date.now() + AUTO_SYNC_INTERVAL_MS;
+      setTimeout(async () => {
+        await loadData();
+        const syncTime = await IntelligenceAPI.getLastSyncTime();
+        if (syncTime) setLastSyncTime(syncTime);
+      }, 4000);
+    } catch (error) {
+      console.error('Auto-sync error:', error);
+    } finally {
+      setSyncing(false);
+    }
+  }, [loadData]);
+
+  const setupRealtimeSubscriptions = useCallback(() => {
     IntelligenceAPI.subscribeToEarthquakes((earthquake) => {
       setEarthquakes((prev) => [earthquake, ...prev].slice(0, 50));
+      pushTickerEvent(toTickerEvent('earthquake', earthquake));
+      markNewEvent(earthquake.id);
+      if (earthquake.magnitude >= 6.5) {
+        addAlert('SEISMIC ALERT', `M${earthquake.magnitude.toFixed(1)} — ${earthquake.location}`);
+      }
     });
 
     IntelligenceAPI.subscribeToDisasters((disaster) => {
       setDisasters((prev) => [disaster, ...prev].slice(0, 50));
+      pushTickerEvent(toTickerEvent('disaster', disaster));
+      markNewEvent(disaster.id);
     });
 
     IntelligenceAPI.subscribeToNews((newsItem) => {
       setNews((prev) => [newsItem, ...prev].slice(0, 50));
+      pushTickerEvent(toTickerEvent('news', newsItem));
+      markNewEvent(newsItem.id);
     });
 
     IntelligenceAPI.subscribeToVessels((vessel) => {
       setVessels((prev) => prev.map((v) => v.mmsi === vessel.mmsi ? vessel : v));
     });
-  };
+
+    IntelligenceAPI.subscribeToVolcanoes((volcano) => {
+      setVolcanoes((prev) => {
+        const exists = prev.find((v) => v.id === volcano.id);
+        if (exists) return prev.map((v) => v.id === volcano.id ? volcano : v);
+        return [volcano, ...prev].slice(0, 50);
+      });
+      pushTickerEvent(toTickerEvent('volcano', volcano));
+      markNewEvent(volcano.id);
+      if (volcano.status === 'erupting') {
+        addAlert('VOLCANO ERUPTION', `${volcano.name}${volcano.country ? ` — ${volcano.country}` : ''}`);
+      }
+    });
+
+    IntelligenceAPI.subscribeToGeopolitical((event) => {
+      setGeopolitical((prev) => {
+        const exists = prev.find((g) => g.id === event.id);
+        if (exists) return prev.map((g) => g.id === event.id ? event : g);
+        return [event, ...prev].slice(0, 50);
+      });
+      pushTickerEvent(toTickerEvent('geopolitical', event));
+      markNewEvent(event.id);
+      if (event.severity === 'critical') {
+        addAlert('CRITICAL ALERT', `${event.title}${event.country ? ` — ${event.country}` : ''}`);
+      }
+    });
+  }, [pushTickerEvent, markNewEvent, addAlert]);
+
+  useEffect(() => {
+    loadData();
+    setupRealtimeSubscriptions();
+
+    autoSyncTimerRef.current = setInterval(() => {
+      runAutoSync();
+    }, AUTO_SYNC_INTERVAL_MS);
+
+    countdownTimerRef.current = setInterval(() => {
+      const remaining = nextSyncAtRef.current - Date.now();
+      setNextSyncIn(Math.max(0, remaining));
+    }, 1000);
+
+    return () => {
+      if (autoSyncTimerRef.current) clearInterval(autoSyncTimerRef.current);
+      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    };
+  }, []);
 
   const handleSync = async () => {
     setSyncing(true);
     try {
       await IntelligenceAPI.triggerDataSync();
-      setTimeout(() => {
-        loadData();
-      }, 3000);
+      nextSyncAtRef.current = Date.now() + AUTO_SYNC_INTERVAL_MS;
+      setTimeout(async () => {
+        await loadData();
+        const syncTime = await IntelligenceAPI.getLastSyncTime();
+        if (syncTime) setLastSyncTime(syncTime);
+      }, 4000);
     } catch (error) {
       console.error('Error syncing data:', error);
     } finally {
@@ -109,7 +275,7 @@ function App() {
     }
   };
 
-  const handleEventSelect = (id: string, type: string) => {
+  const handleEventSelect = (id: string, _type: string) => {
     setSelectedEvent(id);
   };
 
@@ -131,19 +297,12 @@ function App() {
     setTooltip(null);
   };
 
-  const addAlert = (title: string, message: string) => {
-    const id = Date.now().toString();
-    setAlerts((prev) => [...prev, { id, title, message }]);
-    setTimeout(() => {
-      setAlerts((prev) => prev.filter((a) => a.id !== id));
-    }, 5000);
-  };
-
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, []);
 
-  const criticalEvents = earthquakes.filter((e) => e.magnitude >= 6).length + disasters.filter((d) => d.category?.toLowerCase().includes('severe')).length;
+  const criticalEvents = earthquakes.filter((e) => e.magnitude >= 6).length +
+    disasters.filter((d) => d.category?.toLowerCase().includes('severe')).length;
 
   if (loading) {
     return (
@@ -198,6 +357,8 @@ function App() {
         </div>
       </div>
 
+      <LiveEventTicker events={tickerEvents} />
+
       <div className="app-body">
         <Sidebar
           earthquakes={earthquakes}
@@ -229,6 +390,7 @@ function App() {
               onTimeFilterChange={setTimeFilter}
               showTooltip={showTooltip}
               hideTooltip={hideTooltip}
+              newEventIds={newEventIds}
             />
           )}
           {currentView === 'timeline' && (
@@ -258,7 +420,7 @@ function App() {
           DATABASE: CONNECTED
         </div>
         <div>
-          <span className="sdot" style={{ background: '#00D4A0' }}></span>
+          <span className="sdot" style={{ background: '#00D4A0', animation: 'statusPulse 2s ease-in-out infinite' }}></span>
           REALTIME: ACTIVE
         </div>
         <div>
@@ -266,9 +428,15 @@ function App() {
           MODE: {mode.toUpperCase()}
         </div>
         <div>
-          <span className="sdot" style={{ background: '#4D9FFF' }}></span>
-          SYNC: {syncing ? 'IN PROGRESS' : 'IDLE'}
+          <span className="sdot" style={{ background: syncing ? '#FFB800' : '#4D9FFF' }}></span>
+          SYNC: {syncing ? 'IN PROGRESS' : `NEXT ${formatSyncCountdown(nextSyncIn)}`}
         </div>
+        {lastSyncTime && (
+          <div>
+            <span className="sdot" style={{ background: '#00D4A0' }}></span>
+            LAST SYNC: {new Date(lastSyncTime).toUTCString().slice(17, 25)}Z
+          </div>
+        )}
         <div>
           <span className="sdot" style={{ background: theme === 'dark' ? '#00D4A0' : '#007A5E' }}></span>
           THEME: {theme.toUpperCase()}

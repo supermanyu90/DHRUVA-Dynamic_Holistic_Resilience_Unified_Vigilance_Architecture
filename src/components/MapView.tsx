@@ -30,6 +30,7 @@ interface MapViewProps {
   onTimeFilterChange: (filter: string) => void;
   showTooltip: (x: number, y: number, content: string) => void;
   hideTooltip: () => void;
+  newEventIds?: Set<string>;
 }
 
 const REGION_PRESETS = [
@@ -56,6 +57,7 @@ export function MapView({
   onTimeFilterChange,
   showTooltip,
   hideTooltip,
+  newEventIds,
 }: MapViewProps) {
   const [viewMode, setViewMode] = useState<'2d' | '3d'>('2d');
   const [activeRegion, setActiveRegion] = useState('globe');
@@ -112,6 +114,7 @@ export function MapView({
             hideTooltip={hideTooltip}
             activeRegion={activeRegion}
             onResetView={handleResetView}
+            newEventIds={newEventIds}
           />
         ) : (
           <Globe3D
