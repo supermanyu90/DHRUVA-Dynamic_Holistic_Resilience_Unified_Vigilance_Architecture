@@ -36,6 +36,7 @@ Deno.serve(async (req: Request) => {
       'ingest-gov-announcements',
       'ingest-cyber-threats',
       'ingest-info-ops',
+      'ingest-geopolitical',
     ];
 
     const results = await Promise.allSettled(
