@@ -3314,6 +3314,17 @@ header,
 
 .about-link-wrap {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.about-creator-inline {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 1.2px;
+  color: var(--dim);
+  white-space: nowrap;
 }
 
 .about-link-btn {

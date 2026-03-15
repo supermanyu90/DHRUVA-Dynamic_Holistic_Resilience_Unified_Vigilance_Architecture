@@ -460,6 +460,17 @@ function App() {
           <button className="about-link-btn" onClick={() => setShowAbout(true)}>
             ABOUT DHRUVA
           </button>
+          <span className="about-creator-inline">
+            CREATED BY&nbsp;
+            <a
+              href="https://www.linkedin.com/in/abhimanyu-mathur-70643032"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="about-creator-link"
+            >
+              ABHIMANYU MATHUR
+            </a>
+          </span>
         </div>
       </div>
 
