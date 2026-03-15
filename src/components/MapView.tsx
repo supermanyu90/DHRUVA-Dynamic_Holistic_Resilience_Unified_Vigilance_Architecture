@@ -17,6 +17,7 @@ interface MapViewProps {
     military: boolean;
     nuclear: boolean;
     chokepoints: boolean;
+    daynight: boolean;
   };
   timeFilter: string;
   onTimeFilterChange: (filter: string) => void;

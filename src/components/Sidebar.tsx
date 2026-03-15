@@ -1,12 +1,5 @@
 import { Earthquake, Disaster, NewsEvent } from '../lib/intelligence-api';
 
-function getDayNight(eventTime: Date, lat: number | null, lon: number | null): 'DAY' | 'NIGHT' | null {
-  if (lat === null || lon === null) return null;
-  const utcHour = eventTime.getUTCHours() + eventTime.getUTCMinutes() / 60;
-  const localSolarHour = (utcHour + (lon / 15) + 24) % 24;
-  return localSolarHour >= 6 && localSolarHour < 18 ? 'DAY' : 'NIGHT';
-}
-
 interface SidebarProps {
   earthquakes: Earthquake[];
   disasters: Disaster[];
@@ -23,6 +16,7 @@ interface SidebarProps {
     military: boolean;
     nuclear: boolean;
     chokepoints: boolean;
+    daynight: boolean;
   };
   onLayerToggle: (layer: keyof SidebarProps['layersEnabled']) => void;
 }
@@ -122,6 +116,14 @@ export function Sidebar({
           <span className="ldot" style={{ background: '#FF6B00' }}></span>
           CHOKES
         </button>
+        <button
+          className={`lbtn ${layersEnabled.daynight ? 'active' : ''}`}
+          onClick={() => onLayerToggle('daynight')}
+          style={{ borderColor: '#A0C8FF', color: '#A0C8FF' }}
+        >
+          <span className="ldot" style={{ background: '#A0C8FF' }}></span>
+          DAY/NIGHT
+        </button>
       </div>
 
       <div className="mode-bar">
@@ -151,9 +153,6 @@ export function Sidebar({
                 : new Date(event.published_at);
             const isEarthquake = event.type === 'earthquake';
             const isDisaster = event.type === 'disaster';
-            const lat = isEarthquake ? (event as any).latitude : null;
-            const lon = isEarthquake ? (event as any).longitude : null;
-            const dayNight = getDayNight(eventTime, lat, lon);
 
             return (
               <div
@@ -165,22 +164,8 @@ export function Sidebar({
                   {event.icon}
                 </div>
                 <div className="ev-info">
-                  <div className="ev-tp" style={{ color: event.color, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div className="ev-tp" style={{ color: event.color }}>
                     {event.type.toUpperCase()}
-                    {dayNight && (
-                      <span style={{
-                        fontSize: '9px',
-                        padding: '1px 5px',
-                        borderRadius: '3px',
-                        fontFamily: 'Share Tech Mono, monospace',
-                        letterSpacing: '0.05em',
-                        background: dayNight === 'DAY' ? 'rgba(255,184,0,0.15)' : 'rgba(77,159,255,0.15)',
-                        color: dayNight === 'DAY' ? '#FFB800' : '#4D9FFF',
-                        border: `1px solid ${dayNight === 'DAY' ? 'rgba(255,184,0,0.35)' : 'rgba(77,159,255,0.35)'}`,
-                      }}>
-                        {dayNight === 'DAY' ? '☀ DAY' : '☾ NIGHT'}
-                      </span>
-                    )}
                   </div>
                   <div className="ev-nm">
                     {isEarthquake

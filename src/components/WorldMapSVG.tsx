@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { Earthquake, Disaster, NewsEvent } from '../lib/intelligence-api';
 import { UNDERSEA_CABLES } from '../lib/cable-data';
 
@@ -15,6 +15,7 @@ interface WorldMapSVGProps {
     military: boolean;
     nuclear: boolean;
     chokepoints: boolean;
+    daynight: boolean;
   };
   showTooltip: (x: number, y: number, content: string) => void;
   hideTooltip: () => void;
@@ -153,6 +154,34 @@ export function WorldMapSVG({
     { name: 'Cernavoda NPP', lat: 44.32, lon: 28.06, country: 'RO', type: 'Romania NPP', status: 'ACTIVE' },
     { name: 'Mongu / Karachi KANUPP', lat: 24.85, lon: 67.10, country: 'PK', type: 'Pakistan KANUPP', status: 'ACTIVE' },
   ];
+
+  const dayNightPaths = useMemo(() => {
+    const now = new Date();
+    const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86400000);
+    const declination = -23.45 * Math.cos((2 * Math.PI / 365) * (dayOfYear + 10)) * (Math.PI / 180);
+    const utcHour = now.getUTCHours() + now.getUTCMinutes() / 60 + now.getUTCSeconds() / 3600;
+    const sunLon = -((utcHour / 24) * 360 - 180);
+
+    const terminatorPoints: Array<[number, number]> = [];
+    for (let lon = -180; lon <= 180; lon += 1) {
+      const lonRad = ((lon - sunLon + 540) % 360 - 180) * (Math.PI / 180);
+      const lat = Math.atan(-Math.cos(lonRad) / Math.tan(declination)) * (180 / Math.PI);
+      terminatorPoints.push([lon, lat]);
+    }
+
+    const nightPolePath = (() => {
+      const pts = terminatorPoints.map(([lon, lat]) => `${lonToX(lon).toFixed(1)},${latToY(lat).toFixed(1)}`);
+      const nightTop = declination > 0;
+      const capY = nightTop ? latToY(90) : latToY(-90);
+      return `M${pts.join('L')}L${lonToX(180).toFixed(1)},${capY}L${lonToX(-180).toFixed(1)},${capY}Z`;
+    })();
+
+    const terminatorLinePts = terminatorPoints
+      .map(([lon, lat]) => `${lonToX(lon).toFixed(1)},${latToY(lat).toFixed(1)}`)
+      .join('L');
+
+    return { nightPath: nightPolePath, terminatorLine: `M${terminatorLinePts}` };
+  }, []);
 
   useEffect(() => {
     const loadWorldMap = async () => {
@@ -393,6 +422,25 @@ export function WorldMapSVG({
         </defs>
 
         <rect x="0" y="0" width={MAP_WIDTH} height={MAP_HEIGHT} fill="#04101e" />
+
+        {layersEnabled.daynight && (
+          <g className="daynight-layer">
+            <path
+              d={dayNightPaths.nightPath}
+              fill="rgba(0,10,40,0.55)"
+              stroke="none"
+              pointerEvents="none"
+            />
+            <path
+              d={dayNightPaths.terminatorLine}
+              fill="none"
+              stroke="rgba(160,200,255,0.6)"
+              strokeWidth="0.7"
+              strokeDasharray="4,3"
+              pointerEvents="none"
+            />
+          </g>
+        )}
 
         <g className="graticule">
           {Array.from({ length: 9 }, (_, i) => {

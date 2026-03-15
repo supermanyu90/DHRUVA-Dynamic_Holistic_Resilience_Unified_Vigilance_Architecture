@@ -33,6 +33,7 @@ function App() {
     military: false,
     nuclear: false,
     chokepoints: false,
+    daynight: false,
   });
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [timeFilter, setTimeFilter] = useState('24H');
