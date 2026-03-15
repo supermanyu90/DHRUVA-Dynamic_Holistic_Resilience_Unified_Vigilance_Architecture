@@ -1394,6 +1394,134 @@ header,
   padding: 4px 0 0;
 }
 
+/* SEWA Matrix & Extended Classes */
+.sewa-error {
+  background: rgba(255, 76, 76, 0.06);
+  border: 1px solid rgba(255, 76, 76, 0.2);
+  border-radius: 3px;
+  padding: 12px 14px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8px;
+  color: #ff8888;
+  line-height: 1.7;
+}
+
+.sewa-section-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 13px;
+  letter-spacing: 3px;
+  color: var(--text);
+  padding: 10px 2px 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sewa-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 7.5px;
+}
+
+.sewa-matrix th {
+  padding: 5px 8px;
+  text-align: left;
+  letter-spacing: 1.5px;
+  color: var(--dim);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  font-weight: normal;
+}
+
+.sewa-matrix th.svc-head {
+  text-align: center;
+  font-size: 7px;
+}
+
+.sewa-matrix td {
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+}
+
+.sewa-matrix tr.bob-row td {
+  background: rgba(255, 184, 0, 0.04);
+}
+
+.sewa-matrix tr:hover td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.rank-cell {
+  text-align: center;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 13px;
+  color: var(--dim);
+  width: 24px;
+}
+
+.bank-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bank-name-txt {
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  color: var(--text);
+}
+
+.bank-name-txt.bob {
+  color: #ffb800;
+  font-size: 8.5px;
+}
+
+.cat-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.svc-cell {
+  text-align: center;
+  min-width: 52px;
+}
+
+.svc-pct {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  display: block;
+}
+
+.svc-bar-mini {
+  height: 2px;
+  border-radius: 1px;
+  margin: 1px auto 0;
+  background: rgba(255, 255, 255, 0.08);
+  width: 38px;
+  overflow: hidden;
+}
+
+.svc-bar-fill {
+  height: 100%;
+  border-radius: 1px;
+}
+
+.avg-cell {
+  text-align: center;
+  min-width: 52px;
+}
+
+.avg-pct {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+}
+
 /* Cyber Watch Styles */
 .cyber-wrap {
   display: flex;
