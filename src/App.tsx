@@ -10,6 +10,7 @@ import { InfoOpsView } from './components/InfoOpsView';
 import { UaeView } from './components/UaeView';
 import { VesselView } from './components/VesselView';
 import { NewsIntelView } from './components/NewsIntelView';
+import { TimelineView } from './components/TimelineView';
 import { AlertToast } from './components/AlertToast';
 import { Tooltip } from './components/Tooltip';
 
@@ -241,11 +242,14 @@ function App() {
             </div>
           )}
           {currentView === 'timeline' && (
-            <div className="view active">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--dim)' }}>
-                TIMELINE VIEW (Coming Soon)
-              </div>
-            </div>
+            <TimelineView
+              earthquakes={earthquakes}
+              disasters={disasters}
+              news={news}
+              vessels={vessels}
+              volcanoes={volcanoes}
+              geopolitical={geopolitical}
+            />
           )}
           {currentView === 'news' && <NewsIntelView />}
           {currentView === 'sewa' && <SewaView />}
