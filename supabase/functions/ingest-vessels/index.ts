@@ -7,6 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+// VesselFinder AIS type code to label mapping
 const AIS_SHIP_TYPES: Record<number, string> = {
   20: "Wing in Ground", 21: "Wing in Ground", 22: "Wing in Ground",
   30: "Fishing", 31: "Towing", 32: "Towing", 33: "Dredger",
@@ -20,7 +21,7 @@ const AIS_SHIP_TYPES: Record<number, string> = {
   90: "Other", 91: "Other", 92: "Other", 93: "Other", 94: "Other", 95: "Other", 96: "Other", 97: "Other", 98: "Other", 99: "Other",
 };
 
-// Fallback seed data used when aisstream.io API key is not configured
+// Fallback seed data used when no API key is configured
 const SEED_VESSELS = [
   { mmsi: "211456780", name: "NORDIC CROWN", type: "Tanker", lat: 51.95, lon: 4.13, speed: 8.2, course: 270, flag: "DE", destination: "ROTTERDAM" },
   { mmsi: "477123456", name: "COSCO SHIPPING ARIES", type: "Cargo", lat: 22.28, lon: 114.18, speed: 12.1, course: 180, flag: "CN", destination: "SINGAPORE" },
@@ -59,71 +60,112 @@ const SEED_VESSELS = [
   { mmsi: "376001234", name: "TRINIDAD STAR", type: "Tanker", lat: 10.6, lon: -61.5, speed: 9.0, course: 270, flag: "TT", destination: "PORT OF SPAIN" },
 ];
 
-async function ingestFromAISStream(supabase: ReturnType<typeof createClient>, apiKey: string): Promise<number> {
-  return new Promise((resolve) => {
-    const WebSocket = (globalThis as any).WebSocket;
-    if (!WebSocket) {
-      resolve(0);
-      return;
-    }
+// MMSIs used to seed VesselFinder on-demand queries
+const SEED_MMSI_LIST = SEED_VESSELS.map(v => v.mmsi).join(",");
 
-    const ws = new WebSocket("wss://stream.aisstream.io/v0/stream");
-    const vessels: any[] = [];
-    let timeout: ReturnType<typeof setTimeout>;
+interface VesselFinderAIS {
+  MMSI: number;
+  TIMESTAMP: string;
+  LATITUDE: number;
+  LONGITUDE: number;
+  COURSE: number;
+  SPEED: number;
+  HEADING: number;
+  NAVSTAT?: number;
+  IMO?: number;
+  NAME?: string;
+  CALLSIGN?: string;
+  TYPE?: number;
+  A?: number; B?: number; C?: number; D?: number;
+  DRAUGHT?: number;
+  DESTINATION?: string;
+  LOCODE?: string;
+  ETA_AIS?: string;
+  SRC?: string;
+  ZONE?: string;
+}
 
-    ws.onopen = () => {
-      ws.send(JSON.stringify({
-        Apikey: apiKey,
-        BoundingBoxes: [
-          [[-90, -180], [90, 180]]
-        ],
-        FilterMessageTypes: ["PositionReport", "ShipStaticData"],
-      }));
-      timeout = setTimeout(async () => {
-        ws.close();
-        let count = 0;
-        for (const v of vessels.slice(0, 100)) {
-          const { error } = await supabase.from("vessels").upsert(v, { onConflict: "mmsi" });
-          if (!error) count++;
-        }
-        resolve(count);
-      }, 10000);
+interface VesselFinderMaster {
+  FLAG?: string;
+  GT?: number;
+  DWT?: number;
+  LENGTH?: number;
+  BEAM?: number;
+  YEAR_BUILT?: number;
+  TYPE_NAME?: string;
+}
+
+interface VesselFinderRecord {
+  AIS: VesselFinderAIS;
+  MASTERDATA?: VesselFinderMaster;
+}
+
+async function ingestFromVesselFinder(
+  supabase: ReturnType<typeof createClient>,
+  apiKey: string
+): Promise<{ count: number; error?: string }> {
+  const url = new URL("https://api.vesselfinder.com/vessels");
+  url.searchParams.set("userkey", apiKey);
+  url.searchParams.set("mmsi", SEED_MMSI_LIST);
+  url.searchParams.set("extradata", "master");
+  url.searchParams.set("format", "json");
+
+  const res = await fetch(url.toString());
+
+  if (!res.ok) {
+    const body = await res.text();
+    return { count: 0, error: `VesselFinder API error ${res.status}: ${body}` };
+  }
+
+  const records: VesselFinderRecord[] = await res.json();
+
+  if (!Array.isArray(records) || records.length === 0) {
+    return { count: 0, error: "VesselFinder returned empty or invalid response" };
+  }
+
+  let count = 0;
+  for (const record of records) {
+    const ais = record.AIS;
+    const master = record.MASTERDATA;
+    if (!ais?.MMSI) continue;
+
+    const vessel = {
+      mmsi: String(ais.MMSI),
+      name: ais.NAME?.trim() || `VESSEL-${ais.MMSI}`,
+      type: AIS_SHIP_TYPES[ais.TYPE ?? 0] || master?.TYPE_NAME || "Unknown",
+      latitude: ais.LATITUDE,
+      longitude: ais.LONGITUDE,
+      speed: ais.SPEED ?? 0,
+      course: ais.COURSE ?? 0,
+      heading: ais.HEADING ?? ais.COURSE ?? 0,
+      destination: ais.DESTINATION?.trim() || "",
+      flag: master?.FLAG || "",
+      last_position_time: ais.TIMESTAMP
+        ? new Date(ais.TIMESTAMP).toISOString()
+        : new Date().toISOString(),
+      properties: {
+        source: "vesselfinder",
+        imo: ais.IMO,
+        callsign: ais.CALLSIGN,
+        navstat: ais.NAVSTAT,
+        draught: ais.DRAUGHT,
+        locode: ais.LOCODE,
+        eta: ais.ETA_AIS,
+        zone: ais.ZONE,
+        length: master?.LENGTH,
+        beam: master?.BEAM,
+        gt: master?.GT,
+        dwt: master?.DWT,
+        year_built: master?.YEAR_BUILT,
+      },
+      updated_at: new Date().toISOString(),
     };
 
-    ws.onmessage = (event: any) => {
-      try {
-        const msg = JSON.parse(event.data);
-        const meta = msg.MetaData;
-        if (!meta) return;
+    const { error } = await supabase.from("vessels").upsert(vessel, { onConflict: "mmsi" });
+    if (!error) count++;
+  }
 
-        const pos = msg.Message?.PositionReport;
-        const stat = msg.Message?.ShipStaticData;
-
-        if (pos && meta.MMSI) {
-          vessels.push({
-            mmsi: String(meta.MMSI),
-            name: meta.ShipName?.trim() || `VESSEL-${meta.MMSI}`,
-            type: AIS_SHIP_TYPES[stat?.Type ?? 0] || "Unknown",
-            latitude: pos.Latitude,
-            longitude: pos.Longitude,
-            speed: pos.Sog || 0,
-            course: pos.Cog || 0,
-            heading: pos.TrueHeading || pos.Cog || 0,
-            destination: stat?.Destination?.trim() || "",
-            flag: "",
-            last_position_time: meta.time_utc || new Date().toISOString(),
-            properties: { source: "aisstream.io", navstat: pos.NavigationalStatus },
-            updated_at: new Date().toISOString(),
-          });
-        }
-      } catch (_) {}
-    };
-
-    ws.onerror = () => {
-      clearTimeout(timeout);
-      resolve(0);
-    };
-  });
+  return { count };
 }
 
 Deno.serve(async (req: Request) => {
@@ -139,13 +181,16 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const aisApiKey = Deno.env.get("AISSTREAM_API_KEY") || "";
+    const vesselApiKey = Deno.env.get("VESSEL_API_KEY") || "";
     let insertCount = 0;
     let source = "seed";
+    let apiError: string | undefined;
 
-    if (aisApiKey) {
-      source = "aisstream.io";
-      insertCount = await ingestFromAISStream(supabase, aisApiKey);
+    if (vesselApiKey) {
+      source = "vesselfinder";
+      const result = await ingestFromVesselFinder(supabase, vesselApiKey);
+      insertCount = result.count;
+      apiError = result.error;
     }
 
     if (insertCount === 0) {
@@ -176,10 +221,15 @@ Deno.serve(async (req: Request) => {
     }
 
     const responseTime = Date.now() - startTime;
-    await supabase.from("api_logs").insert({ endpoint: "/ingest-vessels", method: "POST", status_code: 200, response_time_ms: responseTime });
+    await supabase.from("api_logs").insert({
+      endpoint: "/ingest-vessels",
+      method: "POST",
+      status_code: 200,
+      response_time_ms: responseTime,
+    });
 
     return new Response(
-      JSON.stringify({ success: true, count: insertCount, source, responseTime }),
+      JSON.stringify({ success: true, count: insertCount, source, apiError, responseTime }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {

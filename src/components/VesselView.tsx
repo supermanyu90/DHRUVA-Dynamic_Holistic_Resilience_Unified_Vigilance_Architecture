@@ -315,8 +315,8 @@ export function VesselView() {
 
           <div style={{ marginTop: 8, padding: '6px 10px', background: 'rgba(0,191,255,0.04)', border: '1px solid rgba(0,191,255,0.1)', fontSize: 9, fontFamily: 'Share Tech Mono', color: 'rgba(0,191,255,0.4)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <Satellite size={9} />
-            For live global AIS feed, set your free <span style={{ color: '#00BFFF' }}>aisstream.io</span> API key as the AISSTREAM_API_KEY secret.
-            Currently showing {vessels.length} vessels from AIS data.
+            For live AIS data, set your <span style={{ color: '#00BFFF' }}>VesselFinder</span> API key as the VESSEL_API_KEY secret. MMSI searches will return live positions + master data.
+            Currently showing {vessels.length} tracked vessels.
           </div>
         </div>
       )}
