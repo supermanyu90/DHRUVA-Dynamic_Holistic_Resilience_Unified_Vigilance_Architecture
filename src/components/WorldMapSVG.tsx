@@ -76,22 +76,82 @@ export function WorldMapSVG({
   };
 
   const chokepoints = [
-    { name: 'Strait of Hormuz', lat: 26.5, lon: 56.25 },
-    { name: 'Suez Canal', lat: 30.5, lon: 32.35 },
-    { name: 'Strait of Malacca', lat: 2.5, lon: 101.25 },
-    { name: 'Bab el-Mandeb', lat: 12.5, lon: 43.3 },
-    { name: 'Panama Canal', lat: 9, lon: -79.5 },
+    { name: 'Strait of Hormuz', lat: 26.5, lon: 56.5, type: 'energy', desc: '20% of world oil supply' },
+    { name: 'Suez Canal', lat: 30.5, lon: 32.5, type: 'trade', desc: '~15% of global trade' },
+    { name: 'Malacca Strait', lat: 1.3, lon: 103.8, type: 'trade', desc: '25% of global trade' },
+    { name: 'Bab el-Mandeb', lat: 12.6, lon: 43.3, type: 'energy', desc: 'Red Sea access — Houthi attacks disrupted shipping since Nov 2023' },
+    { name: 'Panama Canal', lat: 9.1, lon: -79.9, type: 'trade', desc: 'Connects Atlantic-Pacific' },
+    { name: 'Turkish Straits', lat: 41.1, lon: 29.1, type: 'trade', desc: 'Black Sea gateway' },
+    { name: 'Strait of Gibraltar', lat: 36.0, lon: -5.4, type: 'trade', desc: 'Mediterranean gateway' },
+    { name: 'Danish Straits', lat: 56.0, lon: 12.0, type: 'energy', desc: 'Baltic Sea access' },
+    { name: 'Lombok Strait', lat: -8.8, lon: 115.7, type: 'trade', desc: 'Pacific-Indian alt route' },
+    { name: 'Cape of Good Hope', lat: -34.4, lon: 18.5, type: 'trade', desc: 'Africa bypass route' },
+    { name: 'Strait of Taiwan', lat: 24.5, lon: 120.5, type: 'strategic', desc: 'China-Pacific flashpoint' },
+    { name: 'Hormuz-India Route', lat: 19.0, lon: 65.0, type: 'energy', desc: 'India energy supply line' },
   ];
 
   const militaryBases = [
-    { name: 'Diego Garcia', lat: -7.3, lon: 72.4 },
-    { name: 'Guam', lat: 13.4, lon: 144.8 },
-    { name: 'Djibouti', lat: 11.6, lon: 43.1 },
+    { name: 'Pentagon / Andrews AFB', lat: 38.87, lon: -77.06, country: 'US', type: 'USAF/Army CMD HQ' },
+    { name: 'Ramstein AB', lat: 49.44, lon: 7.60, country: 'DE', type: 'USAF Europe HQ' },
+    { name: 'Camp Humphreys', lat: 36.96, lon: 126.97, country: 'KR', type: 'US Army Korea' },
+    { name: 'Kadena AB', lat: 26.36, lon: 127.77, country: 'JP', type: 'USAF Pacific Hub' },
+    { name: 'Diego Garcia', lat: -7.31, lon: 72.41, country: 'IO', type: 'US-UK Joint Base' },
+    { name: 'Al Udeid AB', lat: 25.12, lon: 51.31, country: 'QA', type: 'USCENTCOM Forward' },
+    { name: 'Ali Al Salem AB', lat: 29.34, lon: 47.52, country: 'KW', type: 'USAF Kuwait' },
+    { name: 'Guantanamo Bay NAS', lat: 19.90, lon: -75.13, country: 'CU', type: 'US Naval Station' },
+    { name: 'Yokosuka Naval Base', lat: 35.29, lon: 139.67, country: 'JP', type: 'US 7th Fleet HQ' },
+    { name: 'Andersen AFB — Guam', lat: 13.58, lon: 144.93, country: 'GU', type: 'USAF Pacific Strike' },
+    { name: 'RAAF Tindal', lat: -14.52, lon: 132.38, country: 'AU', type: 'Australia RAAF' },
+    { name: 'Pine Gap', lat: -23.80, lon: 133.74, country: 'AU', type: 'US-AU SIGINT' },
+    { name: 'Futenma/Henoko, Okinawa', lat: 26.28, lon: 127.75, country: 'JP', type: 'USMC Pacific' },
+    { name: 'Camp Lemonnier', lat: 11.55, lon: 43.16, country: 'DJ', type: 'US AFRICOM FWD' },
+    { name: 'Manda Bay, Kenya', lat: -2.26, lon: 41.20, country: 'KE', type: 'US Africa Ops' },
+    { name: 'Severomorsk Naval Base', lat: 69.07, lon: 33.42, country: 'RU', type: 'Russia Northern Fleet' },
+    { name: 'Hmeimim AB, Syria', lat: 35.40, lon: 35.95, country: 'SY', type: 'Russia Syria Ops' },
+    { name: 'Tartus Naval Facility', lat: 34.89, lon: 35.87, country: 'SY', type: 'Russia Naval Med' },
+    { name: 'Engels-2 AB', lat: 51.14, lon: 46.17, country: 'RU', type: 'Russia Strategic Bombers' },
+    { name: 'Sanya Naval Base', lat: 18.22, lon: 109.51, country: 'CN', type: 'PLAN South Sea' },
+    { name: 'PLA Djibouti Base', lat: 11.56, lon: 43.14, country: 'DJ', type: 'China Overseas Base' },
+    { name: 'Yulin Naval Base', lat: 18.22, lon: 109.75, country: 'CN', type: 'PLAN SSBN Base' },
+    { name: 'INS Kadamba, Karwar', lat: 14.82, lon: 74.14, country: 'IN', type: 'India Navy West CMD' },
+    { name: 'Andaman CMD, Port Blair', lat: 11.62, lon: 92.72, country: 'IN', type: 'India Andaman CMD' },
+    { name: 'RAF Akrotiri, Cyprus', lat: 34.59, lon: 32.99, country: 'CY', type: 'UK RAF East Med' },
+    { name: 'SHAPE — Mons', lat: 50.45, lon: 3.84, country: 'BE', type: 'NATO Supreme HQ' },
+    { name: 'Mihail Kogalniceanu AB', lat: 44.36, lon: 28.49, country: 'RO', type: 'NATO Eastern Flank' },
+    { name: 'Ain Al-Asad AB, Iraq', lat: 33.79, lon: 42.44, country: 'IQ', type: 'Coalition Iraq FWD' },
+    { name: 'Incirlik AB, Turkey', lat: 37.00, lon: 35.43, country: 'TR', type: 'NATO Turkey Hub' },
+    { name: 'Kings Bay SSBN Base', lat: 30.80, lon: -81.55, country: 'US', type: 'US Trident SSBN East' },
   ];
 
   const nuclearSites = [
-    { name: 'Pokhran', lat: 27.1, lon: 71.7 },
-    { name: 'Los Alamos', lat: 35.9, lon: -106.3 },
+    { name: 'Zaporizhzhia NPP', lat: 47.51, lon: 34.59, country: 'UA', type: 'NPP — Warzone Risk', status: 'OCCUPIED' },
+    { name: 'Bushehr NPP', lat: 28.83, lon: 50.91, country: 'IR', type: 'NPP — Iran', status: 'ACTIVE' },
+    { name: 'Kudankulam NPP', lat: 8.17, lon: 77.71, country: 'IN', type: 'NPP Tamil Nadu', status: 'ACTIVE' },
+    { name: 'Tarapur BARC', lat: 19.83, lon: 72.72, country: 'IN', type: 'BARC Research Reactor', status: 'ACTIVE' },
+    { name: 'Yongbyon Complex', lat: 39.79, lon: 125.75, country: 'KP', type: 'DPRK Weapons Program', status: 'ACTIVE' },
+    { name: 'Dimona Nuclear Centre', lat: 30.97, lon: 35.15, country: 'IL', type: 'Israel Weapons (est)', status: 'UNDECLARED' },
+    { name: 'Natanz Enrichment', lat: 33.72, lon: 51.73, country: 'IR', type: 'Iran Enrichment', status: 'STRUCK' },
+    { name: 'Fordow (Qom) Enrichment', lat: 34.88, lon: 49.14, country: 'IR', type: 'Iran Underground', status: 'STRUCK' },
+    { name: 'Kola NPP', lat: 67.46, lon: 32.50, country: 'RU', type: 'Russia Arctic NPP', status: 'ACTIVE' },
+    { name: 'Leningrad NPP', lat: 59.87, lon: 29.08, country: 'RU', type: 'Russia NPP', status: 'ACTIVE' },
+    { name: 'Tianwan NPP', lat: 34.69, lon: 119.46, country: 'CN', type: 'China NPP (RU-built)', status: 'ACTIVE' },
+    { name: 'Changjiang NPP, Hainan', lat: 19.49, lon: 108.73, country: 'CN', type: 'China NPP', status: 'ACTIVE' },
+    { name: 'Bangor SSBN Base', lat: 47.73, lon: -122.70, country: 'US', type: 'US Trident SSBN Pacific', status: 'ACTIVE' },
+    { name: 'Kings Bay SSBN Base', lat: 30.80, lon: -81.55, country: 'US', type: 'US Trident SSBN Atlantic', status: 'ACTIVE' },
+    { name: 'Faslane SSBN Base', lat: 56.07, lon: -4.77, country: 'GB', type: 'UK Trident SSBN', status: 'ACTIVE' },
+    { name: 'Île Longue SSBN Base', lat: 48.35, lon: -4.56, country: 'FR', type: 'France SSBN Base', status: 'ACTIVE' },
+    { name: 'Gadzhiyevo SSBN Base', lat: 69.25, lon: 33.52, country: 'RU', type: 'Russia SSBN Northern', status: 'ACTIVE' },
+    { name: 'Rybachiy SSBN Base', lat: 52.99, lon: 158.68, country: 'RU', type: 'Russia Pacific SSBN', status: 'ACTIVE' },
+    { name: 'Yulin SSBN Base', lat: 18.22, lon: 109.75, country: 'CN', type: 'China SSBN Base', status: 'ACTIVE' },
+    { name: 'Sellafield Complex', lat: 54.42, lon: -3.50, country: 'GB', type: 'UK Reprocessing', status: 'ACTIVE' },
+    { name: 'La Hague Reprocessing', lat: 49.68, lon: -1.88, country: 'FR', type: 'France Reprocessing', status: 'ACTIVE' },
+    { name: 'Kalpakkam PFBR', lat: 12.55, lon: 80.17, country: 'IN', type: 'India Fast Breeder', status: 'COMMISSIONING' },
+    { name: 'Chashma NPP', lat: 32.39, lon: 71.46, country: 'PK', type: 'Pakistan NPP', status: 'ACTIVE' },
+    { name: 'Khushab Plutonium', lat: 32.06, lon: 72.20, country: 'PK', type: 'Pakistan Weapons Fac', status: 'ACTIVE' },
+    { name: 'Parchin Military Complex', lat: 35.52, lon: 51.77, country: 'IR', type: 'Iran Weapons (suspected)', status: 'SUSPECTED' },
+    { name: 'Ulchin NPP', lat: 37.09, lon: 129.38, country: 'KR', type: 'South Korea NPP', status: 'ACTIVE' },
+    { name: 'Cernavoda NPP', lat: 44.32, lon: 28.06, country: 'RO', type: 'Romania NPP', status: 'ACTIVE' },
+    { name: 'Mongu / Karachi KANUPP', lat: 24.85, lon: 67.10, country: 'PK', type: 'Pakistan KANUPP', status: 'ACTIVE' },
   ];
 
   useEffect(() => {
@@ -402,19 +462,21 @@ export function WorldMapSVG({
           chokepoints.map((point) => {
             const x = lonToX(point.lon);
             const y = latToY(point.lat);
+            const color = point.type === 'strategic' ? '#FF2255' : point.type === 'energy' ? '#FFB800' : '#FF6B00';
             return (
-              <g key={point.name}>
+              <g key={point.name} style={{ cursor: 'pointer' }}>
+                <circle cx={x} cy={y} r="5" fill={color} opacity="0.12" />
                 <circle
                   cx={x}
                   cy={y}
-                  r="3"
-                  fill="#FF6B00"
-                  opacity="0.7"
+                  r="2.5"
+                  fill={color}
+                  opacity="0.85"
                   filter="url(#glow)"
-                  onMouseEnter={(e) => handleMarkerHover(e, point.name)}
+                  onMouseEnter={(e) => handleMarkerHover(e, `${point.name} — ${point.desc}`)}
                   onMouseLeave={hideTooltip}
                 />
-                <text x={x + 5} y={y + 2} fill="#FF6B00" fontSize="4" fontFamily="Share Tech Mono">
+                <text x={x + 4} y={y + 1.5} fill={color} fontSize="3.5" fontFamily="Share Tech Mono" opacity="0.9" pointerEvents="none">
                   {point.name.toUpperCase()}
                 </text>
               </g>
@@ -426,18 +488,19 @@ export function WorldMapSVG({
             const x = lonToX(base.lon);
             const y = latToY(base.lat);
             return (
-              <rect
-                key={base.name}
-                x={x - 2.5}
-                y={y - 2.5}
-                width="5"
-                height="5"
-                fill="#4A9EFF"
-                opacity="0.8"
-                filter="url(#glow)"
-                onMouseEnter={(e) => handleMarkerHover(e, base.name)}
-                onMouseLeave={hideTooltip}
-              />
+              <g key={base.name} style={{ cursor: 'pointer' }}>
+                <rect
+                  x={x - 3}
+                  y={y - 3}
+                  width="6"
+                  height="6"
+                  fill="#4A9EFF"
+                  opacity="0.8"
+                  filter="url(#glow)"
+                  onMouseEnter={(e) => handleMarkerHover(e, `[${base.country}] ${base.name} — ${base.type}`)}
+                  onMouseLeave={hideTooltip}
+                />
+              </g>
             );
           })}
 
@@ -445,18 +508,20 @@ export function WorldMapSVG({
           nuclearSites.map((site) => {
             const x = lonToX(site.lon);
             const y = latToY(site.lat);
+            const color = site.status === 'STRUCK' ? '#FF2255' : site.status === 'OCCUPIED' ? '#FF6B00' : site.status === 'UNDECLARED' ? '#FFB800' : site.status === 'SUSPECTED' ? '#FFB800' : '#39FF88';
             return (
-              <polygon
-                key={site.name}
-                points={`${x},${y - 3} ${x - 2.5},${y + 2} ${x + 2.5},${y + 2}`}
-                fill="rgba(57, 255, 136, 0.3)"
-                stroke="#39FF88"
-                strokeWidth="1"
-                opacity="0.8"
-                filter="url(#glow)"
-                onMouseEnter={(e) => handleMarkerHover(e, site.name)}
-                onMouseLeave={hideTooltip}
-              />
+              <g key={site.name} style={{ cursor: 'pointer' }}>
+                <polygon
+                  points={`${x},${y - 4} ${x - 3.5},${y + 2.5} ${x + 3.5},${y + 2.5}`}
+                  fill={`${color}30`}
+                  stroke={color}
+                  strokeWidth="0.8"
+                  opacity="0.9"
+                  filter="url(#glow)"
+                  onMouseEnter={(e) => handleMarkerHover(e, `[${site.status}] ${site.name} — ${site.type}`)}
+                  onMouseLeave={hideTooltip}
+                />
+              </g>
             );
           })}
 
