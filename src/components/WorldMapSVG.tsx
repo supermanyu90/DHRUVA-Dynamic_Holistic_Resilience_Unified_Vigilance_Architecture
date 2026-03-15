@@ -38,6 +38,7 @@ interface WorldMapSVGProps {
   showTooltip: (x: number, y: number, content: string) => void;
   hideTooltip: () => void;
   activeRegion?: string;
+  onResetView?: () => void;
 }
 
 interface TopoJSONTransform {
@@ -79,6 +80,7 @@ export function WorldMapSVG({
   showTooltip,
   hideTooltip,
   activeRegion = 'globe',
+  onResetView,
 }: WorldMapSVGProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -416,6 +418,49 @@ export function WorldMapSVG({
     setIsPanning(false);
   };
 
+  const handleZoomIn = () => {
+    setViewBox((prev) => {
+      const factor = 0.75;
+      const newWidth = Math.max(100, prev.width * factor);
+      const newHeight = Math.max(50, prev.height * factor);
+      return {
+        x: prev.x + (prev.width - newWidth) * 0.5,
+        y: prev.y + (prev.height - newHeight) * 0.5,
+        width: newWidth,
+        height: newHeight,
+      };
+    });
+  };
+
+  const handleZoomOut = () => {
+    setViewBox((prev) => {
+      const factor = 1.33;
+      const newWidth = Math.min(2000, prev.width * factor);
+      const newHeight = Math.min(1000, prev.height * factor);
+      return {
+        x: prev.x + (prev.width - newWidth) * 0.5,
+        y: prev.y + (prev.height - newHeight) * 0.5,
+        width: newWidth,
+        height: newHeight,
+      };
+    });
+  };
+
+  const handleResetView = () => {
+    const region = REGIONS['globe'];
+    const scaledWidth = MAP_WIDTH / region.scale;
+    const scaledHeight = MAP_HEIGHT / region.scale;
+    const centerX = lonToX(region.cx);
+    const centerY = latToY(region.cy);
+    setViewBox({
+      x: centerX - scaledWidth / 2,
+      y: centerY - scaledHeight / 2,
+      width: scaledWidth,
+      height: scaledHeight,
+    });
+    onResetView?.();
+  };
+
   const handleMarkerClick = (id: string, type: string) => {
     onEventSelect(id, type);
   };
@@ -436,6 +481,7 @@ export function WorldMapSVG({
         overflow: 'hidden',
         cursor: isPanning ? 'grabbing' : 'grab',
         background: '#04101e',
+        position: 'relative',
       }}
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
@@ -443,6 +489,113 @@ export function WorldMapSVG({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
+      <div
+        style={{
+          position: 'absolute',
+          right: '12px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          zIndex: 20,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px',
+        }}
+      >
+        <button
+          onClick={(e) => { e.stopPropagation(); handleZoomIn(); }}
+          onMouseDown={(e) => e.stopPropagation()}
+          title="Zoom In"
+          style={{
+            width: '30px',
+            height: '30px',
+            background: 'rgba(4, 16, 30, 0.92)',
+            border: '1px solid rgba(0, 212, 160, 0.35)',
+            color: '#00d4a0',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '18px',
+            fontFamily: 'Share Tech Mono, monospace',
+            lineHeight: 1,
+            borderRadius: '3px',
+            transition: 'background 0.15s, border-color 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0, 212, 160, 0.15)';
+            (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(0, 212, 160, 0.7)';
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = 'rgba(4, 16, 30, 0.92)';
+            (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(0, 212, 160, 0.35)';
+          }}
+        >
+          +
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); handleZoomOut(); }}
+          onMouseDown={(e) => e.stopPropagation()}
+          title="Zoom Out"
+          style={{
+            width: '30px',
+            height: '30px',
+            background: 'rgba(4, 16, 30, 0.92)',
+            border: '1px solid rgba(0, 212, 160, 0.35)',
+            color: '#00d4a0',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '18px',
+            fontFamily: 'Share Tech Mono, monospace',
+            lineHeight: 1,
+            borderRadius: '3px',
+            transition: 'background 0.15s, border-color 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0, 212, 160, 0.15)';
+            (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(0, 212, 160, 0.7)';
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = 'rgba(4, 16, 30, 0.92)';
+            (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(0, 212, 160, 0.35)';
+          }}
+        >
+          −
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); handleResetView(); }}
+          onMouseDown={(e) => e.stopPropagation()}
+          title="Reset to Globe View"
+          style={{
+            width: '30px',
+            height: '30px',
+            background: 'rgba(4, 16, 30, 0.92)',
+            border: '1px solid rgba(0, 212, 160, 0.35)',
+            color: '#00d4a0',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '9px',
+            fontFamily: 'Share Tech Mono, monospace',
+            lineHeight: 1,
+            borderRadius: '3px',
+            letterSpacing: '0.02em',
+            transition: 'background 0.15s, border-color 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0, 212, 160, 0.15)';
+            (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(0, 212, 160, 0.7)';
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = 'rgba(4, 16, 30, 0.92)';
+            (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(0, 212, 160, 0.35)';
+          }}
+        >
+          RST
+        </button>
+      </div>
       <svg
         ref={svgRef}
         viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}

@@ -60,6 +60,10 @@ export function MapView({
   const [viewMode, setViewMode] = useState<'2d' | '3d'>('2d');
   const [activeRegion, setActiveRegion] = useState('globe');
 
+  const handleResetView = () => {
+    setActiveRegion('globe');
+  };
+
   const totalEvents = earthquakes.length + disasters.length + news.length + volcanoes.length + geopolitical.length;
 
   return (
@@ -107,6 +111,7 @@ export function MapView({
             showTooltip={showTooltip}
             hideTooltip={hideTooltip}
             activeRegion={activeRegion}
+            onResetView={handleResetView}
           />
         ) : (
           <Globe3D
