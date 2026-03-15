@@ -171,7 +171,7 @@ Deno.serve(async (req: Request) => {
       const batch = allThreats.slice(0, 100);
       const { error, count } = await supabase
         .from('cyber_threats')
-        .upsert(batch, { onConflict: 'threat_id', ignoreDuplicates: true, count: 'exact' });
+        .upsert(batch, { onConflict: 'threat_id', ignoreDuplicates: false, count: 'exact' });
       if (error) {
         console.error('Upsert error:', error);
       } else {

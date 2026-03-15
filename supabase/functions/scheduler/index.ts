@@ -6,9 +6,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
-async function callIngestFunction(functionName: string, supabaseUrl: string): Promise<void> {
+async function callIngestFunction(functionName: string, supabaseUrl: string, anonKey: string): Promise<void> {
   const url = `${supabaseUrl}/functions/v1/${functionName}`;
-  const response = await fetch(url, { method: 'POST' });
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${anonKey}`,
+      'Content-Type': 'application/json',
+    },
+  });
   if (!response.ok) {
     console.error(`Failed to call ${functionName}:`, response.statusText);
   }
@@ -39,8 +45,10 @@ Deno.serve(async (req: Request) => {
       'ingest-geopolitical',
     ];
 
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+
     const results = await Promise.allSettled(
-      ingestFunctions.map(fn => callIngestFunction(fn, supabaseUrl))
+      ingestFunctions.map(fn => callIngestFunction(fn, supabaseUrl, anonKey))
     );
 
     const successful = results.filter(r => r.status === 'fulfilled').length;
