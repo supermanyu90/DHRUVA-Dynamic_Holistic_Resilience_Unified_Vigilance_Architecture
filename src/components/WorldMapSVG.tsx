@@ -550,10 +550,11 @@ export function WorldMapSVG({
 
         {layersEnabled.disasters &&
           disasters.slice(0, 30).map((disaster) => {
-            const randomLat = Math.random() * 140 - 70;
-            const randomLon = Math.random() * 300 - 150;
-            const x = lonToX(randomLon);
-            const y = latToY(randomLat);
+            const hash = disaster.id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+            const stableLat = ((hash * 9301 + 49297) % 139) - 69;
+            const stableLon = ((hash * 49297 + 233) % 299) - 149;
+            const x = lonToX(stableLon);
+            const y = latToY(stableLat);
             return (
               <circle
                 key={disaster.id}
@@ -567,30 +568,6 @@ export function WorldMapSVG({
                 style={{ cursor: 'pointer' }}
                 onClick={() => handleMarkerClick(disaster.id, 'disaster')}
                 onMouseEnter={(e) => handleMarkerHover(e, disaster.title)}
-                onMouseLeave={hideTooltip}
-              />
-            );
-          })}
-
-        {layersEnabled.news &&
-          news.slice(0, 20).map((item) => {
-            const randomLat = Math.random() * 140 - 70;
-            const randomLon = Math.random() * 300 - 150;
-            const x = lonToX(randomLon);
-            const y = latToY(randomLat);
-            return (
-              <circle
-                key={item.id}
-                cx={x}
-                cy={y}
-                r="2"
-                fill="rgba(0, 212, 160, 0.5)"
-                stroke="#00D4A0"
-                strokeWidth="0.5"
-                filter="url(#glow)"
-                style={{ cursor: 'pointer' }}
-                onClick={() => handleMarkerClick(item.id, 'news')}
-                onMouseEnter={(e) => handleMarkerHover(e, item.title)}
                 onMouseLeave={hideTooltip}
               />
             );
