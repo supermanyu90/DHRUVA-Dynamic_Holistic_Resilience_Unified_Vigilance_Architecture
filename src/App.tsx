@@ -117,6 +117,8 @@ function App() {
   const [nextSyncIn, setNextSyncIn] = useState<number>(AUTO_SYNC_INTERVAL_MS);
   const [newEventIds, setNewEventIds] = useState<Set<string>>(new Set());
   const [showAbout, setShowAbout] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [mobileRightPanelOpen, setMobileRightPanelOpen] = useState(false);
 
   const autoSyncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -336,6 +338,10 @@ function App() {
         onToggleSound={() => setSoundEnabled(!soundEnabled)}
         theme={theme}
         onThemeToggle={handleThemeToggle}
+        onToggleSidebar={() => setMobileSidebarOpen(o => !o)}
+        onToggleRightPanel={() => setMobileRightPanelOpen(o => !o)}
+        mobileSidebarOpen={mobileSidebarOpen}
+        mobileRightPanelOpen={mobileRightPanelOpen}
       />
 
       <div className="view-tabs">
@@ -365,7 +371,49 @@ function App() {
         </div>
       </div>
 
+      <div className="mobile-view-tabs">
+        <button className={`mvt-btn ${currentView === 'map' ? 'active' : ''}`} onClick={() => setCurrentView('map')}>
+          <span className="mvt-icon">🗺️</span>
+          <span className="mvt-label">MAP</span>
+        </button>
+        <button className={`mvt-btn ${currentView === 'timeline' ? 'active' : ''}`} onClick={() => setCurrentView('timeline')}>
+          <span className="mvt-icon">📈</span>
+          <span className="mvt-label">TIME</span>
+        </button>
+        <button className={`mvt-btn ${currentView === 'news' ? 'active' : ''}`} onClick={() => setCurrentView('news')}>
+          <span className="mvt-icon">📡</span>
+          <span className="mvt-label">NEWS</span>
+        </button>
+        <button className={`mvt-btn ${currentView === 'sewa' ? 'active' : ''}`} onClick={() => setCurrentView('sewa')}>
+          <span className="mvt-icon">🏦</span>
+          <span className="mvt-label">SEWA</span>
+        </button>
+        <button className={`mvt-btn ${currentView === 'cyber' ? 'active' : ''}`} onClick={() => setCurrentView('cyber')}>
+          <span className="mvt-icon">💻</span>
+          <span className="mvt-label">CYBER</span>
+        </button>
+        <button className={`mvt-btn ${currentView === 'infoops' ? 'active' : ''}`} onClick={() => setCurrentView('infoops')}>
+          <span className="mvt-icon">🧠</span>
+          <span className="mvt-label">INFO</span>
+        </button>
+        <button className={`mvt-btn ${currentView === 'gov' ? 'active' : ''}`} onClick={() => setCurrentView('gov')}>
+          <span className="mvt-icon">🏛️</span>
+          <span className="mvt-label">GOV</span>
+        </button>
+        <button className={`mvt-btn ${currentView === 'vessel' ? 'active' : ''}`} onClick={() => setCurrentView('vessel')}>
+          <span className="mvt-icon">⚓</span>
+          <span className="mvt-label">VESSEL</span>
+        </button>
+      </div>
+
       <LiveEventTicker events={tickerEvents} />
+
+      {mobileSidebarOpen && (
+        <div className="mobile-overlay" onClick={() => setMobileSidebarOpen(false)} />
+      )}
+      {mobileRightPanelOpen && (
+        <div className="mobile-overlay" onClick={() => setMobileRightPanelOpen(false)} />
+      )}
 
       <div className="app-body">
         <Sidebar
@@ -376,11 +424,12 @@ function App() {
           volcanoes={volcanoes}
           geopolitical={geopolitical}
           selectedEvent={selectedEvent}
-          onEventSelect={handleEventSelect}
+          onEventSelect={(id, type) => { handleEventSelect(id, type); setMobileSidebarOpen(false); }}
           mode={mode}
           onModeChange={setMode}
           layersEnabled={layersEnabled}
           onLayerToggle={handleLayerToggle}
+          mobileOpen={mobileSidebarOpen}
         />
 
         <div className="center">
@@ -426,6 +475,7 @@ function App() {
           vessels={vessels}
           volcanoes={volcanoes}
           geopolitical={geopolitical}
+          mobileOpen={mobileRightPanelOpen}
         />
       </div>
 

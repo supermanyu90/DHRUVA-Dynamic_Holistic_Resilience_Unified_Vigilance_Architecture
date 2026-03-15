@@ -8,6 +8,7 @@ interface RightPanelProps {
   vessels: Vessel[];
   volcanoes: VolcanoEvent[];
   geopolitical: GeopoliticalEvent[];
+  mobileOpen?: boolean;
 }
 
 function MagnitudeBand({ label, count, color }: { label: string; count: number; color: string }) {
@@ -60,7 +61,7 @@ function MetricCard({
   );
 }
 
-export function RightPanel({ earthquakes, disasters, news, vessels, volcanoes, geopolitical }: RightPanelProps) {
+export function RightPanel({ earthquakes, disasters, news, vessels, volcanoes, geopolitical, mobileOpen = false }: RightPanelProps) {
   const m45 = earthquakes.filter(e => e.magnitude >= 4.5 && e.magnitude < 5.5).length;
   const m55 = earthquakes.filter(e => e.magnitude >= 5.5 && e.magnitude < 6.5).length;
   const m65 = earthquakes.filter(e => e.magnitude >= 6.5).length;
@@ -103,7 +104,7 @@ export function RightPanel({ earthquakes, disasters, news, vessels, volcanoes, g
   };
 
   return (
-    <div className="right-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0', overflowY: 'auto' }}>
+    <div className={`right-panel${mobileOpen ? ' mobile-open' : ''}`} style={{ display: 'flex', flexDirection: 'column', gap: '0', overflowY: 'auto' }}>
 
       <div style={{
         fontFamily: "'Bebas Neue', sans-serif",

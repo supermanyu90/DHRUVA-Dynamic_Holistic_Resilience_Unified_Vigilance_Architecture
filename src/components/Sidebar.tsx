@@ -36,6 +36,7 @@ interface SidebarProps {
     curfews: boolean;
   };
   onLayerToggle: (layer: keyof SidebarProps['layersEnabled']) => void;
+  mobileOpen?: boolean;
 }
 
 const SUPPORTED_DRAWER_TYPES = new Set(['news', 'earthquake', 'disaster', 'geopolitical', 'curfew']);
@@ -53,6 +54,7 @@ export function Sidebar({
   onModeChange,
   layersEnabled,
   onLayerToggle,
+  mobileOpen = false,
 }: SidebarProps) {
   const [drawerEvent, setDrawerEvent] = useState<DrawerEvent | null>(null);
 
@@ -103,7 +105,7 @@ export function Sidebar({
   }
 
   return (
-    <div className="sidebar" style={{ position: 'relative' }}>
+    <div className={`sidebar${mobileOpen ? ' mobile-open' : ''}`} style={{ position: 'relative' }}>
       {drawerEvent && (
         <EventDetailDrawer event={drawerEvent} onClose={() => setDrawerEvent(null)} />
       )}
