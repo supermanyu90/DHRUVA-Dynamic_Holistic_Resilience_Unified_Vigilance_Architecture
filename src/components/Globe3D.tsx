@@ -278,7 +278,7 @@ export function Globe3D({
     nightOverlayRef.current = nightOverlay;
 
     const markersGroup = new THREE.Group();
-    scene.add(markersGroup);
+    globeGroup.add(markersGroup);
     markersRef.current = markersGroup;
 
     fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
