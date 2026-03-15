@@ -81,7 +81,7 @@ async function fetchGDELTInfluence(): Promise<InfoOpRecord[]> {
       const articles = data.articles || [];
       for (const a of articles) {
         results.push({
-          campaign_id: `gdelt-infoops-${Buffer.from(a.url || a.title || Math.random().toString()).toString('base64').slice(0, 20)}`,
+          campaign_id: `gdelt-infoops-${(a.url || a.title || Math.random().toString()).replace(/[^a-zA-Z0-9]/g, '').slice(0, 32)}`,
           title: (a.title || 'Untitled').slice(0, 200),
           description: `Source: ${a.domain || 'Unknown'}. Language: ${a.language || 'Unknown'}. ${a.url || ''}`.slice(0, 500),
           platform: 'web',
@@ -131,12 +131,14 @@ Deno.serve(async (req: Request) => {
       const newOps = allOps.filter(o => !existingIds.has(o.campaign_id));
 
       if (newOps.length > 0) {
-        const { error } = await supabase.from('info_ops').insert(newOps.slice(0, 50));
+        const { error, count } = await supabase
+          .from('info_ops')
+          .upsert(newOps.slice(0, 50), { onConflict: 'campaign_id', ignoreDuplicates: true, count: 'exact' });
         if (error) {
-          console.error('Insert error:', error);
+          console.error('Upsert error:', error);
         } else {
-          inserted = newOps.length;
-          console.log(`Inserted ${inserted} new info ops`);
+          inserted = count ?? newOps.length;
+          console.log(`Upserted ${inserted} info ops`);
         }
       }
     }

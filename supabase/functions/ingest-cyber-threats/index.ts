@@ -168,23 +168,15 @@ Deno.serve(async (req: Request) => {
 
     let inserted = 0;
     if (allThreats.length > 0) {
-      const threatIds = allThreats.map(t => t.threat_id);
-      const { data: existing } = await supabase
+      const batch = allThreats.slice(0, 100);
+      const { error, count } = await supabase
         .from('cyber_threats')
-        .select('threat_id')
-        .in('threat_id', threatIds.slice(0, 500));
-
-      const existingIds = new Set(existing?.map(e => e.threat_id) || []);
-      const newThreats = allThreats.filter(t => !existingIds.has(t.threat_id));
-
-      if (newThreats.length > 0) {
-        const { error } = await supabase.from('cyber_threats').insert(newThreats.slice(0, 100));
-        if (error) {
-          console.error('Insert error:', error);
-        } else {
-          inserted = newThreats.length;
-          console.log(`Inserted ${inserted} new threats`);
-        }
+        .upsert(batch, { onConflict: 'threat_id', ignoreDuplicates: true, count: 'exact' });
+      if (error) {
+        console.error('Upsert error:', error);
+      } else {
+        inserted = count ?? batch.length;
+        console.log(`Upserted ${inserted} threats`);
       }
     }
 

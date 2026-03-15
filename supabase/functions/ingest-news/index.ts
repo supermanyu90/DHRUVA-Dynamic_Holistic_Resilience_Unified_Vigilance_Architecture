@@ -88,9 +88,9 @@ Deno.serve(async (req: Request) => {
     }
 
     if (allNews.length > 0) {
-      const { data: inserted, error: dbError } = await supabase
+      const { error: dbError } = await supabase
         .from('news_events')
-        .insert(allNews);
+        .upsert(allNews, { onConflict: 'url', ignoreDuplicates: true });
 
       if (dbError) {
         console.error('Database error:', dbError);

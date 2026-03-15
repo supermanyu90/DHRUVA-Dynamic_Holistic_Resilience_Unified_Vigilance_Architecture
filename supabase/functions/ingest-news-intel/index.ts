@@ -311,26 +311,15 @@ Deno.serve(async (req: Request) => {
 
     let inserted = 0;
     if (allArticles.length > 0) {
-      const urls = allArticles.map(a => a.url).filter(Boolean);
-      const { data: existing } = await supabase
+      const batch = allArticles.slice(0, 300);
+      const { error, count } = await supabase
         .from('news_events')
-        .select('url')
-        .in('url', urls.slice(0, 500));
-
-      const existingUrls = new Set(existing?.map(e => e.url) || []);
-      const newArticles = allArticles.filter(a => a.url && !existingUrls.has(a.url));
-
-      if (newArticles.length > 0) {
-        const batch = newArticles.slice(0, 300);
-        const { error } = await supabase.from('news_events').insert(batch);
-        if (error) {
-          console.error('Insert error:', error);
-        } else {
-          inserted = batch.length;
-          console.log(`Inserted ${inserted} new articles`);
-        }
+        .upsert(batch, { onConflict: 'url', ignoreDuplicates: true, count: 'exact' });
+      if (error) {
+        console.error('Upsert error:', error);
       } else {
-        console.log('No new articles to insert');
+        inserted = count ?? batch.length;
+        console.log(`Upserted ${inserted} articles`);
       }
     }
 
