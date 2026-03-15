@@ -44,14 +44,13 @@ export function Sidebar({
   const allEvents = [
     ...earthquakes.map((e) => ({ ...e, type: 'earthquake', icon: '🌍', color: 'var(--quake)' })),
     ...disasters.map((d) => ({ ...d, type: 'disaster', icon: '⚠️', color: 'var(--fire)' })),
-    ...news.map((n) => ({ ...n, type: 'news', icon: '📰', color: 'var(--accent)' })),
   ]
     .filter((event) => {
       const eventTime = 'event_time' in event
         ? new Date(event.event_time)
         : 'event_date' in event
         ? new Date(event.event_date)
-        : new Date(event.published_at);
+        : new Date((event as any).published_at);
       return filterByMode(eventTime);
     })
     .sort((a, b) => {
@@ -83,14 +82,6 @@ export function Sidebar({
         >
           <span className="ldot" style={{ background: 'var(--fire)' }}></span>
           DISASTERS
-        </button>
-        <button
-          className={`lbtn ${layersEnabled.news ? 'active' : ''}`}
-          onClick={() => onLayerToggle('news')}
-          style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}
-        >
-          <span className="ldot" style={{ background: 'var(--accent)' }}></span>
-          INTEL
         </button>
         <button
           className={`lbtn lbtn-cab ${layersEnabled.cables ? 'active' : ''}`}
@@ -142,7 +133,6 @@ export function Sidebar({
           .filter((event) => {
             if (event.type === 'earthquake') return layersEnabled.earthquakes;
             if (event.type === 'disaster') return layersEnabled.disasters;
-            if (event.type === 'news') return layersEnabled.news;
             return true;
           })
           .map((event) => {
@@ -154,7 +144,6 @@ export function Sidebar({
                 : new Date(event.published_at);
             const isEarthquake = event.type === 'earthquake';
             const isDisaster = event.type === 'disaster';
-            const isNews = event.type === 'news';
 
             return (
               <div
