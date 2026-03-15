@@ -1,6 +1,23 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Brain, Activity, RefreshCw } from 'lucide-react';
 import { IntelligenceAPI, InfoOp } from '../lib/intelligence-api';
+import { supabase } from '../lib/supabase';
+
+type TimeWindow = '1h' | '6h' | '24h' | '7d' | 'all';
+
+const TIME_WINDOWS: { key: TimeWindow; label: string }[] = [
+  { key: '1h',  label: '1HR'  },
+  { key: '6h',  label: '6HR'  },
+  { key: '24h', label: '24H'  },
+  { key: '7d',  label: '7D'   },
+  { key: 'all', label: 'ALL'  },
+];
+
+function getWindowStart(w: TimeWindow): string | null {
+  if (w === 'all') return null;
+  const ms = { '1h': 3600000, '6h': 21600000, '24h': 86400000, '7d': 604800000 }[w];
+  return new Date(Date.now() - ms).toISOString();
+}
 
 function getStatusColor(status: string) {
   switch (status) {
@@ -31,18 +48,27 @@ export function InfoOpsView() {
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<string>('all');
   const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [timeWindow, setTimeWindow] = useState<TimeWindow>('7d');
 
   const loadOps = useCallback(async () => {
     try {
-      const data = await IntelligenceAPI.getInfoOps(100);
-      setOperations(data);
+      let query = supabase
+        .from('info_ops')
+        .select('*')
+        .order('first_detected', { ascending: false })
+        .limit(100);
+      const since = getWindowStart(timeWindow);
+      if (since) query = query.gte('first_detected', since);
+      const { data, error } = await query;
+      if (error) throw error;
+      setOperations((data as InfoOp[]) || []);
       setLastUpdated(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     } catch (err) {
       console.error('Failed to load info ops:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [timeWindow]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -65,6 +91,7 @@ export function InfoOpsView() {
   }, [loadOps]);
 
   useEffect(() => {
+    setLoading(true);
     loadOps();
   }, [loadOps]);
 
@@ -107,6 +134,20 @@ export function InfoOpsView() {
         <div className="infoops-status">
           {loading ? 'LOADING...' : lastUpdated ? `Last analysis: ${lastUpdated}` : 'No data loaded'}
         </div>
+      </div>
+
+      <div className="infoops-time-row">
+        <span className="infoops-time-label">WINDOW:</span>
+        {TIME_WINDOWS.map(w => (
+          <button
+            key={w.key}
+            className={`infoops-time-btn ${timeWindow === w.key ? 'active' : ''}`}
+            onClick={() => setTimeWindow(w.key)}
+          >
+            {w.label}
+          </button>
+        ))}
+        <span className="infoops-time-count">{operations.length} OPS</span>
       </div>
 
       <div className="infoops-body">

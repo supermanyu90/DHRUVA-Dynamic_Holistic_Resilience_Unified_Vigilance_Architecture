@@ -2964,6 +2964,151 @@ header,
   flex-shrink: 0;
 }
 
+/* Time window filter row (shared across news/cyber/infoops) */
+.news-time-row {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.18);
+  flex-wrap: wrap;
+}
+
+.news-time-btn {
+  padding: 3px 11px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 11px;
+  letter-spacing: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.12s;
+}
+
+.news-time-btn:hover:not(.active) {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.news-time-btn.active {
+  background: rgba(0, 212, 160, 0.14);
+  color: var(--accent);
+  border-color: rgba(0, 212, 160, 0.55);
+}
+
+.news-time-count {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  color: var(--accent);
+  letter-spacing: 1px;
+  margin-left: auto;
+}
+
+/* Cyber time window row */
+.cyber-time-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 0 6px;
+  flex-wrap: wrap;
+}
+
+.cyber-time-label {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  color: var(--dim);
+  margin-right: 2px;
+}
+
+.cyber-time-btn {
+  padding: 3px 11px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 11px;
+  letter-spacing: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.12s;
+}
+
+.cyber-time-btn:hover:not(.active) {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.cyber-time-btn.active {
+  background: rgba(255, 68, 68, 0.12);
+  color: #FF4444;
+  border-color: rgba(255, 68, 68, 0.5);
+}
+
+.cyber-time-count {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  color: #FF4444;
+  letter-spacing: 1px;
+  margin-left: auto;
+}
+
+/* InfoOps time window row */
+.infoops-time-row {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.18);
+  flex-wrap: wrap;
+}
+
+.infoops-time-label {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  color: var(--dim);
+  margin-right: 2px;
+}
+
+.infoops-time-btn {
+  padding: 3px 11px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 11px;
+  letter-spacing: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.12s;
+}
+
+.infoops-time-btn:hover:not(.active) {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.infoops-time-btn.active {
+  background: rgba(200, 100, 255, 0.12);
+  color: #CC66FF;
+  border-color: rgba(200, 100, 255, 0.5);
+}
+
+.infoops-time-count {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  color: #CC66FF;
+  letter-spacing: 1px;
+  margin-left: auto;
+}
+
 /* Search row */
 .news-search-row {
   flex-shrink: 0;

@@ -1,6 +1,22 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { ExternalLink, RefreshCw, Globe, Search, X, Radio, Filter } from 'lucide-react';
+import { ExternalLink, RefreshCw, Globe, Search, X, Radio, Filter, Clock } from 'lucide-react';
+
+type TimeWindow = '1h' | '6h' | '24h' | '7d' | 'all';
+
+const TIME_WINDOWS: { key: TimeWindow; label: string }[] = [
+  { key: '1h',  label: '1HR'  },
+  { key: '6h',  label: '6HR'  },
+  { key: '24h', label: '24H'  },
+  { key: '7d',  label: '7D'   },
+  { key: 'all', label: 'ALL'  },
+];
+
+function getWindowStart(w: TimeWindow): string | null {
+  if (w === 'all') return null;
+  const ms = { '1h': 3600000, '6h': 21600000, '24h': 86400000, '7d': 604800000 }[w];
+  return new Date(Date.now() - ms).toISOString();
+}
 
 interface GovAnnouncement {
   id: string;
@@ -151,15 +167,19 @@ export function GovAnnouncementsView() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
+  const [timeWindow, setTimeWindow] = useState<TimeWindow>('7d');
 
   const loadAnnouncements = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('gov_announcements')
         .select('*')
         .order('published_at', { ascending: false })
         .limit(500);
+      const since = getWindowStart(timeWindow);
+      if (since) query = query.gte('published_at', since);
+      const { data, error } = await query;
       if (error) throw error;
       setAnnouncements(data || []);
     } catch (err) {
@@ -167,7 +187,7 @@ export function GovAnnouncementsView() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [timeWindow]);
 
   useEffect(() => { loadAnnouncements(); }, [loadAnnouncements]);
 
@@ -299,6 +319,39 @@ export function GovAnnouncementsView() {
             </button>
           );
         })}
+      </div>
+
+      {/* Time window filter row */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 16px',
+        borderBottom: '1px solid var(--border)', flexShrink: 0, overflowX: 'auto',
+      }}>
+        <Clock size={10} style={{ color: 'var(--dim)', flexShrink: 0 }} />
+        <span style={{
+          fontFamily: "'Bebas Neue', sans-serif", fontSize: '9px', letterSpacing: '1.5px',
+          color: 'var(--dim)', flexShrink: 0,
+        }}>WINDOW:</span>
+        {TIME_WINDOWS.map(w => {
+          const active = timeWindow === w.key;
+          return (
+            <button key={w.key} onClick={() => setTimeWindow(w.key)} style={{
+              fontFamily: "'Bebas Neue', sans-serif", fontSize: '10px', letterSpacing: '1.5px',
+              padding: '3px 10px', borderRadius: '3px', cursor: 'pointer', flexShrink: 0,
+              background: active ? 'rgba(0,212,160,0.18)' : 'transparent',
+              border: `1px solid ${active ? 'rgba(0,212,160,0.6)' : 'rgba(255,255,255,0.1)'}`,
+              color: active ? 'var(--accent)' : 'var(--dim)',
+              transition: 'all 0.12s',
+            }}>
+              {w.label}
+            </button>
+          );
+        })}
+        <span style={{
+          fontFamily: "'Share Tech Mono', monospace", fontSize: '9px',
+          color: 'var(--accent)', marginLeft: '4px', flexShrink: 0,
+        }}>
+          {announcements.length} ITEMS IN WINDOW
+        </span>
       </div>
 
       {/* Category + Country + Search row */}

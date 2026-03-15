@@ -1,6 +1,23 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Shield, Activity, RefreshCw } from 'lucide-react';
 import { IntelligenceAPI, CyberThreat } from '../lib/intelligence-api';
+import { supabase } from '../lib/supabase';
+
+type TimeWindow = '1h' | '6h' | '24h' | '7d' | 'all';
+
+const TIME_WINDOWS: { key: TimeWindow; label: string }[] = [
+  { key: '1h',  label: '1HR'  },
+  { key: '6h',  label: '6HR'  },
+  { key: '24h', label: '24H'  },
+  { key: '7d',  label: '7D'   },
+  { key: 'all', label: 'ALL'  },
+];
+
+function getWindowStart(w: TimeWindow): string | null {
+  if (w === 'all') return null;
+  const ms = { '1h': 3600000, '6h': 21600000, '24h': 86400000, '7d': 604800000 }[w];
+  return new Date(Date.now() - ms).toISOString();
+}
 
 const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low'] as const;
 
@@ -20,18 +37,27 @@ export function CyberView() {
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<string>('all');
   const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [timeWindow, setTimeWindow] = useState<TimeWindow>('7d');
 
   const loadThreats = useCallback(async () => {
     try {
-      const data = await IntelligenceAPI.getCyberThreats(100);
-      setThreats(data);
+      let query = supabase
+        .from('cyber_threats')
+        .select('*')
+        .order('first_seen', { ascending: false })
+        .limit(100);
+      const since = getWindowStart(timeWindow);
+      if (since) query = query.gte('first_seen', since);
+      const { data, error } = await query;
+      if (error) throw error;
+      setThreats((data as CyberThreat[]) || []);
       setLastUpdated(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     } catch (err) {
       console.error('Failed to load cyber threats:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [timeWindow]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -54,6 +80,7 @@ export function CyberView() {
   }, [loadThreats]);
 
   useEffect(() => {
+    setLoading(true);
     loadThreats();
   }, [loadThreats]);
 
@@ -116,6 +143,20 @@ export function CyberView() {
         <div className="cyber-section-title">
           <Shield size={14} />
           ACTIVE THREATS
+        </div>
+
+        <div className="cyber-time-row">
+          <span className="cyber-time-label">WINDOW:</span>
+          {TIME_WINDOWS.map(w => (
+            <button
+              key={w.key}
+              className={`cyber-time-btn ${timeWindow === w.key ? 'active' : ''}`}
+              onClick={() => setTimeWindow(w.key)}
+            >
+              {w.label}
+            </button>
+          ))}
+          <span className="cyber-time-count">{threats.length} THREATS</span>
         </div>
 
         <div className="cyber-filter-bar">

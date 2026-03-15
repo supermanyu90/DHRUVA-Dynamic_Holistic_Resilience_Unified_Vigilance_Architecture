@@ -3,6 +3,22 @@ import { supabase } from '../lib/supabase';
 import { NewsSourceBar } from './news/NewsSourceBar';
 import { NewsCard } from './news/NewsCard';
 
+type TimeWindow = '1h' | '6h' | '24h' | '7d' | 'all';
+
+const TIME_WINDOWS: { key: TimeWindow; label: string }[] = [
+  { key: '1h',  label: '1HR'  },
+  { key: '6h',  label: '6HR'  },
+  { key: '24h', label: '24H'  },
+  { key: '7d',  label: '7D'   },
+  { key: 'all', label: 'ALL'  },
+];
+
+function getWindowStart(w: TimeWindow): string | null {
+  if (w === 'all') return null;
+  const ms = { '1h': 3600000, '6h': 21600000, '24h': 86400000, '7d': 604800000 }[w];
+  return new Date(Date.now() - ms).toISOString();
+}
+
 export interface NewsArticle {
   id: string;
   source: string;
@@ -60,19 +76,23 @@ export function NewsIntelView() {
   const [selectedSource, setSelectedSource] = useState<string>('all');
   const [gdeltTheme, setGdeltTheme] = useState<GdeltTheme>('breaking');
   const [searchQuery, setSearchQuery] = useState('');
+  const [timeWindow, setTimeWindow] = useState<TimeWindow>('24h');
 
   useEffect(() => {
     loadArticles();
-  }, []);
+  }, [timeWindow]);
 
   const loadArticles = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('news_events')
         .select('*')
         .order('published_at', { ascending: false })
         .limit(500);
+      const since = getWindowStart(timeWindow);
+      if (since) query = query.gte('published_at', since);
+      const { data, error } = await query;
       if (error) throw error;
       setArticles(data || []);
     } catch (err) {
@@ -100,7 +120,7 @@ export function NewsIntelView() {
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [timeWindow]);
 
   const filteredArticles = useMemo(() => {
     return articles.filter(article => {
@@ -240,6 +260,23 @@ export function NewsIntelView() {
         sourceStats={sourceStats}
         newsGroup={newsGroup}
       />
+
+      {/* Time window filter */}
+      <div className="news-time-row">
+        <span className="news-region-label">WINDOW:</span>
+        {TIME_WINDOWS.map(w => (
+          <button
+            key={w.key}
+            className={`news-time-btn ${timeWindow === w.key ? 'active' : ''}`}
+            onClick={() => setTimeWindow(w.key)}
+          >
+            {w.label}
+          </button>
+        ))}
+        <span className="news-time-count">
+          {articles.length} ARTICLE{articles.length !== 1 ? 'S' : ''} IN WINDOW
+        </span>
+      </div>
 
       {/* Search bar */}
       <div className="news-search-row">
