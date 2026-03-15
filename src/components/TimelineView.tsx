@@ -27,7 +27,7 @@ export function TimelineView({ earthquakes, disasters, news, vessels, volcanoes,
   const now = useMemo(() => Date.now(), []);
   const rangeMs = RANGES[rangeIdx].ms;
 
-  const events: TimelineEvent[] = useMemo(() => {
+  const timedEvents: TimelineEvent[] = useMemo(() => {
     const result: TimelineEvent[] = [];
 
     for (const eq of earthquakes) {
@@ -73,6 +73,12 @@ export function TimelineView({ earthquakes, disasters, news, vessels, volcanoes,
       });
     }
 
+    return result;
+  }, [earthquakes, disasters, news, vessels]);
+
+  const persistentEvents: TimelineEvent[] = useMemo(() => {
+    const result: TimelineEvent[] = [];
+
     for (const vol of volcanoes) {
       result.push({
         id: vol.id,
@@ -89,18 +95,24 @@ export function TimelineView({ earthquakes, disasters, news, vessels, volcanoes,
         id: geo.id,
         type: 'geo',
         label: geo.title,
-        timestamp: geo.started_at || geo.updated_at,
+        timestamp: geo.updated_at,
         severity: geo.severity,
         location: geo.country || undefined,
+        detail: geo.started_at ? `Active since ${new Date(geo.started_at).toLocaleDateString()}` : undefined,
       });
     }
 
     return result;
-  }, [earthquakes, disasters, news, vessels, volcanoes, geopolitical]);
+  }, [volcanoes, geopolitical]);
+
+  const windowTimedEvents = useMemo(
+    () => timedEvents.filter((e) => new Date(e.timestamp).getTime() >= now - rangeMs),
+    [timedEvents, now, rangeMs]
+  );
 
   const windowEvents = useMemo(
-    () => events.filter((e) => new Date(e.timestamp).getTime() >= now - rangeMs),
-    [events, now, rangeMs]
+    () => [...windowTimedEvents, ...persistentEvents],
+    [windowTimedEvents, persistentEvents]
   );
 
   const totalInWindow = windowEvents.length;
@@ -183,7 +195,13 @@ export function TimelineView({ earthquakes, disasters, news, vessels, volcanoes,
               EVENT FREQUENCY — {RANGES[rangeIdx].label} WINDOW
             </div>
             <div style={{ height: 170 }}>
-              <TimelineChart events={selectedType ? windowEvents.filter(e => e.type === selectedType) : windowEvents} rangeMs={rangeMs} now={now} />
+              <TimelineChart
+                events={selectedType
+                  ? windowTimedEvents.filter(e => e.type === selectedType)
+                  : windowTimedEvents}
+                rangeMs={rangeMs}
+                now={now}
+              />
             </div>
           </div>
 
