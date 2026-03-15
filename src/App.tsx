@@ -7,7 +7,7 @@ import { MapView } from './components/MapView';
 import { SewaView } from './components/SewaView';
 import { CyberView } from './components/CyberView';
 import { InfoOpsView } from './components/InfoOpsView';
-import { UaeView } from './components/UaeView';
+import { GovAnnouncementsView } from './components/GovAnnouncementsView';
 import { VesselView } from './components/VesselView';
 import { NewsIntelView } from './components/NewsIntelView';
 import { TimelineView } from './components/TimelineView';
@@ -15,7 +15,7 @@ import { AlertToast } from './components/AlertToast';
 import { Tooltip } from './components/Tooltip';
 import { LiveEventTicker, TickerEvent } from './components/LiveEventTicker';
 
-type ViewType = 'map' | 'timeline' | 'news' | 'sewa' | 'cyber' | 'infoops' | 'uae' | 'vessel';
+type ViewType = 'map' | 'timeline' | 'news' | 'sewa' | 'cyber' | 'infoops' | 'gov' | 'vessel';
 
 const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -349,8 +349,8 @@ function App() {
         <div className={`view-tab ${currentView === 'infoops' ? 'active' : ''}`} onClick={() => setCurrentView('infoops')} style={{ color: currentView === 'infoops' ? '' : '#CC66FF99' }}>
           🧠 INFO OPS
         </div>
-        <div className={`view-tab ${currentView === 'uae' ? 'active' : ''}`} onClick={() => setCurrentView('uae')} style={{ color: currentView === 'uae' ? '' : '#1DA1F299' }}>
-          🇦🇪 UAE FEED
+        <div className={`view-tab ${currentView === 'gov' ? 'active' : ''}`} onClick={() => setCurrentView('gov')} style={{ color: currentView === 'gov' ? '' : '#4D9FFF99' }}>
+          GOV FEED
         </div>
         <div className={`view-tab ${currentView === 'vessel' ? 'active' : ''}`} onClick={() => setCurrentView('vessel')} style={{ color: currentView === 'vessel' ? '' : '#00BFFF99' }}>
           ⚓ VESSEL INTEL
@@ -407,7 +407,7 @@ function App() {
           {currentView === 'sewa' && <SewaView />}
           {currentView === 'cyber' && <CyberView />}
           {currentView === 'infoops' && <InfoOpsView />}
-          {currentView === 'uae' && <UaeView />}
+          {currentView === 'gov' && <GovAnnouncementsView />}
           {currentView === 'vessel' && <VesselView />}
         </div>
 
