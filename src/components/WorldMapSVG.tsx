@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
 import { UNDERSEA_CABLES } from '../lib/cable-data';
-import { INDIA_OUTER_BOUNDARY, LINE_OF_CONTROL, LINE_OF_ACTUAL_CONTROL, INDIA_DISCLAIMER } from '../lib/india-boundary';
+import { INDIA_OUTER_BOUNDARY, INDIA_NORTHERN_TERRITORY, INDIA_DISCLAIMER } from '../lib/india-boundary';
 
 const REGIONS: Record<string, { cx: number; cy: number; scale: number }> = {
   globe:    { cx: 0,    cy: 0,   scale: 1.0 },
@@ -670,35 +670,25 @@ export function WorldMapSVG({
               }
               fill="#0d2438"
               stroke="#2a6a54"
-              strokeWidth="0.65"
+              strokeWidth="0.7"
               strokeLinejoin="round"
               pointerEvents="none"
             />
           )}
-          <path
-            d={
-              'M' +
-              LINE_OF_CONTROL.map(([lon, lat]) => `${lonToX(lon).toFixed(1)},${latToY(lat).toFixed(1)}`).join('L')
-            }
-            fill="none"
-            stroke="#2a6a54"
-            strokeWidth="0.75"
-            strokeLinejoin="round"
-            opacity="0.9"
-            pointerEvents="none"
-          />
-          <path
-            d={
-              'M' +
-              LINE_OF_ACTUAL_CONTROL.map(([lon, lat]) => `${lonToX(lon).toFixed(1)},${latToY(lat).toFixed(1)}`).join('L')
-            }
-            fill="none"
-            stroke="#2a6a54"
-            strokeWidth="0.75"
-            strokeLinejoin="round"
-            opacity="0.9"
-            pointerEvents="none"
-          />
+          {INDIA_NORTHERN_TERRITORY.length > 0 && (
+            <path
+              d={
+                'M' +
+                INDIA_NORTHERN_TERRITORY.map(([lon, lat]) => `${lonToX(lon).toFixed(1)},${latToY(lat).toFixed(1)}`).join('L') +
+                'Z'
+              }
+              fill="#0d2438"
+              stroke="#2a6a54"
+              strokeWidth="0.7"
+              strokeLinejoin="round"
+              pointerEvents="none"
+            />
+          )}
         </g>
 
         <g className="country-labels">
