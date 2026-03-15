@@ -87,6 +87,7 @@ function App() {
   const [syncing, setSyncing] = useState(false);
   const [currentView, setCurrentView] = useState<ViewType>('map');
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
+  const [pendingDrawer, setPendingDrawer] = useState<{ id: string; type: string } | null>(null);
   const [mode, setMode] = useState<'live' | 'archive'>('live');
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [layersEnabled, setLayersEnabled] = useState({
@@ -292,8 +293,9 @@ function App() {
     }
   };
 
-  const handleEventSelect = (id: string, _type: string) => {
+  const handleEventSelect = (id: string, type: string) => {
     setSelectedEvent(id);
+    setPendingDrawer({ id, type });
   };
 
   const handleLayerToggle = (layer: keyof typeof layersEnabled) => {
@@ -481,6 +483,8 @@ function App() {
           volcanoes={volcanoes}
           geopolitical={geopolitical}
           selectedEvent={selectedEvent}
+          pendingDrawer={pendingDrawer}
+          onPendingDrawerConsumed={() => setPendingDrawer(null)}
           onEventSelect={(id, type) => { handleEventSelect(id, type); setMobileSidebarOpen(false); }}
           mode={mode}
           onModeChange={setMode}

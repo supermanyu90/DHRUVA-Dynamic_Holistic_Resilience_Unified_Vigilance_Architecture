@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
 import { EventDetailDrawer } from './sidebar/EventDetailDrawer';
@@ -8,6 +8,7 @@ type DrawerEvent =
   | { type: 'earthquake'; data: Earthquake }
   | { type: 'disaster'; data: Disaster }
   | { type: 'volcano'; data: VolcanoEvent }
+  | { type: 'vessel'; data: Vessel }
   | { type: 'geopolitical' | 'curfew'; data: GeopoliticalEvent };
 
 interface SidebarProps {
@@ -18,6 +19,8 @@ interface SidebarProps {
   volcanoes: VolcanoEvent[];
   geopolitical: GeopoliticalEvent[];
   selectedEvent: string | null;
+  pendingDrawer?: { id: string; type: string } | null;
+  onPendingDrawerConsumed?: () => void;
   onEventSelect: (id: string, type: string) => void;
   mode: 'live' | 'archive';
   onModeChange: (mode: 'live' | 'archive') => void;
@@ -39,7 +42,7 @@ interface SidebarProps {
   mobileOpen?: boolean;
 }
 
-const SUPPORTED_DRAWER_TYPES = new Set(['news', 'earthquake', 'disaster', 'geopolitical', 'curfew']);
+const SUPPORTED_DRAWER_TYPES = new Set(['news', 'earthquake', 'disaster', 'geopolitical', 'curfew', 'volcano', 'vessel']);
 
 export function Sidebar({
   earthquakes,
@@ -49,6 +52,8 @@ export function Sidebar({
   volcanoes,
   geopolitical,
   selectedEvent,
+  pendingDrawer,
+  onPendingDrawerConsumed,
   onEventSelect,
   mode,
   onModeChange,
@@ -57,6 +62,37 @@ export function Sidebar({
   mobileOpen = false,
 }: SidebarProps) {
   const [drawerEvent, setDrawerEvent] = useState<DrawerEvent | null>(null);
+
+  useEffect(() => {
+    if (!pendingDrawer) return;
+    const { id, type } = pendingDrawer;
+    const findAndOpen = () => {
+      if (type === 'earthquake') {
+        const found = earthquakes.find(e => e.id === id);
+        if (found) setDrawerEvent({ type: 'earthquake', data: found });
+      } else if (type === 'disaster') {
+        const found = disasters.find(d => d.id === id);
+        if (found) setDrawerEvent({ type: 'disaster', data: found });
+      } else if (type === 'volcano') {
+        const found = volcanoes.find(v => v.id === id);
+        if (found) setDrawerEvent({ type: 'volcano', data: found });
+      } else if (type === 'vessel') {
+        const found = vessels.find(v => v.id === id);
+        if (found) setDrawerEvent({ type: 'vessel', data: found });
+      } else if (type === 'geopolitical') {
+        const found = geopolitical.find(g => g.id === id);
+        if (found) setDrawerEvent({ type: 'geopolitical', data: found });
+      } else if (type === 'curfew') {
+        const found = geopolitical.find(g => g.id === id);
+        if (found) setDrawerEvent({ type: 'curfew', data: found });
+      } else if (type === 'news') {
+        const found = news.find(n => n.id === id);
+        if (found) setDrawerEvent({ type: 'news', data: found });
+      }
+    };
+    findAndOpen();
+    onPendingDrawerConsumed?.();
+  }, [pendingDrawer]);
 
   const now = new Date();
   const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -97,6 +133,10 @@ export function Sidebar({
       setDrawerEvent({ type: 'earthquake', data: event as unknown as Earthquake });
     } else if (event.type === 'disaster') {
       setDrawerEvent({ type: 'disaster', data: event as unknown as Disaster });
+    } else if (event.type === 'volcano') {
+      setDrawerEvent({ type: 'volcano', data: event as unknown as VolcanoEvent });
+    } else if (event.type === 'vessel') {
+      setDrawerEvent({ type: 'vessel', data: event as unknown as Vessel });
     } else if (event.type === 'geopolitical') {
       setDrawerEvent({ type: 'geopolitical', data: event as unknown as GeopoliticalEvent });
     } else if (event.type === 'curfew') {

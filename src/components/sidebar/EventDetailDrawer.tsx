@@ -1,16 +1,60 @@
-import { ExternalLink, X, Radio, Globe, Tag, Clock, TrendingUp, TrendingDown, Minus, AlertTriangle, Activity, MapPin, Layers, Shield } from 'lucide-react';
+import { ExternalLink, X, Radio, Globe, Tag, Clock, TrendingUp, TrendingDown, Minus, AlertTriangle, Activity, MapPin, Layers, Shield, Zap, Navigation, Anchor } from 'lucide-react';
 import { Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from '../../lib/intelligence-api';
+import { Vessel } from '../../lib/intelligence-api';
 
 type DrawerEvent =
   | { type: 'news'; data: NewsEvent }
   | { type: 'earthquake'; data: Earthquake }
   | { type: 'disaster'; data: Disaster }
   | { type: 'volcano'; data: VolcanoEvent }
+  | { type: 'vessel'; data: Vessel }
   | { type: 'geopolitical' | 'curfew'; data: GeopoliticalEvent };
 
 interface EventDetailDrawerProps {
   event: DrawerEvent;
   onClose: () => void;
+}
+
+const FEED_SOURCE_LABELS: Record<string, { name: string; baseUrl: string }> = {
+  reuters_world: { name: 'Reuters', baseUrl: 'https://www.reuters.com' },
+  reuters_disinfo: { name: 'Reuters', baseUrl: 'https://www.reuters.com' },
+  ap_world: { name: 'AP News', baseUrl: 'https://apnews.com' },
+  ap_disinfo: { name: 'AP News', baseUrl: 'https://apnews.com' },
+  aljazeera: { name: 'Al Jazeera', baseUrl: 'https://www.aljazeera.com' },
+  aljazeera_disinfo: { name: 'Al Jazeera', baseUrl: 'https://www.aljazeera.com' },
+  bbc_world: { name: 'BBC News', baseUrl: 'https://www.bbc.com/news/world' },
+  bbc_disinfo: { name: 'BBC News', baseUrl: 'https://www.bbc.com/news/world' },
+  bbc_conflict: { name: 'BBC News', baseUrl: 'https://www.bbc.com/news/world' },
+  france24_world: { name: 'France 24', baseUrl: 'https://www.france24.com/en' },
+  france24_disinfo: { name: 'France 24', baseUrl: 'https://www.france24.com/en' },
+  dw_world: { name: 'Deutsche Welle', baseUrl: 'https://www.dw.com/en' },
+  dw_mideast: { name: 'DW Middle East', baseUrl: 'https://www.dw.com/en/middle-east' },
+  dw_africa: { name: 'DW Africa', baseUrl: 'https://www.dw.com/en/africa' },
+  dw_disinfo: { name: 'Deutsche Welle', baseUrl: 'https://www.dw.com/en' },
+  rfi_en: { name: 'RFI English', baseUrl: 'https://www.rfi.fr/en' },
+  the_hindu_world: { name: 'The Hindu', baseUrl: 'https://www.thehindu.com' },
+  middle_east_eye: { name: 'Middle East Eye', baseUrl: 'https://www.middleeasteye.net' },
+  africa_report: { name: 'The Africa Report', baseUrl: 'https://www.theafricareport.com' },
+  npr_world: { name: 'NPR World', baseUrl: 'https://www.npr.org/sections/world' },
+  npr_disinfo: { name: 'NPR', baseUrl: 'https://www.npr.org' },
+  voa_news: { name: 'Voice of America', baseUrl: 'https://www.voanews.com' },
+  voa_conflict: { name: 'Voice of America', baseUrl: 'https://www.voanews.com' },
+  voa_disinfo: { name: 'Voice of America', baseUrl: 'https://www.voanews.com' },
+  rferl: { name: 'Radio Free Europe', baseUrl: 'https://www.rferl.org' },
+  rferl_disinfo: { name: 'Radio Free Europe', baseUrl: 'https://www.rferl.org' },
+  guardian_world: { name: 'The Guardian', baseUrl: 'https://www.theguardian.com/world' },
+  guardian_conflict: { name: 'The Guardian', baseUrl: 'https://www.theguardian.com/world/conflict' },
+  guardian_disinfo: { name: 'The Guardian', baseUrl: 'https://www.theguardian.com' },
+  crisisgroup: { name: 'Crisis Group', baseUrl: 'https://www.crisisgroup.org' },
+  reliefweb: { name: 'ReliefWeb', baseUrl: 'https://reliefweb.int' },
+  amnesty: { name: 'Amnesty International', baseUrl: 'https://www.amnesty.org' },
+  dawn_pakistan: { name: 'Dawn', baseUrl: 'https://www.dawn.com' },
+  bellingcat: { name: 'Bellingcat', baseUrl: 'https://www.bellingcat.com' },
+  euvsdisin: { name: 'EU vs Disinfo', baseUrl: 'https://euvsdisinfo.eu' },
+};
+
+function getSourceLabel(source: string): string {
+  return FEED_SOURCE_LABELS[source]?.name || source.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
 function Badge({ color, icon, label }: { color: string; icon?: React.ReactNode; label: string }) {
@@ -212,9 +256,112 @@ function DisasterDrawer({ data }: { data: Disaster }) {
   );
 }
 
-function GeopoliticalDrawer({ data, isСurfew }: { data: GeopoliticalEvent; isСurfew: boolean }) {
+function VolcanoDrawer({ data }: { data: VolcanoEvent }) {
+  const alertColor = data.alert_level === 'WARNING' || data.alert_level === 'RED' ? '#FF0040'
+    : data.alert_level === 'WATCH' || data.alert_level === 'ORANGE' ? '#FF6B00'
+    : data.alert_level === 'ADVISORY' || data.alert_level === 'YELLOW' ? '#FFB800'
+    : '#00BFFF';
+  const statusColor = data.status === 'Erupting' ? '#FF4500' : '#FF8C00';
+  const gvpUrl = data.source || `https://volcano.si.edu/volcano.cfm?vn=${data.volcano_id}`;
+
+  return (
+    <>
+      <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 600, fontSize: '13px', color: 'var(--text)', lineHeight: 1.4 }}>
+        {data.name}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+        <Badge color={statusColor} icon={<Zap size={8} style={{ color: statusColor }} />} label={data.status || 'ACTIVE'} />
+        {data.alert_level && <Badge color={alertColor} icon={<AlertTriangle size={8} style={{ color: alertColor }} />} label={`Alert: ${data.alert_level}`} />}
+        {data.country && <Badge color="#4D9FFF" icon={<Globe size={8} style={{ color: '#4D9FFF' }} />} label={data.country} />}
+        <Badge color="var(--accent)" label="GVP / SMITHSONIAN" />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+        <MapPin size={8} style={{ color: 'var(--dim)' }} />
+        <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: '8px', color: 'var(--dim)' }}>{data.latitude?.toFixed(4)}, {data.longitude?.toFixed(4)}</span>
+      </div>
+      {data.elevation != null && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <Activity size={8} style={{ color: 'var(--dim)' }} />
+          <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: '8px', color: 'var(--dim)' }}>Elevation: {data.elevation.toLocaleString()} m</span>
+        </div>
+      )}
+      {data.last_eruption && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <Clock size={8} style={{ color: 'var(--dim)' }} />
+          <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: '8px', color: 'var(--dim)' }}>Last eruption: {data.last_eruption}</span>
+        </div>
+      )}
+      {data.activity_description && (
+        <Section label="ACTIVITY REPORT">
+          <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: '11px', color: 'rgba(232,240,248,0.8)', lineHeight: 1.55 }}>
+            {data.activity_description.length > 400 ? data.activity_description.slice(0, 400).trimEnd() + '…' : data.activity_description}
+          </p>
+        </Section>
+      )}
+      <SourceButton url={gvpUrl} label="VIEW ON SMITHSONIAN GVP" />
+    </>
+  );
+}
+
+function VesselDrawer({ data }: { data: Vessel }) {
+  const typeColor = data.type === 'Military' ? '#FF2255' : data.type === 'Tanker' ? '#FFB800' : '#00BFFF';
+  const marineUrl = `https://www.marinetraffic.com/en/ais/details/ships/mmsi:${data.mmsi}`;
+
+  return (
+    <>
+      <div style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 600, fontSize: '13px', color: 'var(--text)', lineHeight: 1.4 }}>
+        {data.name}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+        <Badge color={typeColor} icon={<Anchor size={8} style={{ color: typeColor }} />} label={data.type || 'VESSEL'} />
+        {data.flag && <Badge color="#4D9FFF" icon={<Globe size={8} style={{ color: '#4D9FFF' }} />} label={data.flag} />}
+        {data.mmsi && <Badge color="var(--accent)" label={`MMSI: ${data.mmsi}`} />}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+        <MapPin size={8} style={{ color: 'var(--dim)' }} />
+        <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: '8px', color: 'var(--dim)' }}>{data.latitude?.toFixed(4)}, {data.longitude?.toFixed(4)}</span>
+      </div>
+      {data.last_position_time && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <Clock size={8} style={{ color: 'var(--dim)' }} />
+          <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: '8px', color: 'var(--dim)' }}>Last seen: {new Date(data.last_position_time).toLocaleString()}</span>
+        </div>
+      )}
+      <Section label="NAVIGATION">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {data.speed != null && (
+            <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: '11px', color: 'rgba(232,240,248,0.8)' }}>
+              <span style={{ color: 'var(--dim)' }}>Speed: </span>{data.speed.toFixed(1)} knots
+            </div>
+          )}
+          {data.course != null && (
+            <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: '11px', color: 'rgba(232,240,248,0.8)' }}>
+              <span style={{ color: 'var(--dim)' }}>Course: </span>{data.course.toFixed(0)}°
+            </div>
+          )}
+          {data.heading != null && (
+            <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: '11px', color: 'rgba(232,240,248,0.8)' }}>
+              <span style={{ color: 'var(--dim)' }}>Heading: </span>{data.heading.toFixed(0)}°
+            </div>
+          )}
+          {data.destination && (
+            <div style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: '11px', color: 'rgba(232,240,248,0.8)' }}>
+              <span style={{ color: 'var(--dim)' }}>Destination: </span>{data.destination}
+            </div>
+          )}
+        </div>
+      </Section>
+      <SourceButton url={marineUrl} label="VIEW ON MARINETRAFFIC" />
+    </>
+  );
+}
+
+function GeopoliticalDrawer({ data, isCurfew }: { data: GeopoliticalEvent; isCurfew: boolean }) {
   const sevColor = data.severity === 'critical' ? '#FF2255' : data.severity === 'high' ? '#FF6B00' : data.severity === 'medium' ? '#FFB800' : '#4D9FFF';
-  const catColor = isСurfew ? '#CC3300' : '#FF2255';
+  const catColor = isCurfew ? '#CC3300' : '#FF2255';
+
+  const articleUrl = data.properties?.url as string | undefined;
+  const sourceName = getSourceLabel(data.source || '');
 
   return (
     <>
@@ -225,7 +372,7 @@ function GeopoliticalDrawer({ data, isСurfew }: { data: GeopoliticalEvent; isС
         <Badge color={catColor} icon={<Shield size={8} style={{ color: catColor }} />} label={data.category.toUpperCase()} />
         <Badge color={sevColor} icon={<AlertTriangle size={8} style={{ color: sevColor }} />} label={`${data.severity.toUpperCase()} SEVERITY`} />
         {data.country && <Badge color="#4D9FFF" icon={<Globe size={8} style={{ color: '#4D9FFF' }} />} label={data.country} />}
-        {data.source && <Badge color="var(--accent)" label={data.source} />}
+        <Badge color="var(--accent)" icon={<Radio size={8} style={{ color: 'var(--accent)' }} />} label={sourceName} />
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
         <Clock size={8} style={{ color: 'var(--dim)' }} />
@@ -234,7 +381,7 @@ function GeopoliticalDrawer({ data, isСurfew }: { data: GeopoliticalEvent; isС
       {data.started_at && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
           <Activity size={8} style={{ color: 'var(--dim)' }} />
-          <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: '8px', color: 'var(--dim)' }}>Started: {new Date(data.started_at).toLocaleString()}</span>
+          <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: '8px', color: 'var(--dim)' }}>Published: {new Date(data.started_at).toLocaleString()}</span>
         </div>
       )}
       {data.latitude != null && (
@@ -244,27 +391,22 @@ function GeopoliticalDrawer({ data, isСurfew }: { data: GeopoliticalEvent; isС
         </div>
       )}
       {data.description && (
-        <Section label="SITUATION REPORT">
+        <Section label="SITUATION BRIEF">
           <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: '11px', color: 'rgba(232,240,248,0.8)', lineHeight: 1.55 }}>
-            {data.description.length > 300 ? data.description.slice(0, 300).trimEnd() + '…' : data.description}
+            {data.description.length > 450 ? data.description.slice(0, 450).trimEnd() + '…' : data.description}
           </p>
         </Section>
       )}
-      {data.properties && Object.keys(data.properties).length > 0 && (
-        <Section label="ADDITIONAL DATA">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {Object.entries(data.properties).slice(0, 5).map(([k, v]) => v != null && (
-              <div key={k} style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: '11px', color: 'rgba(232,240,248,0.8)' }}>
-                <span style={{ color: 'var(--dim)', textTransform: 'capitalize' }}>{k.replace(/_/g, ' ')}: </span>{String(v)}
-              </div>
-            ))}
-          </div>
-        </Section>
+      {articleUrl && (
+        <SourceButton url={articleUrl} label={`READ FULL REPORT — ${sourceName}`} />
       )}
-      {data.source && (() => {
+      {!articleUrl && data.source && (() => {
         const src = data.source.trim();
-        const isUrl = src.startsWith('http://') || src.startsWith('https://');
-        if (isUrl) {
+        const fallbackInfo = FEED_SOURCE_LABELS[src];
+        if (fallbackInfo) {
+          return <SourceButton url={fallbackInfo.baseUrl} label={`VISIT ${fallbackInfo.name.toUpperCase()}`} />;
+        }
+        if (src.startsWith('http://') || src.startsWith('https://')) {
           return <SourceButton url={src} label={`VIEW SOURCE — ${new URL(src).hostname}`} />;
         }
         return null;
@@ -279,6 +421,7 @@ export function EventDetailDrawer({ event, onClose }: EventDetailDrawerProps) {
     earthquake: 'SEISMIC EVENT',
     disaster: 'DISASTER ALERT',
     volcano: 'VOLCANIC ACTIVITY',
+    vessel: 'VESSEL TRACK',
     geopolitical: 'GEOPOLITICAL EVENT',
     curfew: 'CURFEW ALERT',
   };
@@ -311,7 +454,11 @@ export function EventDetailDrawer({ event, onClose }: EventDetailDrawerProps) {
         {event.type === 'news' && <NewsDrawer data={event.data} />}
         {event.type === 'earthquake' && <EarthquakeDrawer data={event.data} />}
         {event.type === 'disaster' && <DisasterDrawer data={event.data} />}
-        {(event.type === 'geopolitical' || event.type === 'curfew') && <GeopoliticalDrawer data={event.data} isСurfew={event.type === 'curfew'} />}
+        {event.type === 'volcano' && <VolcanoDrawer data={event.data} />}
+        {event.type === 'vessel' && <VesselDrawer data={event.data} />}
+        {(event.type === 'geopolitical' || event.type === 'curfew') && (
+          <GeopoliticalDrawer data={event.data} isCurfew={event.type === 'curfew'} />
+        )}
       </div>
     </div>
   );
