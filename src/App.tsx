@@ -14,6 +14,7 @@ import { TimelineView } from './components/TimelineView';
 import { AlertToast } from './components/AlertToast';
 import { Tooltip } from './components/Tooltip';
 import { LiveEventTicker, TickerEvent } from './components/LiveEventTicker';
+import { AboutDhruva } from './components/AboutDhruva';
 
 type ViewType = 'map' | 'timeline' | 'news' | 'sewa' | 'cyber' | 'infoops' | 'gov' | 'vessel';
 
@@ -115,6 +116,7 @@ function App() {
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [nextSyncIn, setNextSyncIn] = useState<number>(AUTO_SYNC_INTERVAL_MS);
   const [newEventIds, setNewEventIds] = useState<Set<string>>(new Set());
+  const [showAbout, setShowAbout] = useState(false);
 
   const autoSyncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -454,10 +456,16 @@ function App() {
           <span className="sdot" style={{ background: theme === 'dark' ? '#00D4A0' : '#007A5E' }}></span>
           THEME: {theme.toUpperCase()}
         </div>
+        <div className="about-link-wrap">
+          <button className="about-link-btn" onClick={() => setShowAbout(true)}>
+            ABOUT DHRUVA
+          </button>
+        </div>
       </div>
 
       <AlertToast alerts={alerts} />
       {tooltip && <Tooltip x={tooltip.x} y={tooltip.y} content={tooltip.content} />}
+      {showAbout && <AboutDhruva onClose={() => setShowAbout(false)} theme={theme} />}
     </div>
   );
 }
