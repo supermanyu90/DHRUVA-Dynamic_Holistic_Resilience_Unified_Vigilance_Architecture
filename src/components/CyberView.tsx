@@ -1,79 +1,86 @@
-import { useState } from 'react';
-import { Shield, AlertTriangle, Activity } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Shield, Activity, RefreshCw } from 'lucide-react';
+import { IntelligenceAPI, CyberThreat } from '../lib/intelligence-api';
 
-interface Threat {
-  id: string;
-  type: string;
-  title: string;
-  description: string;
-  severity: 'critical' | 'high' | 'medium' | 'low';
-  age: string;
-  tags: string[];
+const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low'] as const;
+
+function getSeverityColor(severity: string) {
+  switch (severity) {
+    case 'critical': return '#FF0040';
+    case 'high':     return '#FF6B00';
+    case 'medium':   return '#FFB800';
+    case 'low':      return '#00D4A0';
+    default:         return '#8BAFC8';
+  }
 }
 
 export function CyberView() {
+  const [threats, setThreats] = useState<CyberThreat[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<string>('all');
+  const [lastUpdated, setLastUpdated] = useState<string>('');
+
+  const loadThreats = useCallback(async () => {
+    try {
+      const data = await IntelligenceAPI.getCyberThreats(100);
+      setThreats(data);
+      setLastUpdated(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    } catch (err) {
+      console.error('Failed to load cyber threats:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ingest-cyber-threats`;
+      await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      await new Promise(r => setTimeout(r, 2000));
+      await loadThreats();
+    } catch (err) {
+      console.error('Refresh failed:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadThreats]);
+
+  useEffect(() => {
+    loadThreats();
+  }, [loadThreats]);
 
   const threatLevels = {
-    critical: 3,
-    high: 8,
-    medium: 15,
-    low: 24,
+    critical: threats.filter(t => t.severity === 'critical').length,
+    high: threats.filter(t => t.severity === 'high').length,
+    medium: threats.filter(t => t.severity === 'medium').length,
+    low: threats.filter(t => t.severity === 'low').length,
   };
 
-  const threats: Threat[] = [
-    {
-      id: '1',
-      type: 'APT',
-      title: 'APT29 Phishing Campaign Detected',
-      description: 'Sophisticated spear-phishing targeting government agencies with credential harvesting',
-      severity: 'critical',
-      age: '2h',
-      tags: ['Russia', 'Government', 'Phishing'],
-    },
-    {
-      id: '2',
-      type: 'RANSOMWARE',
-      title: 'LockBit 3.0 Variant Spreading',
-      description: 'New ransomware variant exploiting unpatched Exchange servers',
-      severity: 'high',
-      age: '5h',
-      tags: ['Ransomware', 'Exchange', 'Healthcare'],
-    },
-    {
-      id: '3',
-      type: 'VULNERABILITY',
-      title: 'Zero-Day in Popular CMS',
-      description: 'Critical RCE vulnerability discovered in WordPress plugin',
-      severity: 'high',
-      age: '8h',
-      tags: ['0-day', 'WordPress', 'RCE'],
-    },
-    {
-      id: '4',
-      type: 'BOTNET',
-      title: 'Mirai Botnet Activity Surge',
-      description: 'Increased scanning activity from IoT devices across Asia-Pacific',
-      severity: 'medium',
-      age: '12h',
-      tags: ['Botnet', 'IoT', 'APAC'],
-    },
-  ];
+  const filteredThreats = threats.filter(t => {
+    if (filter === 'all') return true;
+    if (filter === 'apt') return t.threat_type?.toLowerCase().includes('apt');
+    if (filter === 'ransomware') return t.threat_type?.toLowerCase().includes('ransomware');
+    if (filter === 'malware') return t.threat_type?.toLowerCase().includes('malware');
+    if (filter === 'vuln') return t.threat_type?.toLowerCase().includes('vulnerabilit');
+    return t.threat_type?.toLowerCase().includes(filter.toLowerCase());
+  });
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical':
-        return '#FF0040';
-      case 'high':
-        return '#FF6B00';
-      case 'medium':
-        return '#FFB800';
-      case 'low':
-        return '#00D4A0';
-      default:
-        return '#8BAFC8';
-    }
-  };
+  function formatAge(dateStr: string): string {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h`;
+    return `${Math.floor(hrs / 24)}d`;
+  }
 
   return (
     <div className="view active cyber-wrap">
@@ -83,19 +90,23 @@ export function CyberView() {
       </div>
 
       <div className="cyber-toolbar">
-        <button className="cyber-refresh-btn">
-          <Activity size={12} style={{ display: 'inline', marginRight: '4px' }} />
-          REFRESH
+        <button className="cyber-refresh-btn" onClick={handleRefresh} disabled={refreshing}>
+          {refreshing
+            ? <><Activity size={12} style={{ display: 'inline', marginRight: '4px', animation: 'spin 0.8s linear infinite' }} />FETCHING...</>
+            : <><RefreshCw size={12} style={{ display: 'inline', marginRight: '4px' }} />REFRESH</>
+          }
         </button>
-        <div className="cyber-status">Last scan: 2 minutes ago</div>
+        <div className="cyber-status">
+          {loading ? 'LOADING...' : lastUpdated ? `Last updated: ${lastUpdated}` : 'No data loaded'}
+        </div>
       </div>
 
       <div className="cyber-body">
         <div className="cyber-threat-strip">
-          {Object.entries(threatLevels).map(([severity, count]) => (
+          {SEVERITY_ORDER.map(severity => (
             <div key={severity} className={`cyber-threat-tile ${severity}`}>
               <div className={`cyber-threat-n ${severity}`} style={{ color: getSeverityColor(severity) }}>
-                {count}
+                {threatLevels[severity]}
               </div>
               <div className="cyber-threat-l">{severity.toUpperCase()}</div>
             </div>
@@ -108,42 +119,47 @@ export function CyberView() {
         </div>
 
         <div className="cyber-filter-bar">
-          <button className={`cyber-filter-btn ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>
-            ALL
-          </button>
-          <button className={`cyber-filter-btn ${filter === 'apt' ? 'active' : ''}`} onClick={() => setFilter('apt')}>
-            APT
-          </button>
-          <button className={`cyber-filter-btn ${filter === 'ransomware' ? 'active' : ''}`} onClick={() => setFilter('ransomware')}>
-            RANSOMWARE
-          </button>
-          <button className={`cyber-filter-btn ${filter === 'malware' ? 'active' : ''}`} onClick={() => setFilter('malware')}>
-            MALWARE
-          </button>
-          <button className={`cyber-filter-btn ${filter === 'vuln' ? 'active' : ''}`} onClick={() => setFilter('vuln')}>
-            VULNERABILITIES
-          </button>
+          {['all', 'apt', 'ransomware', 'malware', 'vuln'].map(f => (
+            <button
+              key={f}
+              className={`cyber-filter-btn ${filter === f ? 'active' : ''}`}
+              onClick={() => setFilter(f)}
+            >
+              {f === 'all' ? 'ALL' : f === 'apt' ? 'APT' : f === 'ransomware' ? 'RANSOMWARE' : f === 'malware' ? 'MALWARE' : 'VULNERABILITIES'}
+            </button>
+          ))}
         </div>
 
         <div className="cyber-feed">
-          {threats.map((threat) => (
-            <div key={threat.id} className={`cyber-card sev-${threat.severity}`}>
-              <div className="cyber-card-head">
-                <div className="cyber-card-type">{threat.type}</div>
-                <div className="cyber-card-age">{threat.age} ago</div>
-              </div>
-              <div className="cyber-card-title">{threat.title}</div>
-              <div className="cyber-card-desc">{threat.description}</div>
-              <div className="cyber-card-footer">
-                {threat.tags.map((tag, i) => (
-                  <div key={i} className="cyber-tag">
-                    {tag}
-                  </div>
-                ))}
-                <div className={`cyber-sev-badge ${threat.severity}`}>{threat.severity.toUpperCase()}</div>
-              </div>
+          {loading ? (
+            <div className="news-loading">
+              <div className="spinner" />
+              LOADING THREAT INTELLIGENCE...
             </div>
-          ))}
+          ) : filteredThreats.length === 0 ? (
+            <div className="news-loading">
+              <div className="news-empty-title">NO THREATS FOUND</div>
+              <div className="news-empty-hint">Click REFRESH to fetch the latest threat intelligence data.</div>
+              <button className="news-retry-btn" onClick={handleRefresh}>REFRESH</button>
+            </div>
+          ) : (
+            filteredThreats.map(threat => (
+              <div key={threat.id} className={`cyber-card sev-${threat.severity}`}>
+                <div className="cyber-card-head">
+                  <div className="cyber-card-type">{threat.threat_type?.toUpperCase() || 'UNKNOWN'}</div>
+                  <div className="cyber-card-age">{formatAge(threat.first_seen)} ago</div>
+                </div>
+                <div className="cyber-card-title">{threat.title}</div>
+                <div className="cyber-card-desc">{threat.description}</div>
+                <div className="cyber-card-footer">
+                  <div className={`cyber-sev-badge ${threat.severity}`}>{threat.severity.toUpperCase()}</div>
+                  {!threat.is_active && (
+                    <div className="cyber-tag" style={{ color: '#8BAFC8' }}>RESOLVED</div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

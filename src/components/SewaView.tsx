@@ -88,41 +88,28 @@ async function fetchSewaDirectly(): Promise<SewaData | null> {
   return null;
 }
 
-async function fetchSewaViaAI(): Promise<SewaData | null> {
-  const prompt = `Search the web for the latest service availability data from the IBA BankSewa portal at https://www.iba-banksewa.in/sewa/service-availability
-
-Return ONLY a valid JSON object with this exact shape (no markdown, no preamble):
-{"fetchedAt":"${new Date().toISOString()}","services":["UPI","IMPS","NEFT","RTGS","Net Banking","Mobile Banking"],"banks":[{"bank":"Bank of Baroda","shortName":"BOB","category":"PSB","isFocus":true,"uptimes":{"UPI":99.5,"IMPS":99.2,"NEFT":99.8,"RTGS":99.9,"Net Banking":98.75,"Mobile Banking":98.9},"plannedOutages":[]},{"bank":"HDFC Bank","shortName":"HDFC","category":"PVT","isFocus":false,"uptimes":{"UPI":99.7,"IMPS":99.6,"NEFT":99.8,"RTGS":99.9,"Net Banking":99.5,"Mobile Banking":99.6},"plannedOutages":[]},{"bank":"ICICI Bank","shortName":"ICICI","category":"PVT","isFocus":false,"uptimes":{"UPI":99.6,"IMPS":99.5,"NEFT":99.7,"RTGS":99.8,"Net Banking":99.4,"Mobile Banking":99.5},"plannedOutages":[]},{"bank":"Axis Bank","shortName":"AXIS","category":"PVT","isFocus":false,"uptimes":{"UPI":99.4,"IMPS":99.3,"NEFT":99.6,"RTGS":99.7,"Net Banking":99.2,"Mobile Banking":99.3},"plannedOutages":[]},{"bank":"Kotak Mahindra Bank","shortName":"KOTAK","category":"PVT","isFocus":false,"uptimes":{"UPI":99.5,"IMPS":99.4,"NEFT":99.6,"RTGS":99.8,"Net Banking":99.3,"Mobile Banking":99.4},"plannedOutages":[]},{"bank":"State Bank of India","shortName":"SBI","category":"PSB","isFocus":false,"uptimes":{"UPI":99.3,"IMPS":99.2,"NEFT":99.5,"RTGS":99.6,"Net Banking":99.1,"Mobile Banking":99.0},"plannedOutages":[]},{"bank":"Canara Bank","shortName":"CANARA","category":"PSB","isFocus":false,"uptimes":{"UPI":98.9,"IMPS":98.8,"NEFT":99.1,"RTGS":99.4,"Net Banking":98.6,"Mobile Banking":98.7},"plannedOutages":[]},{"bank":"Punjab National Bank","shortName":"PNB","category":"PSB","isFocus":false,"uptimes":{"UPI":98.7,"IMPS":98.6,"NEFT":98.9,"RTGS":99.2,"Net Banking":98.4,"Mobile Banking":98.5},"plannedOutages":[]},{"bank":"Union Bank of India","shortName":"UBI","category":"PSB","isFocus":false,"uptimes":{"UPI":98.6,"IMPS":98.5,"NEFT":98.8,"RTGS":99.0,"Net Banking":98.2,"Mobile Banking":98.3},"plannedOutages":[]},{"bank":"Bank of India","shortName":"BOI","category":"PSB","isFocus":false,"uptimes":{"UPI":98.4,"IMPS":98.3,"NEFT":98.6,"RTGS":98.9,"Net Banking":98.0,"Mobile Banking":98.2},"plannedOutages":[]}],"dataSource":"IBA SEWA Portal — iba-banksewa.in","notes":""}
-
-Populate all uptimes with real current values from the IBA SEWA portal. For plannedOutages use: [{"service":"UPI","window":"01:00–02:00 IST","reason":"Scheduled maintenance"}]. Use actual live data.`;
-
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01',
-      'anthropic-beta': 'interstitial-1',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
-      tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
-
-  if (!resp.ok) throw new Error(`API ${resp.status}`);
-  const data = await resp.json();
-  const text = (data.content as Array<{ type: string; text?: string }>)
-    .filter(b => b.type === 'text')
-    .map(b => b.text || '')
-    .join('\n')
-    .replace(/```json|```/g, '')
-    .trim();
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start === -1 || end === -1) throw new Error('No JSON in AI response');
-  return JSON.parse(text.slice(start, end + 1)) as SewaData;
+async function fetchSewaViaEdge(): Promise<SewaData | null> {
+  const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-sewa-data`;
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), 30000);
+  try {
+    const resp = await fetch(apiUrl, {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    clearTimeout(tid);
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    if (!data?.banks?.length) return null;
+    return data as SewaData;
+  } catch {
+    clearTimeout(tid);
+    return null;
+  }
 }
 
 function getSewaFallback(): SewaData {
@@ -169,12 +156,12 @@ export function SewaView() {
     } catch { /* fall through */ }
 
     if (!result) {
-      setLoadingMsg('PORTAL BLOCKED — TRYING AI FETCH...');
-      setStatusMsg('TIER 2 — AI-ASSISTED FETCH');
+      setLoadingMsg('PORTAL BLOCKED — TRYING SERVER-SIDE FETCH...');
+      setStatusMsg('TIER 2 — EDGE FUNCTION FETCH');
       try {
-        result = await fetchSewaViaAI();
+        result = await fetchSewaViaEdge();
       } catch (e) {
-        console.warn('[DHRUVA] AI fetch failed:', e);
+        console.warn('[DHRUVA] Edge fetch failed:', e);
       }
     }
 

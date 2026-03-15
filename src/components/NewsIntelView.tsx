@@ -85,7 +85,7 @@ export function NewsIntelView() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ingest-news-intel`;
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ingest-news`;
       await fetch(apiUrl, {
         method: 'POST',
         headers: {
