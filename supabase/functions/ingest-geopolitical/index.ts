@@ -21,32 +21,60 @@ const COUNTRY_COORDS: Record<string, [number, number]> = {
   'Saudi Arabia': [23.9, 45.1], 'UAE': [23.4, 53.8], 'Egypt': [26.8, 30.8],
   'Tunisia': [33.9, 9.5], 'Algeria': [28.0, 1.7], 'Morocco': [31.8, -7.1],
   'South Africa': [-30.6, 22.9], 'Kenya': [-0.0, 37.9], 'Tanzania': [-6.4, 34.9],
-  'Zimbabwe': [-19.0, 29.2], 'Mozambique': [-18.7, 35.5], 'Venezuela': [6.4, -66.6],
-  'Cuba': [21.5, -77.8], 'Nicaragua': [12.9, -85.2], 'Bolivia': [-16.3, -63.6],
-  'Peru': [-9.2, -75.0], 'Chile': [-35.7, -71.5], 'Brazil': [-14.2, -51.9],
-  'Serbia': [44.0, 21.0], 'Kosovo': [42.6, 21.2], 'Bosnia': [44.2, 17.9],
-  'Bangladesh': [23.7, 90.4], 'Sri Lanka': [7.9, 80.8], 'Nepal': [28.4, 84.1],
+  'Zimbabwe': [-19.0, 29.2], 'Mozambique': [-18.7, 35.5], 'Cuba': [21.5, -77.8],
+  'Nicaragua': [12.9, -85.2], 'Bolivia': [-16.3, -63.6], 'Peru': [-9.2, -75.0],
+  'Chile': [-35.7, -71.5], 'Brazil': [-14.2, -51.9], 'Serbia': [44.0, 21.0],
+  'Kosovo': [42.6, 21.2], 'Bosnia': [44.2, 17.9], 'Bangladesh': [23.7, 90.4],
+  'Sri Lanka': [7.9, 80.8], 'Nepal': [28.4, 84.1], 'Philippines': [12.9, 121.8],
+  'Indonesia': [-0.8, 113.9], 'Thailand': [15.9, 100.9], 'Cambodia': [12.6, 104.9],
+  'Laos': [19.9, 102.5], 'Vietnam': [14.1, 108.3], 'South Sudan': [6.9, 31.3],
+  'Chad': [15.5, 18.7], 'Central African Republic': [6.6, 20.9], 'Cameroon': [3.8, 11.5],
+  'Ghana': [7.9, -1.0], 'Ivory Coast': [5.4, -5.5], 'Senegal': [14.5, -14.5],
+  'Kazakhstan': [48.0, 66.9], 'Uzbekistan': [41.4, 64.6], 'Belarus': [53.7, 27.9],
+  'Poland': [51.9, 19.1], 'Hungary': [47.2, 19.5], 'Romania': [45.9, 24.9],
+  'Serbia': [44.0, 21.0], 'Moldova': [47.4, 28.4], 'Ecuador': [-1.8, -78.2],
+  'Paraguay': [-23.4, -58.4], 'Argentina': [-38.4, -63.6], 'Guatemala': [15.8, -90.2],
+  'Honduras': [15.2, -86.2], 'El Salvador': [13.8, -88.9], 'Panama': [8.5, -80.8],
 };
 
-const GEOPOLITICAL_RSS: Array<{ key: string; url: string; category: string }> = [
-  { key: 'crisisgroup', url: 'https://www.crisisgroup.org/rss.xml', category: 'crisis' },
-  { key: 'reliefweb_crisis', url: 'https://reliefweb.int/updates/rss.xml?taxonomy_vocabulary_6_tid=4598', category: 'crisis' },
-  { key: 'amnesty', url: 'https://www.amnesty.org/en/feed/', category: 'protest' },
-  { key: 'bbc_conflict', url: 'https://feeds.bbci.co.uk/news/world/rss.xml', category: 'conflict' },
-  { key: 'aljazeera_war', url: 'https://www.aljazeera.com/xml/rss/all.xml', category: 'conflict' },
-  { key: 'guardian_conflict', url: 'https://www.theguardian.com/world/conflict/rss', category: 'conflict' },
-  { key: 'rferl', url: 'https://www.rferl.org/api/zgqoumoye', category: 'geopolitical' },
-  { key: 'voa_conflict', url: 'https://www.voanews.com/api/zmoqmeniqv', category: 'geopolitical' },
+const GEOPOLITICAL_FEEDS: Array<{ key: string; url: string; category: string; priority: number }> = [
+  { key: 'reuters_world', url: 'https://feeds.reuters.com/reuters/worldNews', category: 'geopolitical', priority: 1 },
+  { key: 'ap_world', url: 'https://feeds.apnews.com/rss/apf-intlnews', category: 'geopolitical', priority: 1 },
+  { key: 'aljazeera', url: 'https://www.aljazeera.com/xml/rss/all.xml', category: 'conflict', priority: 1 },
+  { key: 'bbc_world', url: 'https://feeds.bbci.co.uk/news/world/rss.xml', category: 'geopolitical', priority: 1 },
+  { key: 'france24_world', url: 'https://www.france24.com/en/rss', category: 'geopolitical', priority: 2 },
+  { key: 'dw_world', url: 'https://rss.dw.com/rdf/rss-en-world', category: 'geopolitical', priority: 2 },
+  { key: 'dw_mideast', url: 'https://rss.dw.com/rdf/rss-en-middle-east', category: 'conflict', priority: 2 },
+  { key: 'dw_africa', url: 'https://rss.dw.com/rdf/rss-en-africa', category: 'crisis', priority: 2 },
+  { key: 'rfi_en', url: 'https://www.rfi.fr/en/rss', category: 'geopolitical', priority: 2 },
+  { key: 'the_hindu_world', url: 'https://www.thehindu.com/news/international/?service=rss', category: 'geopolitical', priority: 2 },
+  { key: 'crisisgroup', url: 'https://www.crisisgroup.org/rss.xml', category: 'crisis', priority: 2 },
+  { key: 'reliefweb', url: 'https://reliefweb.int/updates/rss.xml?taxonomy_vocabulary_6_tid=4598', category: 'crisis', priority: 3 },
+  { key: 'voa_news', url: 'https://www.voanews.com/api/zmoqmeniqv', category: 'geopolitical', priority: 3 },
+  { key: 'rferl', url: 'https://www.rferl.org/api/zgqoumoye', category: 'geopolitical', priority: 3 },
+  { key: 'guardian_world', url: 'https://www.theguardian.com/world/conflict/rss', category: 'conflict', priority: 3 },
+  { key: 'amnesty', url: 'https://www.amnesty.org/en/feed/', category: 'protest', priority: 3 },
+  { key: 'dawn_pakistan', url: 'https://www.dawn.com/feeds/world-news', category: 'geopolitical', priority: 3 },
+  { key: 'middle_east_eye', url: 'https://www.middleeasteye.net/rss', category: 'conflict', priority: 2 },
+  { key: 'africa_report', url: 'https://www.theafricareport.com/feed/', category: 'geopolitical', priority: 3 },
+  { key: 'npr_world', url: 'https://feeds.npr.org/1004/rss.xml', category: 'geopolitical', priority: 2 },
 ];
 
 const CONFLICT_PATTERNS = [
-  { pattern: /\b(war|warfare|airstrike|air strike|missile|shelling|artillery|troops|military offensive|invasion|combat|frontline|ceasefire|killed|casualties|dead|wounded)\b/i, category: 'conflict' as const, severity: 'critical' as const },
-  { pattern: /\b(coup|junta|martial law|military takeover|government overthrown)\b/i, category: 'coup' as const, severity: 'critical' as const },
-  { pattern: /\b(curfew|lockdown order|movement restrictions|night curfew)\b/i, category: 'curfew' as const, severity: 'high' as const },
-  { pattern: /\b(sanctions|embargo|asset freeze|trade war|export ban|import ban)\b/i, category: 'sanctions' as const, severity: 'high' as const },
-  { pattern: /\b(humanitarian crisis|state of emergency|government collapse|political crisis|mass displacement)\b/i, category: 'crisis' as const, severity: 'high' as const },
-  { pattern: /\b(protest|riot|unrest|uprising|crackdown|demonstration|clashes|marching)\b/i, category: 'protest' as const, severity: 'medium' as const },
-  { pattern: /\b(diplomatic crisis|expelled|recalled ambassador|territorial dispute|border clash|sovereignty)\b/i, category: 'geopolitical' as const, severity: 'high' as const },
+  { pattern: /\b(war|warfare|airstrike|air strike|missile|shelling|artillery|troops|military offensive|invasion|combat|frontline|ceasefire|killed|casualties|dead|wounded|bombing|siege|offensive|counteroffensive|airspace|warplane|drone strike)\b/i, category: 'conflict' as const, severity: 'critical' as const },
+  { pattern: /\b(coup|junta|martial law|military takeover|government overthrown|regime change|putsch)\b/i, category: 'coup' as const, severity: 'critical' as const },
+  { pattern: /\b(genocide|ethnic cleansing|war crimes|mass atrocity|civilian massacre|targeted killing)\b/i, category: 'conflict' as const, severity: 'critical' as const },
+  { pattern: /\b(nuclear|chemical weapon|biological weapon|WMD|ICBM|ballistic missile|hypersonic)\b/i, category: 'conflict' as const, severity: 'critical' as const },
+  { pattern: /\b(curfew|lockdown order|movement restrictions|night curfew|martial law)\b/i, category: 'curfew' as const, severity: 'high' as const },
+  { pattern: /\b(sanctions|embargo|asset freeze|trade war|export ban|import ban|secondary sanctions)\b/i, category: 'sanctions' as const, severity: 'high' as const },
+  { pattern: /\b(humanitarian crisis|state of emergency|government collapse|political crisis|mass displacement|famine|refugee|IDPs)\b/i, category: 'crisis' as const, severity: 'high' as const },
+  { pattern: /\b(protest|riot|unrest|uprising|crackdown|demonstration|clashes|marching|civil disobedience|strike|rebellion)\b/i, category: 'protest' as const, severity: 'medium' as const },
+  { pattern: /\b(diplomatic crisis|expelled|recalled ambassador|territorial dispute|border clash|sovereignty|annexation|occupation)\b/i, category: 'geopolitical' as const, severity: 'high' as const },
+  { pattern: /\b(election|referendum|vote|election fraud|poll|ballot|rigged|contested results)\b/i, category: 'geopolitical' as const, severity: 'medium' as const },
+  { pattern: /\b(assassination|killed|shot|leader|president|prime minister|minister|attack on)\b/i, category: 'conflict' as const, severity: 'critical' as const },
+  { pattern: /\b(hostage|kidnapping|abduction|ransom|prisoner|detained|arrested|political prisoner)\b/i, category: 'crisis' as const, severity: 'high' as const },
+  { pattern: /\b(naval|fleet|warship|submarine|aircraft carrier|blockade|strait|maritime|sea lane)\b/i, category: 'conflict' as const, severity: 'high' as const },
+  { pattern: /\b(peace talks|negotiations|ceasefire deal|agreement|truce|armistice|settlement)\b/i, category: 'geopolitical' as const, severity: 'medium' as const },
 ];
 
 function classifyArticle(title: string, description: string): { category: typeof CONFLICT_PATTERNS[0]['category']; severity: typeof CONFLICT_PATTERNS[0]['severity'] } | null {
@@ -59,27 +87,70 @@ function classifyArticle(title: string, description: string): { category: typeof
   return null;
 }
 
+const COUNTRY_PATTERNS: [RegExp, string][] = [
+  [/\b(Ukraine|Ukrainian|Kyiv|Kharkiv|Zelensky)\b/i, 'Ukraine'],
+  [/\b(Russia|Russian|Kremlin|Moscow|Putin|Lavrov)\b/i, 'Russia'],
+  [/\b(Israel|Israeli|Netanyahu|IDF|Tel Aviv|Jerusalem)\b/i, 'Israel'],
+  [/\b(Gaza|Palestinian|Palestine|Hamas|West Bank|Rafah)\b/i, 'Palestine'],
+  [/\b(Lebanon|Lebanese|Hezbollah|Beirut)\b/i, 'Lebanon'],
+  [/\b(Iran|Iranian|Tehran|IRGC|Khamenei|Raisi)\b/i, 'Iran'],
+  [/\b(Syria|Syrian|Damascus|Assad)\b/i, 'Syria'],
+  [/\b(Yemen|Yemeni|Houthi|Sanaa|Aden)\b/i, 'Yemen'],
+  [/\b(Sudan|Sudanese|RSF|Khartoum|Darfur|SAF)\b/i, 'Sudan'],
+  [/\b(Myanmar|Burmese|junta|Yangon|Tatmadaw)\b/i, 'Myanmar'],
+  [/\b(Ethiopia|Ethiopian|Tigray|Amhara|Addis Ababa)\b/i, 'Ethiopia'],
+  [/\b(Somalia|Somali|al-Shabaab|Mogadishu|AMISOM)\b/i, 'Somalia'],
+  [/\b(Afghanistan|Afghan|Taliban|Kabul)\b/i, 'Afghanistan'],
+  [/\b(Pakistan|Pakistani|Islamabad|Lahore|Karachi)\b/i, 'Pakistan'],
+  [/\b(Kashmir|Line of Control|LoC|Jammu)\b/i, 'India'],
+  [/\b(North Korea|DPRK|Kim Jong|Pyongyang)\b/i, 'North Korea'],
+  [/\b(Taiwan|Taiwanese|Taipei|PLA strait)\b/i, 'Taiwan'],
+  [/\b(Haiti|Haitian|Port.au.Prince|gang)\b/i, 'Haiti'],
+  [/\b(Mali|Malian|Bamako|MINUSMA)\b/i, 'Mali'],
+  [/\b(Niger|Nigerien|Niamey|ECOWAS)\b/i, 'Niger'],
+  [/\b(Venezuela|Venezuelan|Maduro|Caracas)\b/i, 'Venezuela'],
+  [/\b(Colombia|Colombian|FARC|ELN|Bogota)\b/i, 'Colombia'],
+  [/\b(Iraq|Iraqi|Baghdad|Erbil|ISIS|ISIL)\b/i, 'Iraq'],
+  [/\b(Libya|Libyan|Tripoli|Benghazi|GNA)\b/i, 'Libya'],
+  [/\b(Nigeria|Nigerian|Abuja|Boko Haram|Lagos)\b/i, 'Nigeria'],
+  [/\b(Congo|DRC|Kinshasa|M23|FDLR|Goma)\b/i, 'DR Congo'],
+  [/\b(Armenia|Armenian|Nagorno|Yerevan)\b/i, 'Armenia'],
+  [/\b(Azerbaijan|Azerbaijani|Baku|Karabakh)\b/i, 'Azerbaijan'],
+  [/\b(Kosovo|Serbian|Serbia|Belgrade|Pristina)\b/i, 'Serbia'],
+  [/\b(Turkey|Turkish|Erdogan|Ankara|Kurds|PKK)\b/i, 'Turkey'],
+  [/\b(Saudi Arabia|Saudi|Riyadh|MBS|Crown Prince)\b/i, 'Saudi Arabia'],
+  [/\b(Egypt|Egyptian|Sisi|Cairo)\b/i, 'Egypt'],
+  [/\b(China|Chinese|Beijing|Xi Jinping|PLA|CCP)\b/i, 'China'],
+  [/\b(India|Indian|Modi|Delhi|BJP|New Delhi)\b/i, 'India'],
+  [/\b(Bangladesh|Bangladeshi|Dhaka)\b/i, 'Bangladesh'],
+  [/\b(Philippines|Filipino|Manila|Marcos)\b/i, 'Philippines'],
+  [/\b(Indonesia|Indonesian|Jakarta)\b/i, 'Indonesia'],
+  [/\b(Belarus|Belarusian|Lukashenko|Minsk)\b/i, 'Belarus'],
+  [/\b(Poland|Polish|Warsaw)\b/i, 'Poland'],
+  [/\b(Hungary|Hungarian|Orban|Budapest)\b/i, 'Hungary'],
+  [/\b(Georgia|Georgian|Tbilisi)\b/i, 'Georgia'],
+  [/\b(Burkina Faso|Ouagadougou|AES)\b/i, 'Burkina Faso'],
+  [/\b(South Sudan|Juba|SPLM)\b/i, 'South Sudan'],
+  [/\b(Chad|Chadian|Ndjamena)\b/i, 'Chad'],
+  [/\b(Central African Republic|CAR|Bangui|Wagner)\b/i, 'Central African Republic'],
+  [/\b(Morocco|Moroccan|Rabat|Western Sahara)\b/i, 'Morocco'],
+  [/\b(Algeria|Algerian|Algiers)\b/i, 'Algeria'],
+  [/\b(Tunisia|Tunisian|Tunis)\b/i, 'Tunisia'],
+  [/\b(Mexico|Mexican|Cartel|CJNG|Sinaloa|Ciudad Juarez)\b/i, 'Mexico'],
+  [/\b(Ecuador|Ecuadorian|Quito)\b/i, 'Ecuador'],
+  [/\b(Peru|Peruvian|Lima)\b/i, 'Peru'],
+  [/\b(Sri Lanka|Colombo)\b/i, 'Sri Lanka'],
+  [/\b(Thailand|Thai|Bangkok)\b/i, 'Thailand'],
+  [/\b(Vietnam|Vietnamese|Hanoi|Ho Chi Minh)\b/i, 'Vietnam'],
+  [/\b(Cambodia|Cambodian|Phnom Penh|Hun Sen)\b/i, 'Cambodia'],
+  [/\b(Kenya|Kenyan|Nairobi)\b/i, 'Kenya'],
+  [/\b(Zimbabwe|Zimbabwean|Harare|Mnangagwa)\b/i, 'Zimbabwe'],
+  [/\b(South Africa|South African|Pretoria|Ramaphosa|ANC)\b/i, 'South Africa'],
+];
+
 function extractCountry(title: string, description: string): string | null {
   const text = title + ' ' + description;
-  const patterns: [RegExp, string][] = [
-    [/\b(Ukraine|Ukrainian)\b/i, 'Ukraine'], [/\b(Russia|Russian|Kremlin)\b/i, 'Russia'],
-    [/\b(Israel|Israeli)\b/i, 'Israel'], [/\b(Gaza|Palestinian|Palestine)\b/i, 'Palestine'],
-    [/\b(Lebanon|Lebanese|Hezbollah)\b/i, 'Lebanon'], [/\b(Iran|Iranian)\b/i, 'Iran'],
-    [/\b(Syria|Syrian)\b/i, 'Syria'], [/\b(Yemen|Yemeni|Houthi)\b/i, 'Yemen'],
-    [/\b(Sudan|Sudanese|RSF)\b/i, 'Sudan'], [/\b(Myanmar|Burmese|junta)\b/i, 'Myanmar'],
-    [/\b(Ethiopia|Ethiopian|Tigray)\b/i, 'Ethiopia'], [/\b(Somalia|Somali|al-Shabaab)\b/i, 'Somalia'],
-    [/\b(Afghanistan|Afghan|Taliban)\b/i, 'Afghanistan'], [/\b(Pakistan|Pakistani)\b/i, 'Pakistan'],
-    [/\b(Kashmir|Line of Control|LoC)\b/i, 'India'], [/\b(North Korea|DPRK|Kim Jong)\b/i, 'North Korea'],
-    [/\b(Taiwan|Taiwanese)\b/i, 'Taiwan'], [/\b(Haiti|Haitian)\b/i, 'Haiti'],
-    [/\b(Mali|Malian)\b/i, 'Mali'], [/\b(Niger|Nigerien)\b/i, 'Niger'],
-    [/\b(Venezuela|Venezuelan|Maduro)\b/i, 'Venezuela'], [/\b(Colombia|Colombian|FARC)\b/i, 'Colombia'],
-    [/\b(Iraq|Iraqi)\b/i, 'Iraq'], [/\b(Libya|Libyan)\b/i, 'Libya'],
-    [/\b(Nigeria|Nigerian)\b/i, 'Nigeria'], [/\b(Congo|DRC|Kinshasa)\b/i, 'DR Congo'],
-    [/\b(Armenia|Armenian|Nagorno)\b/i, 'Armenia'], [/\b(Azerbaijan|Azerbaijani)\b/i, 'Azerbaijan'],
-    [/\b(Kosovo|Serbian|Serbia)\b/i, 'Serbia'], [/\b(Turkey|Turkish|Erdogan)\b/i, 'Turkey'],
-    [/\b(Saudi Arabia|Saudi|Riyadh)\b/i, 'Saudi Arabia'], [/\b(Egypt|Egyptian|Sisi)\b/i, 'Egypt'],
-  ];
-  for (const [re, country] of patterns) {
+  for (const [re, country] of COUNTRY_PATTERNS) {
     if (re.test(text)) return country;
   }
   return null;
@@ -90,16 +161,16 @@ function parseRSSFeed(xml: string, feedKey: string, defaultCategory: string): an
   const itemRegex = /<item>([\s\S]*?)<\/item>/g;
   let match;
 
-  while ((match = itemRegex.exec(xml)) !== null && items.length < 20) {
+  while ((match = itemRegex.exec(xml)) !== null && items.length < 25) {
     const c = match[1];
     const titleRaw = /<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>|<title>([\s\S]*?)<\/title>/s.exec(c);
-    const linkRaw = /<link>([\s\S]*?)<\/link>/s.exec(c);
+    const linkRaw = /<link[^>]*>([\s\S]*?)<\/link>|<link[^>]*href="([^"]*)"[^>]*\/>/s.exec(c);
     const descRaw = /<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>|<description>([\s\S]*?)<\/description>/s.exec(c);
-    const pubDateRaw = /<pubDate>([\s\S]*?)<\/pubDate>/s.exec(c);
+    const pubDateRaw = /<pubDate>([\s\S]*?)<\/pubDate>|<dc:date>([\s\S]*?)<\/dc:date>|<updated>([\s\S]*?)<\/updated>/s.exec(c);
 
-    const title = (titleRaw ? (titleRaw[1] || titleRaw[2]) : '').trim().replace(/<[^>]*>/g, '');
-    const link = (linkRaw ? linkRaw[1] : '').trim();
-    const desc = (descRaw ? (descRaw[1] || descRaw[2]) : '').trim().replace(/<[^>]*>/g, '');
+    const title = (titleRaw ? (titleRaw[1] || titleRaw[2]) : '').trim().replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+    const link = (linkRaw ? (linkRaw[1] || linkRaw[2]) : '').trim();
+    const desc = (descRaw ? (descRaw[1] || descRaw[2]) : '').trim().replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
 
     if (title.length < 10 || !link) continue;
 
@@ -108,14 +179,15 @@ function parseRSSFeed(xml: string, feedKey: string, defaultCategory: string): an
 
     let pubDate: string;
     try {
-      pubDate = pubDateRaw ? new Date(pubDateRaw[1].trim()).toISOString() : new Date().toISOString();
+      const rawDate = pubDateRaw ? (pubDateRaw[1] || pubDateRaw[2] || pubDateRaw[3] || '').trim() : '';
+      pubDate = rawDate ? new Date(rawDate).toISOString() : new Date().toISOString();
     } catch {
       pubDate = new Date().toISOString();
     }
 
     const country = extractCountry(title, desc);
     const coords = country ? COUNTRY_COORDS[country] : null;
-    const slug = (link).replace(/[^a-zA-Z0-9]/g, '').slice(0, 40);
+    const slug = link.replace(/[^a-zA-Z0-9]/g, '').slice(0, 40);
 
     items.push({
       event_id: `rss_${feedKey}_${slug}`,
@@ -124,7 +196,7 @@ function parseRSSFeed(xml: string, feedKey: string, defaultCategory: string): an
       country,
       latitude: coords ? coords[0] : null,
       longitude: coords ? coords[1] : null,
-      description: desc.slice(0, 500) || null,
+      description: desc.slice(0, 600) || null,
       severity: classification.severity,
       is_active: true,
       started_at: pubDate,
@@ -134,6 +206,34 @@ function parseRSSFeed(xml: string, feedKey: string, defaultCategory: string): an
   }
 
   return items;
+}
+
+async function fetchFeed(feed: typeof GEOPOLITICAL_FEEDS[0]): Promise<any[]> {
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), 12000);
+  try {
+    const resp = await fetch(feed.url, {
+      signal: ctrl.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; DHRUVA/2.0 Intelligence Platform)',
+        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+        'Cache-Control': 'no-cache',
+      },
+    });
+    clearTimeout(tid);
+    if (!resp.ok) {
+      console.warn(`[HTTP ${resp.status}] ${feed.key}`);
+      return [];
+    }
+    const xml = await resp.text();
+    const items = parseRSSFeed(xml, feed.key, feed.category);
+    console.log(`[OK] ${feed.key}: ${items.length} geopolitical events`);
+    return items;
+  } catch (e) {
+    clearTimeout(tid);
+    console.warn(`[FAIL] ${feed.key}: ${e.message}`);
+    return [];
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -149,42 +249,36 @@ Deno.serve(async (req: Request) => {
     const allEvents: any[] = [];
     const feedResults: Record<string, number> = {};
 
-    for (const feed of GEOPOLITICAL_RSS) {
-      try {
-        const ctrl = new AbortController();
-        const tid = setTimeout(() => ctrl.abort(), 12000);
-        const resp = await fetch(feed.url, {
-          signal: ctrl.signal,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (compatible; DHRUVA/2.0; Intelligence Platform)',
-            'Accept': 'application/rss+xml, application/xml, text/xml, */*',
-          },
-        });
-        clearTimeout(tid);
+    const priorityOneTwoFeeds = GEOPOLITICAL_FEEDS.filter(f => f.priority <= 2);
+    const priorityThreeFeeds = GEOPOLITICAL_FEEDS.filter(f => f.priority === 3);
 
-        if (resp.ok) {
-          const xml = await resp.text();
-          const items = parseRSSFeed(xml, feed.key, feed.category);
-          allEvents.push(...items);
-          feedResults[feed.key] = items.length;
-          console.log(`[OK] ${feed.key}: ${items.length} geopolitical events`);
-        } else {
-          feedResults[feed.key] = 0;
-          console.warn(`[HTTP ${resp.status}] ${feed.key}`);
-        }
-      } catch (e) {
-        feedResults[feed.key] = 0;
-        console.warn(`[FAIL] ${feed.key}: ${e.message}`);
-      }
-
-      await new Promise(r => setTimeout(r, 300));
+    const p12Results = await Promise.allSettled(priorityOneTwoFeeds.map(feed => fetchFeed(feed)));
+    for (let i = 0; i < priorityOneTwoFeeds.length; i++) {
+      const result = p12Results[i];
+      const items = result.status === 'fulfilled' ? result.value : [];
+      allEvents.push(...items);
+      feedResults[priorityOneTwoFeeds[i].key] = items.length;
     }
 
-    console.log(`Total geopolitical events from RSS: ${allEvents.length}`);
+    for (const feed of priorityThreeFeeds) {
+      const items = await fetchFeed(feed);
+      allEvents.push(...items);
+      feedResults[feed.key] = items.length;
+      await new Promise(r => setTimeout(r, 200));
+    }
+
+    const seenIds = new Set<string>();
+    const deduped = allEvents.filter(e => {
+      if (seenIds.has(e.event_id)) return false;
+      seenIds.add(e.event_id);
+      return true;
+    });
+
+    console.log(`Total unique geopolitical events from all feeds: ${deduped.length}`);
 
     let inserted = 0;
-    if (allEvents.length > 0) {
-      const batch = allEvents.slice(0, 200);
+    if (deduped.length > 0) {
+      const batch = deduped.slice(0, 250);
       const { error, count } = await supabase
         .from('geopolitical_events')
         .upsert(batch, { onConflict: 'event_id', ignoreDuplicates: true, count: 'exact' });
@@ -205,7 +299,7 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, totalFetched: allEvents.length, inserted, feeds: feedResults }),
+      JSON.stringify({ success: true, totalFetched: deduped.length, inserted, feeds: feedResults }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
