@@ -248,6 +248,12 @@ function App() {
         addAlert('CRITICAL ALERT', `${event.title}${event.country ? ` — ${event.country}` : ''}`);
       }
     });
+
+    IntelligenceAPI.subscribeToCyberThreats((threat) => {
+      if (threat.severity === 'critical') {
+        addAlert('CYBER THREAT', threat.title);
+      }
+    });
   }, [pushTickerEvent, markNewEvent, addAlert]);
 
   useEffect(() => {

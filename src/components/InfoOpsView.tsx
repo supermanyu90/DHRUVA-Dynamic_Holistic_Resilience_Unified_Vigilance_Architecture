@@ -95,6 +95,16 @@ export function InfoOpsView() {
     loadOps();
   }, [loadOps]);
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('info-ops-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'info_ops' }, () => {
+        loadOps();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [loadOps]);
+
   const signals = {
     campaigns: operations.length,
     active: operations.filter(o => o.is_active).length,

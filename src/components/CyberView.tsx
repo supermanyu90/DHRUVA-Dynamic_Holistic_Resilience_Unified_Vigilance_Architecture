@@ -84,6 +84,16 @@ export function CyberView() {
     loadThreats();
   }, [loadThreats]);
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('cyber-threats-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cyber_threats' }, () => {
+        loadThreats();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [loadThreats]);
+
   const threatLevels = {
     critical: threats.filter(t => t.severity === 'critical').length,
     high: threats.filter(t => t.severity === 'high').length,

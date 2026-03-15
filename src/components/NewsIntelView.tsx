@@ -82,6 +82,16 @@ export function NewsIntelView() {
     loadArticles();
   }, [timeWindow]);
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('news-intel-live')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'news_events' }, () => {
+        loadArticles();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [timeWindow]);
+
   const loadArticles = async () => {
     setLoading(true);
     try {

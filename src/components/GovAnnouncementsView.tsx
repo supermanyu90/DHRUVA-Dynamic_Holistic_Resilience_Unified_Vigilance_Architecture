@@ -191,6 +191,16 @@ export function GovAnnouncementsView() {
 
   useEffect(() => { loadAnnouncements(); }, [loadAnnouncements]);
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('gov-announcements-live')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'gov_announcements' }, () => {
+        loadAnnouncements();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [loadAnnouncements]);
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {

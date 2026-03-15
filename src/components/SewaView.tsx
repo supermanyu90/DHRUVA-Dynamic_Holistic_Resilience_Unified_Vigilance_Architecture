@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Activity, AlertTriangle, TrendingUp, RefreshCw, CheckCircle } from 'lucide-react';
 
 interface Outage {
@@ -138,7 +138,7 @@ type FetchStatus = 'idle' | 'loading' | 'live' | 'cached' | 'error';
 export function SewaView() {
   const [data, setData] = useState<SewaData | null>(null);
   const [status, setStatus] = useState<FetchStatus>('idle');
-  const [statusMsg, setStatusMsg] = useState('PRESS REFRESH TO FETCH LIVE DATA');
+  const [statusMsg, setStatusMsg] = useState('FETCHING LIVE DATA...');
   const [loadingMsg, setLoadingMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -185,6 +185,8 @@ export function SewaView() {
     const now = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     setStatusMsg(`${tier === 'live' ? 'LIVE' : 'CACHED'} · LAST UPDATED: ${now} IST`);
   }, []);
+
+  useEffect(() => { loadSewa(); }, []);
 
   const services = data?.services || SERVICES;
   const bob = data?.banks.find(b => b.isFocus);
