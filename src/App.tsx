@@ -14,7 +14,7 @@ import { TimelineView } from './components/TimelineView';
 import { AlertToast } from './components/AlertToast';
 import { Tooltip } from './components/Tooltip';
 
-type ViewType = 'map' | 'globe' | 'timeline' | 'news' | 'sewa' | 'cyber' | 'infoops' | 'uae' | 'vessel';
+type ViewType = 'map' | 'timeline' | 'news' | 'sewa' | 'cyber' | 'infoops' | 'uae' | 'vessel';
 
 function App() {
   const [earthquakes, setEarthquakes] = useState<Earthquake[]>([]);
@@ -175,9 +175,6 @@ function App() {
         <div className={`view-tab ${currentView === 'map' ? 'active' : ''}`} onClick={() => setCurrentView('map')}>
           🗺️ MAP
         </div>
-        <div className={`view-tab ${currentView === 'globe' ? 'active' : ''}`} onClick={() => setCurrentView('globe')}>
-          🌐 3D GLOBE
-        </div>
         <div className={`view-tab ${currentView === 'timeline' ? 'active' : ''}`} onClick={() => setCurrentView('timeline')}>
           📈 TIMELINE
         </div>
@@ -233,13 +230,6 @@ function App() {
               showTooltip={showTooltip}
               hideTooltip={hideTooltip}
             />
-          )}
-          {currentView === 'globe' && (
-            <div className="view active">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--dim)' }}>
-                3D GLOBE VIEW (Coming Soon)
-              </div>
-            </div>
           )}
           {currentView === 'timeline' && (
             <TimelineView
