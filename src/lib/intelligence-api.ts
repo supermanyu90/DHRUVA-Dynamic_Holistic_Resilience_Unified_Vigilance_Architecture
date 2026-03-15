@@ -47,8 +47,45 @@ export interface Vessel {
   longitude: number;
   speed: number;
   course: number;
+  heading: number;
   destination: string;
+  flag: string;
   last_position_time: string;
+  properties: Record<string, any>;
+}
+
+export interface VolcanoEvent {
+  id: string;
+  volcano_id: string;
+  name: string;
+  country: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  elevation: number | null;
+  status: 'erupting' | 'unrest' | 'normal';
+  alert_level: string | null;
+  activity_description: string | null;
+  last_eruption: string | null;
+  source: string;
+  properties: Record<string, any>;
+  updated_at: string;
+}
+
+export interface GeopoliticalEvent {
+  id: string;
+  event_id: string;
+  title: string;
+  category: 'conflict' | 'sanctions' | 'curfew' | 'coup' | 'crisis' | 'protest' | 'geopolitical';
+  country: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  description: string | null;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  is_active: boolean;
+  started_at: string | null;
+  source: string;
+  properties: Record<string, any>;
+  updated_at: string;
 }
 
 export interface CyberThreat {
@@ -141,6 +178,43 @@ export class IntelligenceAPI {
 
     if (error) throw error;
     return data || [];
+  }
+
+  static async getVolcanoes(limit = 100): Promise<VolcanoEvent[]> {
+    const { data, error } = await supabase
+      .from('volcanoes')
+      .select('*')
+      .in('status', ['erupting', 'unrest'])
+      .order('updated_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  static async getGeopoliticalEvents(limit = 100): Promise<GeopoliticalEvent[]> {
+    const { data, error } = await supabase
+      .from('geopolitical_events')
+      .select('*')
+      .eq('is_active', true)
+      .order('updated_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  static subscribeToVessels(callback: (vessel: Vessel) => void) {
+    return supabase
+      .channel('vessels-channel')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'vessels',
+      }, (payload) => {
+        callback(payload.new as Vessel);
+      })
+      .subscribe();
   }
 
   static async getCyberThreats(limit = 100): Promise<CyberThreat[]> {

@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
-import { Earthquake, Disaster, NewsEvent } from '../lib/intelligence-api';
+import { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
 import { UNDERSEA_CABLES } from '../lib/cable-data';
 
 interface WorldMapSVGProps {
   earthquakes: Earthquake[];
   disasters: Disaster[];
   news: NewsEvent[];
+  vessels: Vessel[];
+  volcanoes: VolcanoEvent[];
+  geopolitical: GeopoliticalEvent[];
   onEventSelect: (id: string, type: string) => void;
   layersEnabled: {
     earthquakes: boolean;
@@ -16,6 +19,10 @@ interface WorldMapSVGProps {
     nuclear: boolean;
     chokepoints: boolean;
     daynight: boolean;
+    vessels: boolean;
+    volcanoes: boolean;
+    geopolitical: boolean;
+    curfews: boolean;
   };
   showTooltip: (x: number, y: number, content: string) => void;
   hideTooltip: () => void;
@@ -52,6 +59,9 @@ export function WorldMapSVG({
   earthquakes,
   disasters,
   news,
+  vessels,
+  volcanoes,
+  geopolitical,
   onEventSelect,
   layersEnabled,
   showTooltip,
@@ -618,6 +628,115 @@ export function WorldMapSVG({
                 onMouseEnter={(e) => handleMarkerHover(e, disaster.title)}
                 onMouseLeave={hideTooltip}
               />
+            );
+          })}
+
+        {layersEnabled.volcanoes &&
+          volcanoes.map((v) => {
+            if (!v.latitude || !v.longitude) return null;
+            const x = lonToX(v.longitude);
+            const y = latToY(v.latitude);
+            const color = v.status === 'erupting' ? '#FF4500' : '#FF8C00';
+            const size = v.status === 'erupting' ? 5 : 3.5;
+            return (
+              <g key={v.id} style={{ cursor: 'pointer' }}>
+                <circle cx={x} cy={y} r={size + 3} fill={color} opacity="0.12" />
+                <polygon
+                  points={`${x},${y - size} ${x - size * 0.8},${y + size * 0.6} ${x + size * 0.8},${y + size * 0.6}`}
+                  fill={`${color}50`}
+                  stroke={color}
+                  strokeWidth="0.9"
+                  filter="url(#glow)"
+                  onMouseEnter={(e) => handleMarkerHover(e, `[${v.status?.toUpperCase()}] ${v.name} — ${v.country || ''} • ${v.alert_level || ''}`)}
+                  onMouseLeave={hideTooltip}
+                  onClick={() => handleMarkerClick(v.id, 'volcano')}
+                />
+                <text x={x + size + 1} y={y + 1.5} fill={color} fontSize="3" fontFamily="Share Tech Mono" opacity="0.9" pointerEvents="none">
+                  {v.name.toUpperCase().slice(0, 12)}
+                </text>
+              </g>
+            );
+          })}
+
+        {layersEnabled.geopolitical &&
+          geopolitical.filter((g) => g.category !== 'curfew').map((g) => {
+            if (!g.latitude || !g.longitude) return null;
+            const x = lonToX(g.longitude);
+            const y = latToY(g.latitude);
+            const color = g.severity === 'critical' ? '#FF2255' : g.severity === 'high' ? '#FF6B00' : '#FFB800';
+            return (
+              <g key={g.id} style={{ cursor: 'pointer' }}>
+                <circle cx={x} cy={y} r="8" fill={color} opacity="0.06" />
+                <circle cx={x} cy={y} r="4" fill={color} opacity="0.1" />
+                <circle
+                  cx={x}
+                  cy={y}
+                  r="2.5"
+                  fill={color}
+                  opacity="0.9"
+                  filter="url(#glow)"
+                  onMouseEnter={(e) => handleMarkerHover(e, `[${g.category?.toUpperCase()}] ${g.title} — ${g.country || ''}`)}
+                  onMouseLeave={hideTooltip}
+                  onClick={() => handleMarkerClick(g.id, 'geopolitical')}
+                />
+                <text x={x + 4} y={y + 1.5} fill={color} fontSize="3" fontFamily="Share Tech Mono" opacity="0.85" pointerEvents="none">
+                  {g.title.toUpperCase().slice(0, 16)}
+                </text>
+              </g>
+            );
+          })}
+
+        {layersEnabled.curfews &&
+          geopolitical.filter((g) => g.category === 'curfew').map((g) => {
+            if (!g.latitude || !g.longitude) return null;
+            const x = lonToX(g.longitude);
+            const y = latToY(g.latitude);
+            return (
+              <g key={g.id} style={{ cursor: 'pointer' }}>
+                <circle cx={x} cy={y} r="10" fill="#CC3300" opacity="0.08" />
+                <circle cx={x} cy={y} r="6" fill="none" stroke="#CC3300" strokeWidth="0.7" strokeDasharray="2,2" opacity="0.6" />
+                <circle
+                  cx={x}
+                  cy={y}
+                  r="2.5"
+                  fill="#CC3300"
+                  opacity="0.9"
+                  filter="url(#glow)"
+                  onMouseEnter={(e) => handleMarkerHover(e, `[CURFEW] ${g.title} — ${g.country || ''}`)}
+                  onMouseLeave={hideTooltip}
+                  onClick={() => handleMarkerClick(g.id, 'curfew')}
+                />
+                <line x1={x - 3} y1={y - 3} x2={x + 3} y2={y + 3} stroke="#CC3300" strokeWidth="0.8" opacity="0.8" pointerEvents="none" />
+                <line x1={x + 3} y1={y - 3} x2={x - 3} y2={y + 3} stroke="#CC3300" strokeWidth="0.8" opacity="0.8" pointerEvents="none" />
+              </g>
+            );
+          })}
+
+        {layersEnabled.vessels &&
+          vessels.map((v) => {
+            if (!v.latitude || !v.longitude) return null;
+            const x = lonToX(v.longitude);
+            const y = latToY(v.latitude);
+            const color = v.type === 'Military' ? '#FF2255' : v.type === 'Tanker' ? '#FFB800' : '#00BFFF';
+            const courseRad = ((v.course || 0) * Math.PI) / 180;
+            const tipX = x + Math.sin(courseRad) * 4;
+            const tipY = y - Math.cos(courseRad) * 4;
+            const leftX = x + Math.sin(courseRad - 2.2) * 2.5;
+            const leftY = y - Math.cos(courseRad - 2.2) * 2.5;
+            const rightX = x + Math.sin(courseRad + 2.2) * 2.5;
+            const rightY = y - Math.cos(courseRad + 2.2) * 2.5;
+            return (
+              <g key={v.id} style={{ cursor: 'pointer' }}>
+                <polygon
+                  points={`${tipX},${tipY} ${leftX},${leftY} ${x},${y + 1} ${rightX},${rightY}`}
+                  fill={color}
+                  opacity="0.85"
+                  filter="url(#glow)"
+                  onMouseEnter={(e) => handleMarkerHover(e, `${v.name} [${v.type}] ${v.flag || ''} • ${v.speed?.toFixed(1) || '?'}kn → ${v.destination || '?'}`)}
+                  onMouseLeave={hideTooltip}
+                  onClick={() => handleMarkerClick(v.id, 'vessel')}
+                />
+              </g>
             );
           })}
       </svg>

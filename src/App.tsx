@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { IntelligenceAPI, Earthquake, Disaster, NewsEvent } from './lib/intelligence-api';
+import { IntelligenceAPI, Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from './lib/intelligence-api';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { RightPanel } from './components/RightPanel';
@@ -19,6 +19,9 @@ function App() {
   const [earthquakes, setEarthquakes] = useState<Earthquake[]>([]);
   const [disasters, setDisasters] = useState<Disaster[]>([]);
   const [news, setNews] = useState<NewsEvent[]>([]);
+  const [vessels, setVessels] = useState<Vessel[]>([]);
+  const [volcanoes, setVolcanoes] = useState<VolcanoEvent[]>([]);
+  const [geopolitical, setGeopolitical] = useState<GeopoliticalEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [currentView, setCurrentView] = useState<ViewType>('map');
@@ -34,6 +37,10 @@ function App() {
     nuclear: false,
     chokepoints: false,
     daynight: false,
+    vessels: false,
+    volcanoes: false,
+    geopolitical: false,
+    curfews: false,
   });
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [timeFilter, setTimeFilter] = useState('24H');
@@ -48,14 +55,20 @@ function App() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [earthquakesData, disastersData, newsData] = await Promise.all([
+      const [earthquakesData, disastersData, newsData, vesselsData, volcanoesData, geopoliticalData] = await Promise.all([
         IntelligenceAPI.getEarthquakes(4.0, 50),
         IntelligenceAPI.getDisasters(50),
         IntelligenceAPI.getNews(50),
+        IntelligenceAPI.getVessels(50),
+        IntelligenceAPI.getVolcanoes(50),
+        IntelligenceAPI.getGeopoliticalEvents(50),
       ]);
       setEarthquakes(earthquakesData);
       setDisasters(disastersData);
       setNews(newsData);
+      setVessels(vesselsData);
+      setVolcanoes(volcanoesData);
+      setGeopolitical(geopoliticalData);
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -74,6 +87,10 @@ function App() {
 
     IntelligenceAPI.subscribeToNews((newsItem) => {
       setNews((prev) => [newsItem, ...prev].slice(0, 50));
+    });
+
+    IntelligenceAPI.subscribeToVessels((vessel) => {
+      setVessels((prev) => prev.map((v) => v.mmsi === vessel.mmsi ? vessel : v));
     });
   };
 
@@ -188,6 +205,9 @@ function App() {
           earthquakes={earthquakes}
           disasters={disasters}
           news={news}
+          vessels={vessels}
+          volcanoes={volcanoes}
+          geopolitical={geopolitical}
           selectedEvent={selectedEvent}
           onEventSelect={handleEventSelect}
           mode={mode}
@@ -202,6 +222,9 @@ function App() {
               earthquakes={earthquakes}
               disasters={disasters}
               news={news}
+              vessels={vessels}
+              volcanoes={volcanoes}
+              geopolitical={geopolitical}
               onEventSelect={handleEventSelect}
               layersEnabled={layersEnabled}
               timeFilter={timeFilter}

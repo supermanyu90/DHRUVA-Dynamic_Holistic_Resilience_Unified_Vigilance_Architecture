@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Earthquake, Disaster, NewsEvent } from '../lib/intelligence-api';
+import { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
 import { WorldMapSVG } from './WorldMapSVG';
 import { Globe3D } from './Globe3D';
 import { Globe, Map } from 'lucide-react';
@@ -8,6 +8,9 @@ interface MapViewProps {
   earthquakes: Earthquake[];
   disasters: Disaster[];
   news: NewsEvent[];
+  vessels: Vessel[];
+  volcanoes: VolcanoEvent[];
+  geopolitical: GeopoliticalEvent[];
   onEventSelect: (id: string, type: string) => void;
   layersEnabled: {
     earthquakes: boolean;
@@ -18,6 +21,10 @@ interface MapViewProps {
     nuclear: boolean;
     chokepoints: boolean;
     daynight: boolean;
+    vessels: boolean;
+    volcanoes: boolean;
+    geopolitical: boolean;
+    curfews: boolean;
   };
   timeFilter: string;
   onTimeFilterChange: (filter: string) => void;
@@ -29,6 +36,9 @@ export function MapView({
   earthquakes,
   disasters,
   news,
+  vessels,
+  volcanoes,
+  geopolitical,
   onEventSelect,
   layersEnabled,
   timeFilter,
@@ -47,7 +57,7 @@ export function MapView({
             {filter}
           </button>
         ))}
-        <div className="tf-event-count">{earthquakes.length + disasters.length} events</div>
+        <div className="tf-event-count">{earthquakes.length + disasters.length + volcanoes.length + geopolitical.length} events</div>
 
         <div className="map-view-toggle">
           <button
@@ -75,6 +85,9 @@ export function MapView({
             earthquakes={earthquakes}
             disasters={disasters}
             news={news}
+            vessels={vessels}
+            volcanoes={volcanoes}
+            geopolitical={geopolitical}
             onEventSelect={onEventSelect}
             layersEnabled={layersEnabled}
             showTooltip={showTooltip}
@@ -85,6 +98,9 @@ export function MapView({
             earthquakes={earthquakes}
             disasters={disasters}
             news={news}
+            vessels={vessels}
+            volcanoes={volcanoes}
+            geopolitical={geopolitical}
             onEventSelect={onEventSelect}
             layersEnabled={layersEnabled}
             showTooltip={showTooltip}

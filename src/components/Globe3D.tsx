@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Earthquake, Disaster, NewsEvent } from '../lib/intelligence-api';
+import { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
 import { UNDERSEA_CABLES } from '../lib/cable-data';
 
 interface Globe3DProps {
   earthquakes: Earthquake[];
   disasters: Disaster[];
   news: NewsEvent[];
+  vessels: Vessel[];
+  volcanoes: VolcanoEvent[];
+  geopolitical: GeopoliticalEvent[];
   onEventSelect: (id: string, type: string) => void;
   layersEnabled: {
     earthquakes: boolean;
@@ -16,6 +19,11 @@ interface Globe3DProps {
     military: boolean;
     nuclear: boolean;
     chokepoints: boolean;
+    daynight: boolean;
+    vessels: boolean;
+    volcanoes: boolean;
+    geopolitical: boolean;
+    curfews: boolean;
   };
   showTooltip: (x: number, y: number, content: string) => void;
   hideTooltip: () => void;
@@ -25,6 +33,9 @@ export function Globe3D({
   earthquakes,
   disasters,
   news,
+  vessels,
+  volcanoes,
+  geopolitical,
   onEventSelect,
   layersEnabled,
   showTooltip,
@@ -274,7 +285,67 @@ export function Globe3D({
         markersRef.current?.add(marker);
       });
     }
-  }, [earthquakes, disasters, news, layersEnabled]);
+
+    if (layersEnabled.volcanoes) {
+      volcanoes.forEach((v) => {
+        if (!v.latitude || !v.longitude) return;
+        const pos = latLonToVector3(v.latitude, v.longitude, 101);
+        const isErupting = v.status === 'erupting';
+        const geometry = new THREE.ConeGeometry(isErupting ? 2.5 : 1.5, isErupting ? 5 : 3, 4);
+        const material = new THREE.MeshBasicMaterial({ color: isErupting ? 0xff4500 : 0xff8c00, transparent: true, opacity: 0.85 });
+        const marker = new THREE.Mesh(geometry, material);
+        marker.position.copy(pos);
+        marker.lookAt(0, 0, 0);
+        marker.rotateX(Math.PI);
+        marker.userData = { type: 'volcano', id: v.id, name: `[${v.status?.toUpperCase()}] ${v.name} — ${v.country || ''}` };
+        markersRef.current?.add(marker);
+      });
+    }
+
+    if (layersEnabled.geopolitical) {
+      geopolitical.filter((g) => g.category !== 'curfew').forEach((g) => {
+        if (!g.latitude || !g.longitude) return;
+        const pos = latLonToVector3(g.latitude, g.longitude, 101);
+        const color = g.severity === 'critical' ? 0xff2255 : g.severity === 'high' ? 0xff6b00 : 0xffb800;
+        const geometry = new THREE.SphereGeometry(2, 8, 8);
+        const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8 });
+        const marker = new THREE.Mesh(geometry, material);
+        marker.position.copy(pos);
+        marker.userData = { type: 'geopolitical', id: g.id, name: `[${g.category?.toUpperCase()}] ${g.title}` };
+        markersRef.current?.add(marker);
+      });
+    }
+
+    if (layersEnabled.curfews) {
+      geopolitical.filter((g) => g.category === 'curfew').forEach((g) => {
+        if (!g.latitude || !g.longitude) return;
+        const pos = latLonToVector3(g.latitude, g.longitude, 101);
+        const geometry = new THREE.RingGeometry(2, 4, 6);
+        const material = new THREE.MeshBasicMaterial({ color: 0xcc3300, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
+        const marker = new THREE.Mesh(geometry, material);
+        marker.position.copy(pos);
+        marker.lookAt(0, 0, 0);
+        marker.userData = { type: 'curfew', id: g.id, name: `[CURFEW] ${g.title} — ${g.country || ''}` };
+        markersRef.current?.add(marker);
+      });
+    }
+
+    if (layersEnabled.vessels) {
+      vessels.forEach((v) => {
+        if (!v.latitude || !v.longitude) return;
+        const pos = latLonToVector3(v.latitude, v.longitude, 101);
+        const color = v.type === 'Military' ? 0xff2255 : v.type === 'Tanker' ? 0xffb800 : 0x00bfff;
+        const geometry = new THREE.ConeGeometry(1, 3, 3);
+        const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 });
+        const marker = new THREE.Mesh(geometry, material);
+        marker.position.copy(pos);
+        marker.lookAt(0, 0, 0);
+        marker.rotateX(Math.PI);
+        marker.userData = { type: 'vessel', id: v.id, name: `${v.name} [${v.type}] ${v.flag || ''} → ${v.destination || ''}` };
+        markersRef.current?.add(marker);
+      });
+    }
+  }, [earthquakes, disasters, news, vessels, volcanoes, geopolitical, layersEnabled]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
