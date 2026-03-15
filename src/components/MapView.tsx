@@ -32,6 +32,17 @@ interface MapViewProps {
   hideTooltip: () => void;
 }
 
+const REGION_PRESETS = [
+  { key: 'globe',    label: 'GLOBE' },
+  { key: 'americas', label: 'AMERICAS' },
+  { key: 'europe',   label: 'EUROPE' },
+  { key: 'mena',     label: 'MENA' },
+  { key: 'asia',     label: 'ASIA' },
+  { key: 'india',    label: 'INDIA' },
+  { key: 'africa',   label: 'AFRICA' },
+  { key: 'oceania',  label: 'OCEANIA' },
+];
+
 export function MapView({
   earthquakes,
   disasters,
@@ -47,17 +58,20 @@ export function MapView({
   hideTooltip,
 }: MapViewProps) {
   const [viewMode, setViewMode] = useState<'2d' | '3d'>('2d');
+  const [activeRegion, setActiveRegion] = useState('globe');
+
+  const totalEvents = earthquakes.length + disasters.length + news.length + volcanoes.length + geopolitical.length;
 
   return (
     <div className="view active" id="view-map">
       <div className="time-filter-bar">
-        <div className="tf-lbl">TIME:</div>
-        {['1H', '6H', '12H', '24H', '7D', '30D', 'ALL'].map((filter) => (
+        <div className="tf-lbl">WINDOW:</div>
+        {['1H', '6H', '24H', '7D', 'ALL'].map((filter) => (
           <button key={filter} className={`tf-btn ${timeFilter === filter ? 'active' : ''}`} onClick={() => onTimeFilterChange(filter)}>
             {filter}
           </button>
         ))}
-        <div className="tf-event-count">{earthquakes.length + disasters.length + volcanoes.length + geopolitical.length} events</div>
+        <div className="tf-event-count">{totalEvents} EVENTS</div>
 
         <div className="map-view-toggle">
           <button
@@ -92,6 +106,7 @@ export function MapView({
             layersEnabled={layersEnabled}
             showTooltip={showTooltip}
             hideTooltip={hideTooltip}
+            activeRegion={activeRegion}
           />
         ) : (
           <Globe3D
@@ -118,6 +133,20 @@ export function MapView({
           {viewMode === '2d' ? 'EQUIRECTANGULAR PROJECTION' : '3D GLOBE VIEW'}
         </div>
         <div className="map-credits">DHRUVA GLOBAL INTELLIGENCE • {viewMode === '2d' ? 'SVG MAP' : 'WEBGL RENDERING'}</div>
+
+        {viewMode === '2d' && (
+          <div className="regional-bar">
+            {REGION_PRESETS.map((r) => (
+              <button
+                key={r.key}
+                className={`reg-btn ${activeRegion === r.key ? 'active' : ''}`}
+                onClick={() => setActiveRegion(r.key)}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

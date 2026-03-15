@@ -2,6 +2,17 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
 import { UNDERSEA_CABLES } from '../lib/cable-data';
 
+const REGIONS: Record<string, { cx: number; cy: number; scale: number }> = {
+  globe:    { cx: 0,    cy: 0,   scale: 1.0 },
+  americas: { cx: -80,  cy: 5,   scale: 2.2 },
+  europe:   { cx: 15,   cy: 52,  scale: 3.8 },
+  mena:     { cx: 38,   cy: 25,  scale: 3.2 },
+  asia:     { cx: 100,  cy: 35,  scale: 2.5 },
+  india:    { cx: 78,   cy: 22,  scale: 5.5 },
+  africa:   { cx: 20,   cy: 0,   scale: 2.8 },
+  oceania:  { cx: 140,  cy: -25, scale: 3.2 },
+};
+
 interface WorldMapSVGProps {
   earthquakes: Earthquake[];
   disasters: Disaster[];
@@ -26,6 +37,7 @@ interface WorldMapSVGProps {
   };
   showTooltip: (x: number, y: number, content: string) => void;
   hideTooltip: () => void;
+  activeRegion?: string;
 }
 
 interface TopoJSONTransform {
@@ -66,6 +78,7 @@ export function WorldMapSVG({
   layersEnabled,
   showTooltip,
   hideTooltip,
+  activeRegion = 'globe',
 }: WorldMapSVGProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -332,6 +345,20 @@ export function WorldMapSVG({
 
     loadWorldMap();
   }, []);
+
+  useEffect(() => {
+    const region = REGIONS[activeRegion] || REGIONS.globe;
+    const scaledWidth = MAP_WIDTH / region.scale;
+    const scaledHeight = MAP_HEIGHT / region.scale;
+    const centerX = lonToX(region.cx);
+    const centerY = latToY(region.cy);
+    setViewBox({
+      x: centerX - scaledWidth / 2,
+      y: centerY - scaledHeight / 2,
+      width: scaledWidth,
+      height: scaledHeight,
+    });
+  }, [activeRegion]);
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
