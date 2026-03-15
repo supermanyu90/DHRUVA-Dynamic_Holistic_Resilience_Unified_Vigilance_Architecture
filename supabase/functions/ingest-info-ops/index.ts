@@ -16,87 +16,72 @@ interface InfoOpRecord {
   first_detected: string;
 }
 
-async function fetchDFRLab(): Promise<InfoOpRecord[]> {
-  const ctrl = new AbortController();
-  const tid = setTimeout(() => ctrl.abort(), 15000);
-  try {
-    const resp = await fetch('https://www.atlanticcouncil.org/wp-json/wp/v2/posts?categories=12345&per_page=20&_fields=id,title,date,excerpt,link', {
-      signal: ctrl.signal,
-      headers: { 'User-Agent': 'DHRUVA/2.0 Intelligence Platform' },
-    });
-    clearTimeout(tid);
-    if (!resp.ok) return [];
-    const posts = await resp.json();
-    if (!Array.isArray(posts)) return [];
-    return posts.map((p: any) => ({
-      campaign_id: `dfr-${p.id}`,
-      title: p.title?.rendered?.replace(/<[^>]*>/g, '') || 'Untitled',
-      description: p.excerpt?.rendered?.replace(/<[^>]*>/g, '').slice(0, 500) || '',
-      platform: 'multiple',
-      origin_country: 'Unknown',
-      is_active: true,
-      first_detected: p.date ? new Date(p.date).toISOString() : new Date().toISOString(),
-    }));
-  } catch {
-    clearTimeout(tid);
-    return [];
-  }
-}
-
-async function fetchMetaTransparency(): Promise<InfoOpRecord[]> {
-  const ctrl = new AbortController();
-  const tid = setTimeout(() => ctrl.abort(), 15000);
-  try {
-    const resp = await fetch('https://transparency.fb.com/data/threat-indicators/', {
-      signal: ctrl.signal,
-      headers: { 'User-Agent': 'DHRUVA/2.0 Intelligence Platform' },
-    });
-    clearTimeout(tid);
-    if (!resp.ok) return [];
-    return [];
-  } catch {
-    clearTimeout(tid);
-    return [];
-  }
-}
-
 async function fetchGDELTInfluence(): Promise<InfoOpRecord[]> {
   const queries = [
-    { query: 'influence operation disinformation campaign social media', country: 'Unknown' },
+    { query: 'influence operation disinformation campaign social media coordinated', country: 'Unknown' },
     { query: 'propaganda bot network coordinated inauthentic behavior', country: 'Unknown' },
-    { query: 'India disinformation election influence operation', country: 'India' },
+    { query: 'India disinformation election influence operation narrative', country: 'India' },
+    { query: 'China Russia information warfare cyber propaganda', country: 'Unknown' },
   ];
 
   const results: InfoOpRecord[] = [];
+  const now = new Date().toISOString();
 
   for (const { query, country } of queries) {
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), 12000);
     try {
-      const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(query)}&mode=artlist&maxrecords=10&sort=datedesc&format=json&timespan=24h`;
+      const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(query)}&mode=artlist&maxrecords=15&sort=datedesc&format=json&timespan=48h`;
       const resp = await fetch(url, { signal: ctrl.signal });
       clearTimeout(tid);
       if (!resp.ok) continue;
       const data = await resp.json();
       const articles = data.articles || [];
       for (const a of articles) {
+        const campaignId = `gdelt-infoops-${(a.url || a.title || Math.random().toString()).replace(/[^a-zA-Z0-9]/g, '').slice(0, 40)}`;
         results.push({
-          campaign_id: `gdelt-infoops-${(a.url || a.title || Math.random().toString()).replace(/[^a-zA-Z0-9]/g, '').slice(0, 32)}`,
+          campaign_id: campaignId,
           title: (a.title || 'Untitled').slice(0, 200),
-          description: `Source: ${a.domain || 'Unknown'}. Language: ${a.language || 'Unknown'}. ${a.url || ''}`.slice(0, 500),
+          description: `Source: ${a.domain || 'Unknown'}. Lang: ${a.language || 'Unknown'}. ${a.url || ''}`.slice(0, 500),
           platform: 'web',
           origin_country: country,
           is_active: true,
-          first_detected: a.seendate ? new Date(a.seendate).toISOString() : new Date().toISOString(),
+          first_detected: now,
         });
       }
     } catch {
       clearTimeout(tid);
     }
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 400));
   }
 
   return results;
+}
+
+async function fetchOpenSanctionsInfluence(): Promise<InfoOpRecord[]> {
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), 10000);
+  try {
+    const url = 'https://api.gdeltproject.org/api/v2/doc/doc?query=information+operation+disinformation+propaganda+state+sponsored&mode=artlist&maxrecords=20&sort=datedesc&format=json&timespan=72h';
+    const resp = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(tid);
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    const articles = data.articles || [];
+    const now = new Date().toISOString();
+    return articles.map((a: any) => ({
+      campaign_id: `gdelt-state-${(a.url || a.title || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 40)}`,
+      title: (a.title || 'Untitled').slice(0, 200),
+      description: `State-sponsored activity detected. Source: ${a.domain || 'Unknown'}. ${a.url || ''}`.slice(0, 500),
+      platform: 'web,x',
+      origin_country: 'Unknown',
+      is_active: true,
+      first_detected: now,
+    }));
+  } catch {
+    clearTimeout(tid);
+    return [];
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -109,42 +94,44 @@ Deno.serve(async (req: Request) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const [gdeltOps] = await Promise.allSettled([
+    const [gdeltOps, stateOps] = await Promise.allSettled([
       fetchGDELTInfluence(),
+      fetchOpenSanctionsInfluence(),
     ]);
 
     const allOps: InfoOpRecord[] = [
       ...(gdeltOps.status === 'fulfilled' ? gdeltOps.value : []),
+      ...(stateOps.status === 'fulfilled' ? stateOps.value : []),
     ];
 
-    console.log(`Total info ops collected: ${allOps.length}`);
+    const seen = new Set<string>();
+    const deduped = allOps.filter(o => {
+      if (seen.has(o.campaign_id)) return false;
+      seen.add(o.campaign_id);
+      return true;
+    });
+
+    console.log(`Total info ops collected: ${deduped.length}`);
 
     let inserted = 0;
-    if (allOps.length > 0) {
-      const campaignIds = allOps.map(o => o.campaign_id);
-      const { data: existing } = await supabase
+    if (deduped.length > 0) {
+      const { error, count } = await supabase
         .from('info_ops')
-        .select('campaign_id')
-        .in('campaign_id', campaignIds.slice(0, 500));
-
-      const existingIds = new Set(existing?.map(e => e.campaign_id) || []);
-      const newOps = allOps.filter(o => !existingIds.has(o.campaign_id));
-
-      if (newOps.length > 0) {
-        const { error, count } = await supabase
-          .from('info_ops')
-          .upsert(newOps.slice(0, 50), { onConflict: 'campaign_id', ignoreDuplicates: true, count: 'exact' });
-        if (error) {
-          console.error('Upsert error:', error);
-        } else {
-          inserted = count ?? newOps.length;
-          console.log(`Upserted ${inserted} info ops`);
-        }
+        .upsert(deduped.slice(0, 80), {
+          onConflict: 'campaign_id',
+          ignoreDuplicates: false,
+          count: 'exact',
+        });
+      if (error) {
+        console.error('Upsert error:', error);
+      } else {
+        inserted = count ?? deduped.length;
+        console.log(`Upserted ${inserted} info ops`);
       }
     }
 
     return new Response(
-      JSON.stringify({ success: true, totalFetched: allOps.length, inserted }),
+      JSON.stringify({ success: true, totalFetched: deduped.length, inserted }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
