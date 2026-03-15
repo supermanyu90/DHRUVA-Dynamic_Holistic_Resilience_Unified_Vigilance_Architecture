@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
 import { UNDERSEA_CABLES } from '../lib/cable-data';
-import { LINE_OF_CONTROL, LINE_OF_ACTUAL_CONTROL, INDIA_DISCLAIMER } from '../lib/india-boundary';
+import { INDIA_OUTER_BOUNDARY, LINE_OF_CONTROL, LINE_OF_ACTUAL_CONTROL, INDIA_DISCLAIMER } from '../lib/india-boundary';
 
 const REGIONS: Record<string, { cx: number; cy: number; scale: number }> = {
   globe:    { cx: 0,    cy: 0,   scale: 1.0 },
@@ -661,6 +661,20 @@ export function WorldMapSVG({
         </g>
 
         <g className="india-goi-boundary" aria-label={INDIA_DISCLAIMER}>
+          {INDIA_OUTER_BOUNDARY.length > 0 && (
+            <path
+              d={
+                'M' +
+                INDIA_OUTER_BOUNDARY.map(([lon, lat]) => `${lonToX(lon).toFixed(1)},${latToY(lat).toFixed(1)}`).join('L') +
+                'Z'
+              }
+              fill="#0d2438"
+              stroke="#2a6a54"
+              strokeWidth="0.65"
+              strokeLinejoin="round"
+              pointerEvents="none"
+            />
+          )}
           <path
             d={
               'M' +
@@ -668,9 +682,9 @@ export function WorldMapSVG({
             }
             fill="none"
             stroke="#6fa8dc"
-            strokeWidth="0.6"
+            strokeWidth="0.7"
             strokeDasharray="2,1.4"
-            opacity="0.75"
+            opacity="0.8"
             pointerEvents="none"
           />
           <path
@@ -680,9 +694,9 @@ export function WorldMapSVG({
             }
             fill="none"
             stroke="#a4c2f4"
-            strokeWidth="0.6"
+            strokeWidth="0.7"
             strokeDasharray="2,1.4"
-            opacity="0.75"
+            opacity="0.8"
             pointerEvents="none"
           />
         </g>

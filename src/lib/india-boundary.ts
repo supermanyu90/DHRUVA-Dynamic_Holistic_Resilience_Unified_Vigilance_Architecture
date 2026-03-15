@@ -1,15 +1,13 @@
 /*
-  GoI-compliant India boundary overlay data — Survey of India standard.
+  India boundary coordinates — derived from Natural Earth / world-atlas data.
+
+  The base polygon matches the world atlas TopoJSON country shape for India.
+  GoI-mandated overlay lines (LoC, LAC) are rendered as dashed lines on top.
 
   Government of India mandates:
   - J&K, Ladakh (including Aksai Chin & PoK/Gilgit-Baltistan) are integral parts of India
   - Arunachal Pradesh is an integral part of India (McMahon Line applies)
-  - LoC (Line of Control, J&K) and LAC (Line of Actual Control, Ladakh/Arunachal)
-    are shown as dashed lines — NOT solid international borders
-
-  The world atlas TopoJSON data is used for the base India country shape.
-  These overlay lines are rendered as dashed lines on top of the base map
-  to correctly depict the LoC and LAC per GoI convention.
+  - LoC and LAC are shown as dashed lines — NOT solid international borders
 
   Coordinates: [longitude, latitude] (WGS84)
 */
@@ -21,92 +19,192 @@ export interface BoundarySegment {
 }
 
 /*
-  Line of Control (LoC) — J&K / PoK.
-  Runs from Punjab international border north to NJ9842 (Siachen glacier).
-  Shown as dashed blue line per GoI convention. NOT an international border.
-  Pakistan-administered PoK/Gilgit-Baltistan is shown as Indian territory.
+  Full India outer boundary polygon — 136 coordinate pairs.
+  Accurate shape matching the map reference image provided.
+  Includes northeast states (chicken-neck corridor + NE blob) as a single ring.
 */
-export const LINE_OF_CONTROL: [number, number][] = [
-  [74.32, 31.72],
-  [73.98, 32.14],
-  [73.62, 32.54],
-  [73.28, 32.96],
-  [72.88, 33.42],
-  [72.48, 33.88],
-  [72.08, 34.28],
-  [71.72, 34.68],
-  [71.38, 34.96],
-  [71.08, 35.14],
-  [70.84, 35.42],
-  [70.62, 35.68],
-  [70.42, 35.92],
-  [70.18, 36.14],
-  [69.98, 36.32],
-  [69.82, 36.58],
-  [69.72, 36.82],
-  [69.68, 37.08],
-  [69.78, 37.34],
-  [70.08, 37.52],
-  [70.48, 37.62],
-  [70.88, 37.72],
-  [71.28, 37.82],
-  [71.68, 37.88],
-  [72.08, 37.94],
-  [72.48, 37.98],
-  [72.88, 37.98],
-  [73.28, 37.94],
-  [73.62, 37.84],
-  [73.92, 37.68],
-  [74.18, 37.48],
-  [74.38, 37.22],
-  [74.52, 36.94],
-  [74.62, 36.64],
-  [74.68, 36.32],
-  [74.72, 36.04],
-  [74.82, 35.78],
-  [75.02, 35.54],
-  [75.28, 35.34],
-  [75.54, 35.16],
-  [75.82, 35.02],
-  [76.12, 34.88],
-  [76.38, 34.72],
-  [76.62, 34.54],
-  [76.82, 34.28],
-  [76.98, 33.98],
-  [77.08, 33.68],
-  [77.12, 33.38],
+export const INDIA_OUTER_BOUNDARY: [number, number][] = [
+  [77.837451, 35.49401],
+  [78.912269, 34.321936],
+  [78.811086, 33.506198],
+  [79.208892, 32.994395],
+  [79.176129, 32.48378],
+  [78.458446, 32.618164],
+  [78.738894, 31.515906],
+  [79.721367, 30.882715],
+  [81.111256, 30.183481],
+  [80.476721, 29.729865],
+  [80.088425, 28.79447],
+  [81.057203, 28.416095],
+  [81.999987, 27.925479],
+  [83.304249, 27.364506],
+  [84.675018, 27.234901],
+  [85.251779, 26.726198],
+  [86.024393, 26.630985],
+  [87.227472, 26.397898],
+  [88.060238, 26.414615],
+  [88.174804, 26.810405],
+  [88.043133, 27.445819],
+  [88.120441, 27.876542],
+  [88.730326, 28.086865],
+  [88.814248, 27.299316],
+  [88.835643, 27.098966],
+  [89.744528, 26.719403],
+  [90.373275, 26.875724],
+  [91.217513, 26.808648],
+  [92.033484, 26.83831],
+  [92.103712, 27.452614],
+  [91.696657, 27.771742],
+  [92.503119, 27.896876],
+  [93.413348, 28.640629],
+  [94.56599,  29.277438],
+  [95.404802, 29.031717],
+  [96.117679, 29.452802],
+  [96.586591, 28.83098],
+  [96.248833, 28.411031],
+  [97.327114, 28.261583],
+  [97.402561, 27.882536],
+  [97.051989, 27.699059],
+  [97.133999, 27.083774],
+  [96.419366, 27.264589],
+  [95.124768, 26.573572],
+  [95.155153, 26.001307],
+  [94.603249, 25.162495],
+  [94.552658, 24.675238],
+  [94.106742, 23.850741],
+  [93.325188, 24.078556],
+  [93.286327, 23.043658],
+  [93.060294, 22.703111],
+  [93.166128, 22.27846],
+  [92.672721, 22.041239],
+  [92.146035, 23.627499],
+  [91.869928, 23.624346],
+  [91.706475, 22.985264],
+  [91.158963, 23.503527],
+  [91.46773,  24.072639],
+  [91.915093, 24.130414],
+  [92.376202, 24.976693],
+  [91.799596, 25.147432],
+  [90.872211, 25.132601],
+  [89.920693, 25.26975],
+  [89.832481, 25.965082],
+  [89.355094, 26.014407],
+  [88.563049, 26.446526],
+  [88.209789, 25.768066],
+  [88.931554, 25.238692],
+  [88.306373, 24.866079],
+  [88.084422, 24.501657],
+  [88.69994,  24.233715],
+  [88.52977,  23.631142],
+  [88.876312, 22.879146],
+  [89.031961, 22.055708],
+  [88.888766, 21.690588],
+  [88.208497, 21.703172],
+  [86.975704, 21.495562],
+  [87.033169, 20.743308],
+  [86.499351, 20.151638],
+  [85.060266, 19.478579],
+  [83.941006, 18.30201],
+  [83.189217, 17.671221],
+  [82.192792, 17.016636],
+  [82.191242, 16.556664],
+  [81.692719, 16.310219],
+  [80.791999, 15.951972],
+  [80.324896, 15.899185],
+  [80.025069, 15.136415],
+  [80.233274, 13.835771],
+  [80.286294, 13.006261],
+  [79.862547, 12.056215],
+  [79.857999, 10.357275],
+  [79.340512, 10.308854],
+  [78.885345,  9.546136],
+  [79.18972,   9.216544],
+  [78.277941,  8.933047],
+  [77.941165,  8.252959],
+  [77.539898,  7.965535],
+  [76.592979,  8.899276],
+  [76.130061, 10.29963],
+  [75.746467, 11.308251],
+  [75.396101, 11.781245],
+  [74.864816, 12.741936],
+  [74.616717, 13.992583],
+  [74.443859, 14.617222],
+  [73.534199, 15.990652],
+  [73.119909, 17.92857],
+  [72.820909, 19.208234],
+  [72.824475, 20.419503],
+  [72.630533, 21.356009],
+  [71.175273, 20.757441],
+  [70.470459, 20.877331],
+  [69.16413,  22.089298],
+  [69.644928, 22.450775],
+  [69.349597, 22.84318],
+  [68.176645, 23.691965],
+  [68.842599, 24.359134],
+  [71.04324,  24.356524],
+  [70.844699, 25.215102],
+  [70.282873, 25.722229],
+  [70.168927, 26.491872],
+  [69.514393, 26.940966],
+  [70.616496, 27.989196],
+  [71.777666, 27.91318],
+  [72.823752, 28.961592],
+  [73.450638, 29.976413],
+  [74.42138,  30.979815],
+  [74.405929, 31.692639],
+  [75.258642, 32.271105],
+  [74.451559, 32.7649],
+  [74.104294, 33.441473],
+  [73.749948, 34.317699],
+  [74.240203, 34.748887],
+  [75.757061, 34.504923],
+  [76.871722, 34.653544],
+  [77.837451, 35.49401],
 ];
 
 /*
-  Line of Actual Control (LAC) — Ladakh / Aksai Chin / Arunachal.
+  Line of Control (LoC) — J&K / PoK.
+  Shown as dashed blue line per GoI convention. NOT an international border.
+  Runs approximately from the Punjab international border (near Suchetgarh ~74.3°E, 32.5°N)
+  north to the Siachen glacier / NJ9842 area.
+*/
+export const LINE_OF_CONTROL: [number, number][] = [
+  [74.32, 32.50],
+  [74.10, 32.76],
+  [73.94, 33.08],
+  [73.78, 33.42],
+  [73.56, 33.72],
+  [73.28, 34.02],
+  [73.12, 34.38],
+  [73.06, 34.74],
+  [73.24, 35.04],
+  [73.62, 35.26],
+  [73.98, 35.48],
+  [74.22, 35.76],
+  [74.38, 36.08],
+  [74.52, 36.38],
+  [74.64, 36.68],
+  [74.72, 36.94],
+  [74.80, 37.18],
+];
+
+/*
+  Line of Actual Control (LAC) — Ladakh / Aksai Chin.
   Shown as dashed line per GoI convention. NOT an international border.
-  India claims Aksai Chin as part of Ladakh UT.
+  India claims Aksai Chin (currently administered by China) as part of Ladakh UT.
+  Runs from approx Daulat Beg Oldie area south along the Ladakh/Tibet LAC.
 */
 export const LINE_OF_ACTUAL_CONTROL: [number, number][] = [
-  [77.12, 33.38],
-  [77.42, 33.12],
-  [77.78, 32.88],
-  [78.18, 32.68],
-  [78.62, 32.48],
-  [79.08, 32.32],
-  [79.58, 32.18],
-  [80.08, 32.08],
-  [80.58, 32.02],
-  [81.08, 31.98],
-  [81.58, 31.98],
-  [82.08, 32.02],
-  [82.58, 32.08],
-  [83.08, 32.18],
-  [83.58, 32.32],
-  [84.08, 32.48],
-  [84.58, 32.68],
-  [85.08, 32.92],
-  [85.58, 33.18],
-  [86.08, 33.48],
-  [86.58, 33.78],
-  [87.08, 34.08],
-  [87.58, 34.32],
-  [88.08, 34.48],
+  [78.84, 35.49],
+  [79.28, 34.98],
+  [79.54, 34.48],
+  [79.72, 33.96],
+  [79.78, 33.44],
+  [79.72, 32.98],
+  [79.52, 32.58],
+  [79.22, 32.22],
+  [78.92, 31.92],
+  [78.72, 31.52],
 ];
 
 export const INDIA_DISCLAIMER =
@@ -114,11 +212,3 @@ export const INDIA_DISCLAIMER =
   'J&K, Ladakh (including Aksai Chin and PoK), and Arunachal Pradesh are integral parts of India. ' +
   'The external boundaries of India are as notified by the Survey of India. ' +
   'LoC and LAC are indicative and not international borders.';
-
-/*
-  INDIA_OUTER_BOUNDARY is no longer used as a polygon overlay.
-  The base India country shape comes from the world atlas TopoJSON data
-  which is rendered via the landPaths in WorldMapSVG.
-  This export is kept for backward compatibility.
-*/
-export const INDIA_OUTER_BOUNDARY: [number, number][] = [];
