@@ -123,6 +123,8 @@ function App() {
   const autoSyncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const nextSyncAtRef = useRef<number>(Date.now() + AUTO_SYNC_INTERVAL_MS);
+  const swipeTouchStartX = useRef<number | null>(null);
+  const swipeTouchStartY = useRef<number | null>(null);
 
   const pushTickerEvent = useCallback((evt: TickerEvent) => {
     setTickerEvents((prev) => [evt, ...prev].slice(0, 40));
@@ -311,6 +313,39 @@ function App() {
     document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : '');
   }, []);
 
+  const handleSwipeTouchStart = (e: React.TouchEvent) => {
+    swipeTouchStartX.current = e.touches[0].clientX;
+    swipeTouchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleSwipeTouchEnd = (e: React.TouchEvent) => {
+    if (swipeTouchStartX.current === null || swipeTouchStartY.current === null) return;
+    const dx = e.changedTouches[0].clientX - swipeTouchStartX.current;
+    const dy = e.changedTouches[0].clientY - swipeTouchStartY.current;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+    if (absDx < 40 || absDy > absDx) {
+      swipeTouchStartX.current = null;
+      swipeTouchStartY.current = null;
+      return;
+    }
+    const startX = swipeTouchStartX.current;
+    const screenW = window.innerWidth;
+    if (dx > 0 && startX < 40) {
+      setMobileSidebarOpen(true);
+      setMobileRightPanelOpen(false);
+    } else if (dx < 0 && startX > screenW - 40) {
+      setMobileRightPanelOpen(true);
+      setMobileSidebarOpen(false);
+    } else if (dx < 0 && mobileSidebarOpen) {
+      setMobileSidebarOpen(false);
+    } else if (dx > 0 && mobileRightPanelOpen) {
+      setMobileRightPanelOpen(false);
+    }
+    swipeTouchStartX.current = null;
+    swipeTouchStartY.current = null;
+  };
+
   const criticalEvents = earthquakes.filter((e) => e.magnitude >= 6).length +
     disasters.filter((d) => d.category?.toLowerCase().includes('severe')).length;
 
@@ -328,7 +363,7 @@ function App() {
   }
 
   return (
-    <div className="dhruva-app">
+    <div className="dhruva-app" onTouchStart={handleSwipeTouchStart} onTouchEnd={handleSwipeTouchEnd}>
       <div className="portrait-overlay">
         <div className="portrait-overlay-inner">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

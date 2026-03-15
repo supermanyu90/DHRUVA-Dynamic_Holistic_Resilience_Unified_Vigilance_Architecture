@@ -820,6 +820,11 @@ header,
   display: none;
 }
 
+.swipe-edge-left,
+.swipe-edge-right {
+  display: none;
+}
+
 @media (max-width: 768px) {
   :root {
     --sidebar: min(300px, 85vw);
@@ -959,6 +964,25 @@ header,
   .app-body {
     flex-direction: row;
     position: relative;
+  }
+
+  .swipe-edge-left,
+  .swipe-edge-right {
+    display: block;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    width: 16px;
+    z-index: 199;
+    pointer-events: none;
+  }
+
+  .swipe-edge-left {
+    left: 0;
+  }
+
+  .swipe-edge-right {
+    right: 0;
   }
 
   .mobile-overlay {
