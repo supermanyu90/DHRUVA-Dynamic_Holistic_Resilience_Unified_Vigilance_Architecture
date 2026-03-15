@@ -411,7 +411,14 @@ function App() {
           {currentView === 'vessel' && <VesselView />}
         </div>
 
-        <RightPanel earthquakes={earthquakes.length} disasters={disasters.length} news={news.length} />
+        <RightPanel
+          earthquakes={earthquakes}
+          disasters={disasters}
+          news={news}
+          vessels={vessels}
+          volcanoes={volcanoes}
+          geopolitical={geopolitical}
+        />
       </div>
 
       <div className="status-bar">
