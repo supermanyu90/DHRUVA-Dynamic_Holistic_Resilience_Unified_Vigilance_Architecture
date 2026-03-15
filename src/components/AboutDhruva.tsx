@@ -188,6 +188,17 @@ export function AboutDhruva({ onClose, theme }: AboutDhruvaProps) {
           <div className="about-footer">
             <span className="about-version">DHRUVA v1.9</span>
             <span className="about-build">BUILD {new Date().getFullYear()} — OPEN SOURCE INTELLIGENCE PLATFORM</span>
+            <span className="about-creator">
+              CREATED BY&nbsp;
+              <a
+                href="https://www.linkedin.com/in/abhimanyu-mathur-70643032"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="about-creator-link"
+              >
+                ABHIMANYU MATHUR
+              </a>
+            </span>
             <span className="about-classified">UNCLASSIFIED // OSINT ONLY</span>
           </div>
         </div>

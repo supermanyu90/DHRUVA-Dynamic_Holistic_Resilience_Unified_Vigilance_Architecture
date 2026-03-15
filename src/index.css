@@ -3672,3 +3672,27 @@ header,
   padding: 2px 8px;
   border-radius: 2px;
 }
+
+.about-creator {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 1.5px;
+  color: var(--dim);
+}
+
+.about-creator-link {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(0, 212, 160, 0.35);
+  transition: all 0.15s ease;
+}
+.about-creator-link:hover {
+  border-bottom-color: var(--accent);
+  opacity: 0.85;
+}
+[data-theme="light"] .about-creator-link {
+  border-bottom-color: rgba(0, 122, 94, 0.35);
+}
+[data-theme="light"] .about-creator-link:hover {
+  border-bottom-color: var(--accent);
+}
