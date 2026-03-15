@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
 import { UNDERSEA_CABLES } from '../lib/cable-data';
-import { INDIA_OUTER_BOUNDARY, LINE_OF_CONTROL, LINE_OF_ACTUAL_CONTROL, INDIA_DISCLAIMER } from '../lib/india-boundary';
+import { LINE_OF_CONTROL, LINE_OF_ACTUAL_CONTROL, INDIA_DISCLAIMER } from '../lib/india-boundary';
 
 const REGIONS: Record<string, { cx: number; cy: number; scale: number }> = {
   globe:    { cx: 0,    cy: 0,   scale: 1.0 },
@@ -664,25 +664,14 @@ export function WorldMapSVG({
           <path
             d={
               'M' +
-              INDIA_OUTER_BOUNDARY.map(([lon, lat]) => `${lonToX(lon).toFixed(1)},${latToY(lat).toFixed(1)}`).join('L') +
-              'Z'
-            }
-            fill="#0d2238"
-            stroke="#2a7a5a"
-            strokeWidth="0.55"
-            strokeLinejoin="round"
-            opacity="1"
-          />
-          <path
-            d={
-              'M' +
               LINE_OF_CONTROL.map(([lon, lat]) => `${lonToX(lon).toFixed(1)},${latToY(lat).toFixed(1)}`).join('L')
             }
             fill="none"
             stroke="#6fa8dc"
-            strokeWidth="0.5"
-            strokeDasharray="1.8,1.2"
-            opacity="0.8"
+            strokeWidth="0.6"
+            strokeDasharray="2,1.4"
+            opacity="0.75"
+            pointerEvents="none"
           />
           <path
             d={
@@ -691,21 +680,11 @@ export function WorldMapSVG({
             }
             fill="none"
             stroke="#a4c2f4"
-            strokeWidth="0.5"
-            strokeDasharray="1.8,1.2"
-            opacity="0.8"
-          />
-          <text
-            x={lonToX(79)}
-            y={latToY(22)}
-            fill="rgba(139,175,200,0.25)"
-            fontSize="3"
-            fontFamily="Share Tech Mono, monospace"
-            textAnchor="middle"
+            strokeWidth="0.6"
+            strokeDasharray="2,1.4"
+            opacity="0.75"
             pointerEvents="none"
-          >
-            INDIA
-          </text>
+          />
         </g>
 
         <g className="country-labels">
