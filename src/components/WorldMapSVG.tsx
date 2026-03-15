@@ -681,10 +681,10 @@ export function WorldMapSVG({
               LINE_OF_CONTROL.map(([lon, lat]) => `${lonToX(lon).toFixed(1)},${latToY(lat).toFixed(1)}`).join('L')
             }
             fill="none"
-            stroke="#6fa8dc"
-            strokeWidth="0.7"
-            strokeDasharray="2,1.4"
-            opacity="0.8"
+            stroke="#2a6a54"
+            strokeWidth="0.75"
+            strokeLinejoin="round"
+            opacity="0.9"
             pointerEvents="none"
           />
           <path
@@ -693,10 +693,10 @@ export function WorldMapSVG({
               LINE_OF_ACTUAL_CONTROL.map(([lon, lat]) => `${lonToX(lon).toFixed(1)},${latToY(lat).toFixed(1)}`).join('L')
             }
             fill="none"
-            stroke="#a4c2f4"
-            strokeWidth="0.7"
-            strokeDasharray="2,1.4"
-            opacity="0.8"
+            stroke="#2a6a54"
+            strokeWidth="0.75"
+            strokeLinejoin="round"
+            opacity="0.9"
             pointerEvents="none"
           />
         </g>
