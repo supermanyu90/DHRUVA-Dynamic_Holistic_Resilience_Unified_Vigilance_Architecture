@@ -149,6 +149,7 @@ export function MapView({
                 key={r.key}
                 className={`reg-btn ${activeRegion === r.key ? 'active' : ''}`}
                 onClick={() => setActiveRegion(r.key)}
+                onTouchEnd={(e) => { e.stopPropagation(); setActiveRegion(r.key); }}
               >
                 {r.label}
               </button>

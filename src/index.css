@@ -1032,14 +1032,27 @@ header,
   }
 
   .regional-bar {
-    bottom: 6px;
-    gap: 3px;
+    bottom: 8px;
+    left: 8px;
+    right: 60px;
+    transform: none;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    flex-wrap: nowrap;
+    padding-bottom: 2px;
+  }
+
+  .regional-bar::-webkit-scrollbar {
+    display: none;
   }
 
   .reg-btn {
-    font-size: 8px;
-    padding: 4px 7px;
-    min-height: 32px;
+    font-size: 9px;
+    padding: 6px 10px;
+    min-height: 36px;
+    flex-shrink: 0;
+    touch-action: manipulation;
   }
 
   .map-zoom-btns {
@@ -1071,6 +1084,7 @@ header,
     padding: 5px 10px;
     overflow-x: auto;
     scrollbar-width: none;
+    gap: 5px;
   }
 
   .time-filter-bar::-webkit-scrollbar {
@@ -1078,9 +1092,40 @@ header,
   }
 
   .tf-btn {
-    padding: 4px 10px;
-    min-height: 32px;
+    padding: 6px 12px;
+    min-height: 36px;
     flex-shrink: 0;
+    touch-action: manipulation;
+    font-size: 10px;
+  }
+
+  .tf-lbl {
+    flex-shrink: 0;
+    font-size: 9px;
+  }
+
+  .tf-event-count {
+    flex-shrink: 0;
+  }
+
+  .map-view-toggle {
+    flex-shrink: 0;
+    display: flex;
+    gap: 4px;
+    margin-left: 0;
+    padding-left: 6px;
+    border-left: 1px solid var(--border);
+  }
+
+  .view-toggle-btn {
+    padding: 6px 8px;
+    min-height: 36px;
+    font-size: 9px;
+    touch-action: manipulation;
+  }
+
+  .map-view-label {
+    display: none;
   }
 }
 

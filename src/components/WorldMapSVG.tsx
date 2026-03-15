@@ -92,6 +92,7 @@ export function WorldMapSVG({
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [landPaths, setLandPaths] = useState<string[]>([]);
   const [countryLabels, setCountryLabels] = useState<Array<{ x: number; y: number; name: string }>>([]);
+  const touchStateRef = useRef<{ touches: React.Touch[]; lastDist: number | null }>({ touches: [], lastDist: null });
 
   const MAP_WIDTH = 1000;
   const MAP_HEIGHT = 500;
@@ -464,6 +465,78 @@ export function WorldMapSVG({
     onResetView?.();
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    e.preventDefault();
+    const touches = Array.from(e.touches) as unknown as React.Touch[];
+    touchStateRef.current.touches = touches;
+    if (touches.length === 1) {
+      setIsPanning(true);
+      setPanStart({ x: touches[0].clientX, y: touches[0].clientY });
+      touchStateRef.current.lastDist = null;
+    } else if (touches.length === 2) {
+      setIsPanning(false);
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      touchStateRef.current.lastDist = Math.hypot(dx, dy);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    e.preventDefault();
+    const touches = Array.from(e.touches) as unknown as React.Touch[];
+
+    if (touches.length === 1 && isPanning) {
+      const dx = touches[0].clientX - panStart.x;
+      const dy = touches[0].clientY - panStart.y;
+      const containerWidth = containerRef.current?.clientWidth || 1;
+      const containerHeight = containerRef.current?.clientHeight || 1;
+      setViewBox((prev) => ({
+        ...prev,
+        x: prev.x - dx * (prev.width / containerWidth),
+        y: prev.y - dy * (prev.height / containerHeight),
+      }));
+      setPanStart({ x: touches[0].clientX, y: touches[0].clientY });
+    } else if (touches.length === 2) {
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      const newDist = Math.hypot(dx, dy);
+      const lastDist = touchStateRef.current.lastDist;
+
+      if (lastDist !== null && lastDist > 0) {
+        const scale = lastDist / newDist;
+        const midX = (touches[0].clientX + touches[1].clientX) / 2;
+        const midY = (touches[0].clientY + touches[1].clientY) / 2;
+        const containerRect = containerRef.current?.getBoundingClientRect();
+        const relX = containerRect ? (midX - containerRect.left) / containerRect.width : 0.5;
+        const relY = containerRect ? (midY - containerRect.top) / containerRect.height : 0.5;
+
+        setViewBox((prev) => {
+          const newWidth = Math.max(80, Math.min(2000, prev.width * scale));
+          const newHeight = Math.max(40, Math.min(1000, prev.height * scale));
+          return {
+            x: prev.x + (prev.width - newWidth) * relX,
+            y: prev.y + (prev.height - newHeight) * relY,
+            width: newWidth,
+            height: newHeight,
+          };
+        });
+      }
+      touchStateRef.current.lastDist = newDist;
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    e.preventDefault();
+    if (e.touches.length === 0) {
+      setIsPanning(false);
+      touchStateRef.current.lastDist = null;
+    } else if (e.touches.length === 1) {
+      touchStateRef.current.lastDist = null;
+      setIsPanning(true);
+      setPanStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    }
+  };
+
   const handleMarkerClick = (id: string, type: string) => {
     onEventSelect(id, type);
   };
@@ -491,6 +564,9 @@ export function WorldMapSVG({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
       <div
         style={{
@@ -501,16 +577,17 @@ export function WorldMapSVG({
           zIndex: 20,
           display: 'flex',
           flexDirection: 'column',
-          gap: '4px',
+          gap: '6px',
         }}
       >
         <button
           onClick={(e) => { e.stopPropagation(); handleZoomIn(); }}
           onMouseDown={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); handleZoomIn(); }}
           title="Zoom In"
           style={{
-            width: '30px',
-            height: '30px',
+            width: '44px',
+            height: '44px',
             background: 'rgba(4, 16, 30, 0.92)',
             border: '1px solid rgba(0, 212, 160, 0.35)',
             color: '#00d4a0',
@@ -518,11 +595,12 @@ export function WorldMapSVG({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '18px',
+            fontSize: '22px',
             fontFamily: 'Share Tech Mono, monospace',
             lineHeight: 1,
-            borderRadius: '3px',
+            borderRadius: '4px',
             transition: 'background 0.15s, border-color 0.15s',
+            touchAction: 'manipulation',
           }}
           onMouseEnter={(e) => {
             (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0, 212, 160, 0.15)';
@@ -538,10 +616,11 @@ export function WorldMapSVG({
         <button
           onClick={(e) => { e.stopPropagation(); handleZoomOut(); }}
           onMouseDown={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); handleZoomOut(); }}
           title="Zoom Out"
           style={{
-            width: '30px',
-            height: '30px',
+            width: '44px',
+            height: '44px',
             background: 'rgba(4, 16, 30, 0.92)',
             border: '1px solid rgba(0, 212, 160, 0.35)',
             color: '#00d4a0',
@@ -549,11 +628,12 @@ export function WorldMapSVG({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '18px',
+            fontSize: '22px',
             fontFamily: 'Share Tech Mono, monospace',
             lineHeight: 1,
-            borderRadius: '3px',
+            borderRadius: '4px',
             transition: 'background 0.15s, border-color 0.15s',
+            touchAction: 'manipulation',
           }}
           onMouseEnter={(e) => {
             (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0, 212, 160, 0.15)';
@@ -569,10 +649,11 @@ export function WorldMapSVG({
         <button
           onClick={(e) => { e.stopPropagation(); handleResetView(); }}
           onMouseDown={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); handleResetView(); }}
           title="Reset to Globe View"
           style={{
-            width: '30px',
-            height: '30px',
+            width: '44px',
+            height: '44px',
             background: 'rgba(4, 16, 30, 0.92)',
             border: '1px solid rgba(0, 212, 160, 0.35)',
             color: '#00d4a0',
@@ -583,9 +664,10 @@ export function WorldMapSVG({
             fontSize: '9px',
             fontFamily: 'Share Tech Mono, monospace',
             lineHeight: 1,
-            borderRadius: '3px',
+            borderRadius: '4px',
             letterSpacing: '0.02em',
             transition: 'background 0.15s, border-color 0.15s',
+            touchAction: 'manipulation',
           }}
           onMouseEnter={(e) => {
             (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0, 212, 160, 0.15)';
