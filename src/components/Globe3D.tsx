@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
 import { UNDERSEA_CABLES } from '../lib/cable-data';
+import { INDIA_OUTER_BOUNDARY, LINE_OF_CONTROL, LINE_OF_ACTUAL_CONTROL } from '../lib/india-boundary';
 
 interface Globe3DProps {
   earthquakes: Earthquake[];
@@ -290,6 +291,36 @@ export function Globe3D({
           const line = new THREE.Line(geo, borderMat);
           countryLinesRef.current?.add(line);
         });
+
+        const indiaOuterPts = INDIA_OUTER_BOUNDARY.map(([lon, lat]) => latLonToVec3(lat, lon, GLOBE_RADIUS + 0.35));
+        if (indiaOuterPts.length > 1) {
+          indiaOuterPts.push(indiaOuterPts[0]);
+          const indiaGeo = new THREE.BufferGeometry().setFromPoints(indiaOuterPts);
+          const indiaMat = new THREE.LineBasicMaterial({ color: 0x2a7a5a, opacity: 0.85, transparent: true });
+          const indiaLine = new THREE.Line(indiaGeo, indiaMat);
+          indiaLine.userData = { type: 'india-boundary' };
+          countryLinesRef.current?.add(indiaLine);
+        }
+
+        const locPts = LINE_OF_CONTROL.map(([lon, lat]) => latLonToVec3(lat, lon, GLOBE_RADIUS + 0.4));
+        if (locPts.length > 1) {
+          const locGeo = new THREE.BufferGeometry().setFromPoints(locPts);
+          const locMat = new THREE.LineDashedMaterial({ color: 0x6fa8dc, dashSize: 1.5, gapSize: 1.0, opacity: 0.8, transparent: true });
+          const locLine = new THREE.Line(locGeo, locMat);
+          locLine.computeLineDistances();
+          locLine.userData = { type: 'india-loc' };
+          countryLinesRef.current?.add(locLine);
+        }
+
+        const lacPts = LINE_OF_ACTUAL_CONTROL.map(([lon, lat]) => latLonToVec3(lat, lon, GLOBE_RADIUS + 0.4));
+        if (lacPts.length > 1) {
+          const lacGeo = new THREE.BufferGeometry().setFromPoints(lacPts);
+          const lacMat = new THREE.LineDashedMaterial({ color: 0xa4c2f4, dashSize: 1.5, gapSize: 1.0, opacity: 0.8, transparent: true });
+          const lacLine = new THREE.Line(lacGeo, lacMat);
+          lacLine.computeLineDistances();
+          lacLine.userData = { type: 'india-lac' };
+          countryLinesRef.current?.add(lacLine);
+        }
       })
       .catch(() => {});
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
 import { UNDERSEA_CABLES } from '../lib/cable-data';
+import { INDIA_OUTER_BOUNDARY, LINE_OF_CONTROL, LINE_OF_ACTUAL_CONTROL, INDIA_DISCLAIMER } from '../lib/india-boundary';
 
 const REGIONS: Record<string, { cx: number; cy: number; scale: number }> = {
   globe:    { cx: 0,    cy: 0,   scale: 1.0 },
@@ -657,6 +658,54 @@ export function WorldMapSVG({
           {landPaths.map((path, idx) => (
             <path key={`land-${idx}`} d={path} className="land" fill="#0a1c30" stroke="#162e48" strokeWidth="0.35" />
           ))}
+        </g>
+
+        <g className="india-goi-boundary" aria-label={INDIA_DISCLAIMER}>
+          <path
+            d={
+              'M' +
+              INDIA_OUTER_BOUNDARY.map(([lon, lat]) => `${lonToX(lon).toFixed(1)},${latToY(lat).toFixed(1)}`).join('L') +
+              'Z'
+            }
+            fill="#0d2238"
+            stroke="#2a7a5a"
+            strokeWidth="0.55"
+            strokeLinejoin="round"
+            opacity="1"
+          />
+          <path
+            d={
+              'M' +
+              LINE_OF_CONTROL.map(([lon, lat]) => `${lonToX(lon).toFixed(1)},${latToY(lat).toFixed(1)}`).join('L')
+            }
+            fill="none"
+            stroke="#6fa8dc"
+            strokeWidth="0.5"
+            strokeDasharray="1.8,1.2"
+            opacity="0.8"
+          />
+          <path
+            d={
+              'M' +
+              LINE_OF_ACTUAL_CONTROL.map(([lon, lat]) => `${lonToX(lon).toFixed(1)},${latToY(lat).toFixed(1)}`).join('L')
+            }
+            fill="none"
+            stroke="#a4c2f4"
+            strokeWidth="0.5"
+            strokeDasharray="1.8,1.2"
+            opacity="0.8"
+          />
+          <text
+            x={lonToX(79)}
+            y={latToY(22)}
+            fill="rgba(139,175,200,0.25)"
+            fontSize="3"
+            fontFamily="Share Tech Mono, monospace"
+            textAnchor="middle"
+            pointerEvents="none"
+          >
+            INDIA
+          </text>
         </g>
 
         <g className="country-labels">
