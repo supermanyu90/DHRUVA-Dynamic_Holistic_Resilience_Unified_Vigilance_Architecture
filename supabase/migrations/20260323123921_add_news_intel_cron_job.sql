@@ -20,12 +20,10 @@ SELECT cron.schedule(
   'run-ingest-news-intel',
   '*/30 * * * *',
   $$
-  SELECT net.http_post(
-    'https://vimihczgbklcmjefovip.supabase.co/functions/v1/ingest-news-intel',
-    '{}',
-    '{}',
-    '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpbWloY3pnYmtsY21qZWZvdmlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0ODg5NjYsImV4cCI6MjA4OTA2NDk2Nn0.BzsJDGaN4HXWrUsQupLZZSZ9kVyYX7ABSPhEAzfX9CI"}'::jsonb,
-    25000
-  );
+  SELECT extensions.http_post(
+    url := current_setting('app.supabase_url') || '/functions/v1/ingest-news-intel',
+    headers := ('{"Content-Type": "application/json", "Authorization": "Bearer ' || current_setting('app.supabase_anon_key') || '"}')::jsonb,
+    body := '{}'::jsonb
+  )
   $$
 );
