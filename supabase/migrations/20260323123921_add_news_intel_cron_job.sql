@@ -20,10 +20,12 @@ SELECT cron.schedule(
   'run-ingest-news-intel',
   '*/30 * * * *',
   $$
-  SELECT extensions.http_post(
-    url := current_setting('app.supabase_url') || '/functions/v1/ingest-news-intel',
-    headers := ('{"Content-Type": "application/json", "Authorization": "Bearer ' || current_setting('app.supabase_anon_key') || '"}')::jsonb,
-    body := '{}'::jsonb
+  SELECT net.http_post(
+    current_setting('app.supabase_url') || '/functions/v1/ingest-news-intel',
+    '{}',
+    '{}',
+    ('{"Content-Type": "application/json", "Authorization": "Bearer ' || current_setting('app.supabase_anon_key') || '"}')::jsonb,
+    25000
   )
   $$
 );
