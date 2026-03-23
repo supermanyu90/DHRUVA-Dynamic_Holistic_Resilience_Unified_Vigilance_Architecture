@@ -998,6 +998,27 @@ export function WorldMapSVG({
             );
           })}
 
+        {layersEnabled.news && news
+          .filter(n => n.latitude != null && n.longitude != null)
+          .slice(0, 40)
+          .map(n => {
+            const cx = lonToX(n.longitude!);
+            const cy = latToY(n.latitude!);
+            const isNew = newEventIds.has(n.id);
+            return (
+              <g key={n.id}
+                style={{ cursor: 'pointer' }}
+                onClick={() => onEventSelect(n.id, 'news')}
+                onMouseEnter={e => showTooltip(e.clientX, e.clientY, n.title?.slice(0, 80) || 'News')}
+                onMouseLeave={hideTooltip}
+              >
+                {isNew && <circle cx={cx} cy={cy} r={8} fill="none" stroke="#4D9FFF" strokeWidth={1} opacity={0.5} className="pulse-ring" />}
+                <circle cx={cx} cy={cy} r={3} fill="#4D9FFF" opacity={0.75} />
+              </g>
+            );
+          })
+        }
+
         {layersEnabled.curfews &&
           geopolitical.filter((g) => g.category === 'curfew').map((g) => {
             if (!g.latitude || !g.longitude) return null;
