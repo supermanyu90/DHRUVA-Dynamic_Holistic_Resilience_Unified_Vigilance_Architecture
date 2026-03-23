@@ -81,7 +81,7 @@ export function NewsIntelView() {
 
   useEffect(() => {
     loadArticles();
-  }, [timeWindow]);
+  }, [timeWindow, newsGroup]);
 
   useEffect(() => {
     const channel = supabase
@@ -116,7 +116,7 @@ export function NewsIntelView() {
         .order('published_at', { ascending: false })
         .limit(500);
       const since = getWindowStart(timeWindow);
-      if (since) query = query.gte('published_at', since);
+      if (since && newsGroup !== 'gdelt') query = query.gte('published_at', since);
       const { data, error } = await query;
       if (error) throw error;
       const rows = data || [];
