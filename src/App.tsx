@@ -395,13 +395,35 @@ function App() {
   const criticalEvents = earthquakes.filter((e) => e.magnitude >= 6).length +
     disasters.filter((d) => d.category?.toLowerCase().includes('severe')).length;
 
-  const INDIA_COUNTRIES = new Set(['India','Pakistan','China','Bangladesh','Sri Lanka','Nepal','Myanmar','UAE','Afghanistan','Iran']);
-  const INDIA_KEYWORDS = /\b(IOR|Arabian Sea|Bay of Bengal|Line of Control|LoC|Strait of Hormuz|Malacca|nuclear|maritime|Kashmir|Ladakh|Aksai Chin)\b/i;
-  const indiaScore = Math.min(100, Math.round(
-    (geopolitical.filter(g =>
-      INDIA_COUNTRIES.has(g.country || '') || INDIA_KEYWORDS.test(g.title + ' ' + (g.description || ''))
-    ).reduce((sum, g) => sum + (g.severity === 'critical' ? 4 : g.severity === 'high' ? 2 : 1), 0) / Math.max(geopolitical.length, 1)) * 100
-  ));
+  const INDIA_NEIGHBOURS = new Set(['India','Pakistan','China','Bangladesh','Sri Lanka','Nepal','Myanmar','Bhutan','Maldives']);
+  const INDIA_EXTENDED = new Set(['Afghanistan','Iran','UAE','Saudi Arabia','Oman','Yemen','Russia']);
+  const IOR_REGEX = /\b(IOR|Arabian Sea|Bay of Bengal|Indian Ocean|Malacca|Hormuz|Strait of Hormuz|Line of Control|LoC|Kashmir|Ladakh|Aksai Chin|Arunachal|Andaman|Lakshadweep|CPEC|Belt and Road)\b/i;
+  const HIGH_RISK_CATS = new Set(['conflict','coup','sanctions','crisis']);
+
+  const indiaThreatEvents = geopolitical.filter(g => {
+    const isNeighbour = INDIA_NEIGHBOURS.has(g.country || '');
+    const isExtended = INDIA_EXTENDED.has(g.country || '');
+    const isIOR = IOR_REGEX.test((g.title || '') + ' ' + (g.description || ''));
+    return isNeighbour || isExtended || isIOR;
+  });
+
+  const indiaScore = Math.min(100, indiaThreatEvents.reduce((sum, g) => {
+    const severityWeight = g.severity === 'critical' ? 20 : g.severity === 'high' ? 10 : g.severity === 'medium' ? 4 : 1;
+    const categoryBonus = HIGH_RISK_CATS.has(g.category) ? 1.5 : 1;
+    return sum + severityWeight * categoryBonus;
+  }, 0));
+
+  const indiaBreakdown = {
+    critical: indiaThreatEvents.filter(g => g.severity === 'critical'),
+    high: indiaThreatEvents.filter(g => g.severity === 'high'),
+    countries: [...new Set(indiaThreatEvents.map(g => g.country).filter(Boolean))].slice(0, 6) as string[],
+    topEvents: indiaThreatEvents
+      .sort((a, b) => {
+        const w: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+        return (w[b.severity] || 0) - (w[a.severity] || 0);
+      })
+      .slice(0, 4),
+  };
 
   if (loading) {
     return (
@@ -437,7 +459,8 @@ function App() {
       <Header
         totalEvents={earthquakes.length + disasters.length + news.length}
         criticalEvents={criticalEvents}
-        indiaScore={indiaScore}
+        indiaScore={Math.round(indiaScore)}
+        indiaBreakdown={indiaBreakdown}
         onSync={handleSync}
         syncing={syncing}
         soundEnabled={soundEnabled}
