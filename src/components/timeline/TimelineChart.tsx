@@ -155,8 +155,8 @@ export function TimelineChart({ events, rangeMs, now }: Props) {
       return;
     }
     const idx = Math.min(Math.floor((relX / chartW) * BUCKET_COUNT), BUCKET_COUNT - 1);
-    const buckets = buildBuckets();
-    setHovered({ bucket: buckets[idx], x: e.clientX, y: e.clientY });
+    const allBuckets = buildBuckets();
+    setHovered({ bucket: allBuckets[idx], x: e.clientX, y: e.clientY });
   };
 
   const buckets = buildBuckets();
