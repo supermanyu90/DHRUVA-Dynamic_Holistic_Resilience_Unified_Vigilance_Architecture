@@ -1,67 +1,74 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Activity } from 'lucide-react';
+import { IntelligenceAPI } from '../lib/intelligence-api';
+import { supabase } from '../lib/supabase';
 
-interface Tweet {
-  id: string;
-  author: string;
-  content: string;
-  timestamp: string;
-  category: string;
+function fmtAge(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
 }
 
+function categorize(tweet: any): string {
+  const text = ((tweet.content || '') + ' ' + (tweet.hashtags || []).join(' ')).toLowerCase();
+  if (/defense|military|uae armed|security|weapon|forces/.test(text)) return 'Security';
+  if (/finance|market|business|adnoc|economy|investment|trade|oil|gdp/.test(text)) return 'Economy';
+  if (/diplomacy|minister|president|government|policy|cabinet|foreign|political/.test(text)) return 'Politics';
+  return 'Society';
+}
+
+const COLUMNS = [
+  { name: 'Security', role: 'Defense & Intelligence', color: '#FF6B00' },
+  { name: 'Economy', role: 'Business & Finance', color: '#FFB800' },
+  { name: 'Politics', role: 'Government & Diplomacy', color: '#4D9FFF' },
+  { name: 'Society', role: 'Culture & Events', color: '#00D4A0' },
+];
+
 export function UaeView() {
-  const [loading, setLoading] = useState(false);
+  const [tweets, setTweets] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  async function loadTweets() {
+    setLoading(true);
+    try {
+      const data = await IntelligenceAPI.getUAETwitter(100);
+      setTweets(data);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadTweets();
+
+    const channel = supabase
+      .channel('uae-twitter-realtime')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'uae_twitter_feed',
+      }, (payload) => {
+        setTweets(prev => [payload.new as any, ...prev]);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const stats = {
-    tweets: 1247,
-    accounts: 89,
-    engagement: 45623,
-    sentiment: 72,
-    topics: 23,
-    trending: 8,
+    tweets: tweets.length,
+    accounts: new Set(tweets.map(t => t.author)).size,
+    engagement: tweets.reduce((s, t) => s + (t.engagement_score || 0), 0),
+    sentiment: Math.round(tweets.filter(t => t.sentiment === 'positive').length / Math.max(tweets.length, 1) * 100),
   };
 
-  const columns = [
-    { name: 'Security', role: 'Defense & Intelligence', color: '#FF6B00', tweets: [] as Tweet[] },
-    { name: 'Economy', role: 'Business & Finance', color: '#FFB800', tweets: [] as Tweet[] },
-    { name: 'Politics', role: 'Government & Diplomacy', color: '#4D9FFF', tweets: [] as Tweet[] },
-    { name: 'Society', role: 'Culture & Events', color: '#00D4A0', tweets: [] as Tweet[] },
-  ];
-
-  const sampleTweets: Tweet[] = [
-    {
-      id: '1',
-      author: '@UAEGovNews',
-      content: 'UAE strengthens defense cooperation with strategic partners in the region',
-      timestamp: '2m',
-      category: 'Security',
-    },
-    {
-      id: '2',
-      author: '@DubaiFinance',
-      content: 'Dubai stock market reaches new highs as foreign investment surges',
-      timestamp: '5m',
-      category: 'Economy',
-    },
-    {
-      id: '3',
-      author: '@UAEDiplomacy',
-      content: 'Foreign Minister meets counterparts to discuss regional stability',
-      timestamp: '8m',
-      category: 'Politics',
-    },
-    {
-      id: '4',
-      author: '@DubaiCulture',
-      content: 'Expo 2024 preparations in full swing with international participation',
-      timestamp: '12m',
-      category: 'Society',
-    },
-  ];
-
-  columns.forEach((col) => {
-    col.tweets = sampleTweets.filter((t) => t.category === col.name);
-  });
+  const columns = COLUMNS.map(col => ({
+    ...col,
+    tweets: tweets.filter(t => categorize(t) === col.name),
+  }));
 
   return (
     <div className="view active uae-wrap">
@@ -72,11 +79,7 @@ export function UaeView() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div className="uae-status-pill">{loading ? 'UPDATING...' : 'STREAM ACTIVE'}</div>
-          <button className="uae-refresh-btn" disabled={loading} onClick={async () => {
-            setLoading(true);
-            await new Promise(r => setTimeout(r, 2000));
-            setLoading(false);
-          }}>
+          <button className="uae-refresh-btn" disabled={loading} onClick={loadTweets}>
             <Activity size={12} style={{ display: 'inline', marginRight: '4px' }} />
             REFRESH
           </button>
@@ -86,7 +89,7 @@ export function UaeView() {
       <div className="uae-stats-strip">
         {Object.entries(stats).map(([key, value]) => (
           <div key={key} className="uae-stat-tile">
-            <div className="uae-stat-n">{value.toLocaleString()}</div>
+            <div className="uae-stat-n">{typeof value === 'number' ? value.toLocaleString() : value}</div>
             <div className="uae-stat-l">{key.toUpperCase()}</div>
           </div>
         ))}
@@ -133,7 +136,7 @@ export function UaeView() {
                     >
                       <div style={{ fontSize: '10px', color: col.color, fontWeight: 600, marginBottom: '4px' }}>{tweet.author}</div>
                       <div style={{ fontSize: '11px', lineHeight: 1.4, color: 'var(--text)', marginBottom: '4px' }}>{tweet.content}</div>
-                      <div style={{ fontSize: '9px', color: 'var(--dim)' }}>{tweet.timestamp} ago</div>
+                      <div style={{ fontSize: '9px', color: 'var(--dim)' }}>{tweet.posted_at ? fmtAge(tweet.posted_at) : '—'}</div>
                     </div>
                   ))}
                 </div>
