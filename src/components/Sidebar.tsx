@@ -62,6 +62,8 @@ export function Sidebar({
   mobileOpen = false,
 }: SidebarProps) {
   const [drawerEvent, setDrawerEvent] = useState<DrawerEvent | null>(null);
+  const [archiveFrom, setArchiveFrom] = useState<string>('');
+  const [archiveTo, setArchiveTo] = useState<string>('');
 
   useEffect(() => {
     if (!pendingDrawer) return;
@@ -99,6 +101,12 @@ export function Sidebar({
 
   const filterByMode = (eventTime: Date) => {
     if (mode === 'live') return eventTime >= last24Hours;
+    if (archiveFrom && archiveTo) {
+      const from = new Date(archiveFrom);
+      const to = new Date(archiveTo);
+      to.setHours(23, 59, 59, 999);
+      return eventTime >= from && eventTime <= to;
+    }
     return true;
   };
 
@@ -264,6 +272,22 @@ export function Sidebar({
           ARCHIVE
         </button>
       </div>
+
+      {mode === 'archive' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '6px 8px', background: 'rgba(255,184,0,0.06)', border: '1px solid rgba(255,184,0,0.2)', borderRadius: '3px', margin: '0 0 6px' }}>
+          <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '9px', letterSpacing: '1.5px', color: '#FFB800' }}>DATE RANGE</span>
+          <input type="date" value={archiveFrom} onChange={e => setArchiveFrom(e.target.value)}
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '2px', padding: '3px 6px', color: 'var(--text)', fontSize: '11px', width: '100%' }} />
+          <input type="date" value={archiveTo} onChange={e => setArchiveTo(e.target.value)}
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '2px', padding: '3px 6px', color: 'var(--text)', fontSize: '11px', width: '100%' }} />
+          {(archiveFrom || archiveTo) && (
+            <button onClick={() => { setArchiveFrom(''); setArchiveTo(''); }}
+              style={{ fontSize: '9px', background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', textAlign: 'left', padding: '0' }}>
+              ✕ CLEAR RANGE
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="ev-list">
         {allEvents.map((event) => {
