@@ -92,6 +92,20 @@ export function NewsIntelView() {
     return () => { supabase.removeChannel(channel); };
   }, [timeWindow]);
 
+  const triggerIngestion = useCallback(async () => {
+    try {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ingest-news-intel`;
+      await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+    } catch {
+    }
+  }, []);
+
   const loadArticles = async () => {
     setLoading(true);
     try {
@@ -104,7 +118,25 @@ export function NewsIntelView() {
       if (since) query = query.gte('published_at', since);
       const { data, error } = await query;
       if (error) throw error;
-      setArticles(data || []);
+      const rows = data || [];
+      if (rows.length === 0 && timeWindow !== 'all') {
+        const { data: fallback } = await supabase
+          .from('news_events')
+          .select('*')
+          .order('published_at', { ascending: false })
+          .limit(500);
+        const fallbackRows = fallback || [];
+        setArticles(fallbackRows);
+        if (fallbackRows.length > 0) {
+          setTimeWindow('all');
+        } else {
+          triggerIngestion().then(() =>
+            new Promise(r => setTimeout(r, 4000)).then(loadArticles)
+          );
+        }
+      } else {
+        setArticles(rows);
+      }
     } catch (err) {
       console.error('Failed to load news:', err);
     } finally {
@@ -115,15 +147,8 @@ export function NewsIntelView() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ingest-news-intel`;
-      await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      await new Promise(r => setTimeout(r, 3000));
+      await triggerIngestion();
+      await new Promise(r => setTimeout(r, 5000));
       await loadArticles();
     } catch (err) {
       console.error('Refresh failed:', err);
@@ -320,17 +345,20 @@ export function NewsIntelView() {
         ) : filteredArticles.length === 0 ? (
           <div className="news-loading">
             <div className="news-empty-title">
-              {searchQuery ? 'NO RESULTS FOUND' : 'NO ARTICLES LOADED'}
+              {searchQuery ? 'NO RESULTS FOUND' : 'NO ARTICLES IN WINDOW'}
             </div>
             <div className="news-empty-hint">
               {searchQuery
                 ? <>No articles match <span style={{ color: 'var(--accent)' }}>"{searchQuery}"</span> — try a different search.</>
-                : <>Click REFRESH to fetch live feeds from global and India RSS sources.</>}
+                : <>No articles in the selected time window. Try expanding to <strong>7D</strong> or <strong>ALL</strong>, or click REFRESH to fetch the latest feeds.</>}
             </div>
             {searchQuery ? (
               <button className="news-retry-btn" onClick={() => setSearchQuery('')}>✕ CLEAR SEARCH</button>
             ) : (
-              <button className="news-retry-btn" onClick={handleRefresh}>⟳ RETRY</button>
+              <>
+                <button className="news-retry-btn" onClick={() => setTimeWindow('all')} style={{ marginBottom: '6px' }}>SHOW ALL ARTICLES</button>
+                <button className="news-retry-btn" onClick={handleRefresh}>⟳ FETCH LATEST</button>
+              </>
             )}
           </div>
         ) : (
