@@ -14,120 +14,33 @@ interface RSSFeed {
 }
 
 const RSS_FEEDS: RSSFeed[] = [
-  {
-    key: 'bbc',
-    name: 'BBC World',
-    urls: ['https://feeds.bbci.co.uk/news/world/rss.xml', 'https://feeds.bbci.co.uk/news/rss.xml'],
-    group: 'global',
-  },
-  {
-    key: 'aljazeera',
-    name: 'Al Jazeera',
-    urls: ['https://www.aljazeera.com/xml/rss/all.xml'],
-    group: 'global',
-  },
-  {
-    key: 'reuters',
-    name: 'Reuters',
-    urls: [
-      'https://feeds.reuters.com/reuters/topNews',
-      'https://feeds.reuters.com/reuters/worldNews',
-      'https://www.reutersagency.com/feed/?taxonomy=best-topics&post_type=best',
-    ],
-    group: 'global',
-  },
-  {
-    key: 'ap',
-    name: 'AP World',
-    urls: [
-      'https://rsshub.app/apnews/topics/world-news',
-      'https://feeds.apnews.com/apnews/worldnews',
-    ],
-    group: 'global',
-  },
-  {
-    key: 'guardian',
-    name: 'Guardian',
-    urls: ['https://www.theguardian.com/world/rss', 'https://www.theguardian.com/international/rss'],
-    group: 'global',
-  },
-  {
-    key: 'reliefweb',
-    name: 'ReliefWeb',
-    urls: ['https://reliefweb.int/updates/rss.xml', 'https://reliefweb.int/disasters/rss.xml'],
-    group: 'global',
-  },
-  {
-    key: 'thehindu',
-    name: 'The Hindu',
-    urls: [
-      'https://www.thehindu.com/news/national/feeder/default.rss',
-      'https://www.thehindu.com/feeder/default.rss',
-    ],
-    group: 'india',
-  },
-  {
-    key: 'ndtv',
-    name: 'NDTV',
-    urls: [
-      'https://feeds.feedburner.com/ndtvnews-latest',
-      'https://www.ndtv.com/rss/feeds/news',
-    ],
-    group: 'india',
-  },
-  {
-    key: 'ie',
-    name: 'Indian Express',
-    urls: ['https://indianexpress.com/feed/', 'https://indianexpress.com/section/india/feed/'],
-    group: 'india',
-  },
-  {
-    key: 'ht',
-    name: 'Hindustan Times',
-    urls: [
-      'https://www.hindustantimes.com/feeds/rss/india-news/rssfeed.xml',
-      'https://www.hindustantimes.com/feeds/rss/latest/rssfeed.xml',
-    ],
-    group: 'india',
-  },
-  {
-    key: 'bs',
-    name: 'Business Standard',
-    urls: [
-      'https://www.business-standard.com/rss/home_page_top_stories.rss',
-      'https://www.business-standard.com/rss/latest.rss',
-    ],
-    group: 'india',
-  },
-  {
-    key: 'bbcindia',
-    name: 'BBC India',
-    urls: ['https://feeds.bbci.co.uk/news/world/asia/india/rss.xml'],
-    group: 'india',
-  },
-  {
-    key: 'ndma',
-    name: 'NDMA/Govt India',
-    urls: [
-      'https://pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=3',
-      'https://ndma.gov.in/feed',
-    ],
-    group: 'india',
-  },
+  { key: 'bbc', name: 'BBC World', urls: ['https://feeds.bbci.co.uk/news/world/rss.xml', 'https://feeds.bbci.co.uk/news/rss.xml'], group: 'global' },
+  { key: 'aljazeera', name: 'Al Jazeera', urls: ['https://www.aljazeera.com/xml/rss/all.xml'], group: 'global' },
+  { key: 'reuters', name: 'Reuters', urls: ['https://feeds.reuters.com/reuters/topNews', 'https://feeds.reuters.com/reuters/worldNews'], group: 'global' },
+  { key: 'ap', name: 'AP World', urls: ['https://rsshub.app/apnews/topics/world-news', 'https://feeds.apnews.com/apnews/worldnews'], group: 'global' },
+  { key: 'guardian', name: 'Guardian', urls: ['https://www.theguardian.com/world/rss', 'https://www.theguardian.com/international/rss'], group: 'global' },
+  { key: 'reliefweb', name: 'ReliefWeb', urls: ['https://reliefweb.int/updates/rss.xml', 'https://reliefweb.int/disasters/rss.xml'], group: 'global' },
+  { key: 'thehindu', name: 'The Hindu', urls: ['https://www.thehindu.com/news/national/feeder/default.rss', 'https://www.thehindu.com/feeder/default.rss'], group: 'india' },
+  { key: 'ndtv', name: 'NDTV', urls: ['https://feeds.feedburner.com/ndtvnews-latest', 'https://www.ndtv.com/rss/feeds/news'], group: 'india' },
+  { key: 'ie', name: 'Indian Express', urls: ['https://indianexpress.com/feed/', 'https://indianexpress.com/section/india/feed/'], group: 'india' },
+  { key: 'ht', name: 'Hindustan Times', urls: ['https://www.hindustantimes.com/feeds/rss/india-news/rssfeed.xml', 'https://www.hindustantimes.com/feeds/rss/latest/rssfeed.xml'], group: 'india' },
+  { key: 'bs', name: 'Business Standard', urls: ['https://www.business-standard.com/rss/home_page_top_stories.rss', 'https://www.business-standard.com/rss/latest.rss'], group: 'india' },
+  { key: 'bbcindia', name: 'BBC India', urls: ['https://feeds.bbci.co.uk/news/world/asia/india/rss.xml'], group: 'india' },
+  { key: 'ndma', name: 'NDMA/Govt India', urls: ['https://pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=3', 'https://ndma.gov.in/feed'], group: 'india' },
 ];
 
 const GDELT_THEMES: Record<string, string> = {
-  BREAKING: 'emergency OR explosion OR attack OR crisis OR breaking news',
-  DISASTER: 'earthquake OR flood OR wildfire OR hurricane OR tsunami OR cyclone',
-  CONFLICT: 'war OR military OR airstrike OR missile OR troops OR ceasefire',
-  HEALTH: 'outbreak OR epidemic OR pandemic OR disease OR WHO OR virus',
-  CLIMATE: 'climate change OR emissions OR extreme weather OR drought OR flood',
-  CYBER: 'cyberattack OR ransomware OR data breach OR hacking OR APT',
-  FINANCE: 'market crash OR recession OR inflation OR sanctions OR IMF',
-  INDIA: 'India OR Modi OR Mumbai OR Delhi OR NDRF OR Indian Army',
-  GULF: 'Iran OR UAE OR Hormuz OR tanker OR Gulf OR Yemen OR Houthi',
-  ENERGY: 'oil price OR Brent crude OR LNG OR OPEC OR energy crisis',
-  MARITIME: 'vessel OR tanker OR maritime OR naval OR shipping OR piracy',
+  BREAKING: 'emergency OR explosion OR attack OR crisis',
+  DISASTER: 'earthquake OR flood OR wildfire OR hurricane OR tsunami',
+  CONFLICT: 'war OR military OR airstrike OR missile OR ceasefire',
+  HEALTH: 'outbreak OR epidemic OR pandemic OR disease OR WHO',
+  CLIMATE: 'climate OR emissions OR extreme weather OR drought',
+  CYBER: 'cyberattack OR ransomware OR hacking OR data breach',
+  FINANCE: 'recession OR inflation OR sanctions OR market crash',
+  INDIA: 'India OR Modi OR Mumbai OR Delhi OR Indian Army',
+  GULF: 'Iran OR UAE OR Hormuz OR tanker OR Yemen OR Houthi',
+  ENERGY: 'oil price OR LNG OR OPEC OR energy crisis',
+  MARITIME: 'vessel OR tanker OR maritime OR naval OR piracy',
 };
 
 function parseRSS(xml: string, feedKey: string, feedName: string, group: string) {
@@ -201,6 +114,78 @@ function parseRSS(xml: string, feedKey: string, feedName: string, group: string)
   return items;
 }
 
+async function fetchFeed(feed: RSSFeed): Promise<{ key: string; items: any[] }> {
+  for (const url of feed.urls) {
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 8000);
+      const resp = await fetch(url, {
+        signal: ctrl.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; DHRUVA/2.0; Intelligence Platform)',
+          'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+        },
+      });
+      clearTimeout(tid);
+      if (resp.ok) {
+        const xml = await resp.text();
+        if (xml.length > 100) {
+          const items = parseRSS(xml, feed.key, feed.name, feed.group);
+          if (items.length > 0) {
+            console.log(`[OK] ${feed.name}: ${items.length} articles`);
+            return { key: feed.key, items };
+          }
+        }
+      } else {
+        console.warn(`[HTTP ${resp.status}] ${feed.name} (${url})`);
+      }
+    } catch (e: any) {
+      console.warn(`[FAIL] ${feed.name} (${url}): ${e.message}`);
+    }
+  }
+  console.warn(`[SKIP] ${feed.name}: all URLs failed`);
+  return { key: feed.key, items: [] };
+}
+
+async function fetchGdeltTheme(themeName: string, query: string): Promise<{ theme: string; items: any[] }> {
+  try {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 10000);
+    const gdeltUrl = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(query)}&mode=artlist&maxrecords=20&sort=datedesc&format=json&timespan=24h`;
+    const resp = await fetch(gdeltUrl, { signal: ctrl.signal });
+    clearTimeout(tid);
+    if (resp.ok) {
+      const data = await resp.json();
+      const articles = data.articles || [];
+      const items = articles.map((a: any) => {
+        let pubDate: string;
+        try {
+          pubDate = a.seendate ? new Date(a.seendate).toISOString() : new Date().toISOString();
+        } catch {
+          pubDate = new Date().toISOString();
+        }
+        const toneVal = a.tone ? parseFloat(String(a.tone).split(',')[0]) : null;
+        return {
+          source: 'GDELT',
+          title: (a.title || 'Untitled').slice(0, 300),
+          url: a.url || '',
+          content: '',
+          published_at: pubDate,
+          categories: [themeName],
+          sentiment: toneVal != null ? (toneVal > 1 ? 'positive' : toneVal < -1 ? 'negative' : 'neutral') : null,
+          tone: toneVal,
+          metadata: { domain: a.domain, language: a.language, tone: toneVal, theme: themeName, sourcecountry: a.sourcecountry, category: 'gdelt', group: 'gdelt' },
+        };
+      });
+      console.log(`[OK] GDELT ${themeName}: ${items.length} articles`);
+      return { theme: themeName, items };
+    }
+  } catch (e: any) {
+    console.warn(`[FAIL] GDELT ${themeName}: ${e.message}`);
+  }
+  return { theme: themeName, items: [] };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -211,123 +196,58 @@ Deno.serve(async (req: Request) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    const [rssResults, gdeltResults] = await Promise.all([
+      Promise.all(RSS_FEEDS.map(feed => fetchFeed(feed))),
+      Promise.all(Object.entries(GDELT_THEMES).map(([name, query]) => fetchGdeltTheme(name, query))),
+    ]);
+
     const allArticles: any[] = [];
     const feedResults: Record<string, number> = {};
 
-    for (const feed of RSS_FEEDS) {
-      let fetched = false;
-      for (const url of feed.urls) {
-        try {
-          const ctrl = new AbortController();
-          const tid = setTimeout(() => ctrl.abort(), 12000);
-          const resp = await fetch(url, {
-            signal: ctrl.signal,
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (compatible; DHRUVA/2.0; Intelligence Platform)',
-              'Accept': 'application/rss+xml, application/xml, text/xml, */*',
-            },
-          });
-          clearTimeout(tid);
-
-          if (resp.ok) {
-            const xml = await resp.text();
-            if (xml.length > 100) {
-              const items = parseRSS(xml, feed.key, feed.name, feed.group);
-              if (items.length > 0) {
-                allArticles.push(...items);
-                feedResults[feed.key] = items.length;
-                console.log(`[OK] ${feed.name}: ${items.length} articles`);
-                fetched = true;
-                break;
-              }
-            }
-          } else {
-            console.warn(`[HTTP ${resp.status}] ${feed.name} (${url})`);
-          }
-        } catch (e) {
-          console.warn(`[FAIL] ${feed.name} (${url}): ${e.message}`);
-        }
-      }
-
-      if (!fetched) {
-        feedResults[feed.key] = 0;
-        console.warn(`[SKIP] ${feed.name}: all URLs failed`);
-      }
-
-      await new Promise(r => setTimeout(r, 250));
+    for (const { key, items } of rssResults) {
+      allArticles.push(...items);
+      feedResults[key] = items.length;
     }
 
-    for (const [themeName, query] of Object.entries(GDELT_THEMES)) {
-      try {
-        const ctrl = new AbortController();
-        const tid = setTimeout(() => ctrl.abort(), 12000);
-        const gdeltUrl = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(query)}&mode=artlist&maxrecords=20&sort=datedesc&format=json&timespan=12h`;
-        const resp = await fetch(gdeltUrl, { signal: ctrl.signal });
-        clearTimeout(tid);
-
-        if (resp.ok) {
-          const data = await resp.json();
-          const articles = data.articles || [];
-          for (const a of articles) {
-            let pubDate: string;
-            try {
-              pubDate = a.seendate ? new Date(a.seendate).toISOString() : new Date().toISOString();
-            } catch {
-              pubDate = new Date().toISOString();
-            }
-            const toneVal = a.tone ? parseFloat(String(a.tone).split(',')[0]) : null;
-            allArticles.push({
-              source: 'GDELT',
-              title: (a.title || 'Untitled').slice(0, 300),
-              url: a.url || '',
-              content: '',
-              published_at: pubDate,
-              categories: [themeName],
-              sentiment: toneVal != null ? (toneVal > 1 ? 'positive' : toneVal < -1 ? 'negative' : 'neutral') : null,
-              tone: toneVal,
-              metadata: {
-                domain: a.domain,
-                language: a.language,
-                tone: toneVal,
-                theme: themeName,
-                sourcecountry: a.sourcecountry,
-                category: 'gdelt',
-                group: 'gdelt',
-              },
-            });
-          }
-          feedResults[`GDELT_${themeName}`] = articles.length;
-          console.log(`[OK] GDELT ${themeName}: ${articles.length} articles`);
-        }
-      } catch (e) {
-        console.warn(`[FAIL] GDELT ${themeName}: ${e.message}`);
-        feedResults[`GDELT_${themeName}`] = 0;
-      }
-
-      await new Promise(r => setTimeout(r, 600));
+    for (const { theme, items } of gdeltResults) {
+      const validItems = items.filter((a: any) => a.url && a.url.length > 5);
+      allArticles.push(...validItems);
+      feedResults[`GDELT_${theme}`] = validItems.length;
     }
 
     console.log(`Total collected: ${allArticles.length}`);
 
+    const seen = new Set<string>();
+    const deduped = allArticles.filter(a => {
+      if (!a.url || seen.has(a.url)) return false;
+      seen.add(a.url);
+      return true;
+    });
+
     let inserted = 0;
-    if (allArticles.length > 0) {
-      const batch = allArticles.slice(0, 300);
-      const { error, count } = await supabase
-        .from('news_events')
-        .upsert(batch, { onConflict: 'url', ignoreDuplicates: true, count: 'exact' });
-      if (error) {
-        console.error('Upsert error:', error);
-      } else {
-        inserted = count ?? batch.length;
-        console.log(`Upserted ${inserted} articles`);
+    if (deduped.length > 0) {
+      const batches = [];
+      for (let i = 0; i < deduped.length; i += 100) {
+        batches.push(deduped.slice(i, i + 100));
       }
+      for (const batch of batches) {
+        const { error, count } = await supabase
+          .from('news_events')
+          .upsert(batch, { onConflict: 'url', ignoreDuplicates: true, count: 'exact' });
+        if (error) {
+          console.error('Upsert error:', error);
+        } else {
+          inserted += count ?? 0;
+        }
+      }
+      console.log(`Inserted ${inserted} new articles from ${deduped.length} unique`);
     }
 
     return new Response(
-      JSON.stringify({ success: true, totalFetched: allArticles.length, inserted, feeds: feedResults }),
+      JSON.stringify({ success: true, totalFetched: allArticles.length, unique: deduped.length, inserted, feeds: feedResults }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error('Fatal error:', error);
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
