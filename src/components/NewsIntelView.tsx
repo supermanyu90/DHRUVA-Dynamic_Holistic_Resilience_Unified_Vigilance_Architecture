@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { NewsSourceBar } from './news/NewsSourceBar';
 import { NewsCard } from './news/NewsCard';
@@ -77,6 +77,7 @@ export function NewsIntelView() {
   const [gdeltTheme, setGdeltTheme] = useState<GdeltTheme>('breaking');
   const [searchQuery, setSearchQuery] = useState('');
   const [timeWindow, setTimeWindow] = useState<TimeWindow>('24h');
+  const hasTriggeredIngestion = useRef(false);
 
   useEffect(() => {
     loadArticles();
@@ -130,9 +131,12 @@ export function NewsIntelView() {
         if (fallbackRows.length > 0) {
           setTimeWindow('all');
         } else {
-          triggerIngestion().then(() =>
-            new Promise(r => setTimeout(r, 4000)).then(loadArticles)
-          );
+          if (!hasTriggeredIngestion.current) {
+            hasTriggeredIngestion.current = true;
+            triggerIngestion().then(() =>
+              new Promise(r => setTimeout(r, 4000)).then(loadArticles)
+            );
+          }
         }
       } else {
         setArticles(rows);
