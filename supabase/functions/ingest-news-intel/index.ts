@@ -152,7 +152,13 @@ async function fetchGdeltTheme(themeName: string, query: string): Promise<{ them
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), 10000);
     const gdeltUrl = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(query)}&mode=artlist&maxrecords=20&sort=datedesc&format=json&timespan=24h`;
-    const resp = await fetch(gdeltUrl, { signal: ctrl.signal });
+    const resp = await fetch(gdeltUrl, {
+      signal: ctrl.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; DHRUVA/2.0; Intelligence Platform)',
+        'Accept': 'application/json, text/plain, */*',
+      },
+    });
     clearTimeout(tid);
     if (resp.ok) {
       const data = await resp.json();

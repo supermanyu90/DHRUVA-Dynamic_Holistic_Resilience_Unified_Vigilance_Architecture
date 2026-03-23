@@ -152,7 +152,7 @@ export function NewsIntelView() {
     setRefreshing(true);
     try {
       await triggerIngestion();
-      await new Promise(r => setTimeout(r, 5000));
+      await new Promise(r => setTimeout(r, 12000));
       await loadArticles();
     } catch (err) {
       console.error('Refresh failed:', err);
