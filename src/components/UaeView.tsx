@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Twitter, Activity } from 'lucide-react';
+import { Activity } from 'lucide-react';
 
 interface Tweet {
   id: string;
@@ -59,7 +59,7 @@ export function UaeView() {
     },
   ];
 
-  columns.forEach((col, i) => {
+  columns.forEach((col) => {
     col.tweets = sampleTweets.filter((t) => t.category === col.name);
   });
 
@@ -72,7 +72,11 @@ export function UaeView() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div className="uae-status-pill">{loading ? 'UPDATING...' : 'STREAM ACTIVE'}</div>
-          <button className="uae-refresh-btn" disabled={loading} onClick={() => setLoading(true)}>
+          <button className="uae-refresh-btn" disabled={loading} onClick={async () => {
+            setLoading(true);
+            await new Promise(r => setTimeout(r, 2000));
+            setLoading(false);
+          }}>
             <Activity size={12} style={{ display: 'inline', marginRight: '4px' }} />
             REFRESH
           </button>
