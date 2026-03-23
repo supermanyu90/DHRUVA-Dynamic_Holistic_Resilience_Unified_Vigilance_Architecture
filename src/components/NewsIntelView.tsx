@@ -113,24 +113,42 @@ export function NewsIntelView() {
       let query = supabase
         .from('news_events')
         .select('*')
+        .neq('source', 'GDELT')
         .order('published_at', { ascending: false })
         .limit(500);
       const since = getWindowStart(timeWindow);
-      if (since && newsGroup !== 'gdelt') query = query.gte('published_at', since);
-      const { data, error } = await query;
-      if (error) throw error;
-      const rows = data || [];
-      if (rows.length === 0 && timeWindow !== 'all') {
+      if (since) query = query.gte('published_at', since);
+
+      const gdeltQuery = supabase
+        .from('news_events')
+        .select('*')
+        .eq('source', 'GDELT')
+        .order('published_at', { ascending: false })
+        .limit(300);
+
+      const [{ data: rssData, error: rssError }, { data: gdeltData }] = await Promise.all([
+        query,
+        gdeltQuery,
+      ]);
+
+      if (rssError) throw rssError;
+      const rssRows = rssData || [];
+      const gdeltRows = gdeltData || [];
+      const allRows = [...rssRows, ...gdeltRows];
+
+      if (rssRows.length === 0 && timeWindow !== 'all') {
         const { data: fallback } = await supabase
           .from('news_events')
+          .neq('source', 'GDELT')
           .select('*')
           .order('published_at', { ascending: false })
           .limit(500);
         const fallbackRows = fallback || [];
-        setArticles(fallbackRows);
         if (fallbackRows.length > 0) {
+          setArticles([...fallbackRows, ...gdeltRows]);
           setTimeWindow('all');
         } else {
+          setArticles(gdeltRows);
           if (!hasTriggeredIngestion.current) {
             hasTriggeredIngestion.current = true;
             triggerIngestion().then(() =>
@@ -139,7 +157,7 @@ export function NewsIntelView() {
           }
         }
       } else {
-        setArticles(rows);
+        setArticles(allRows);
       }
     } catch (err) {
       console.error('Failed to load news:', err);

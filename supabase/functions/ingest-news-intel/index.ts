@@ -150,16 +150,20 @@ async function fetchFeed(feed: RSSFeed): Promise<{ key: string; items: any[] }> 
 async function fetchGdeltTheme(themeName: string, query: string): Promise<{ theme: string; items: any[] }> {
   try {
     const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 10000);
+    const tid = setTimeout(() => ctrl.abort(), 15000);
     const gdeltUrl = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(query)}&mode=artlist&maxrecords=20&sort=datedesc&format=json&timespan=24h`;
     const resp = await fetch(gdeltUrl, {
       signal: ctrl.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; DHRUVA/2.0; Intelligence Platform)',
-        'Accept': 'application/json, text/plain, */*',
+        'Accept': 'application/json, */*',
       },
     });
     clearTimeout(tid);
+    if (!resp.ok) {
+      console.warn(`[GDELT HTTP ${resp.status}] ${themeName}`);
+      return { theme: themeName, items: [] };
+    }
     if (resp.ok) {
       const data = await resp.json();
       const articles = data.articles || [];
