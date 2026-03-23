@@ -160,7 +160,13 @@ async function fetchGdeltTheme(themeName: string, query: string): Promise<{ them
       const items = articles.map((a: any) => {
         let pubDate: string;
         try {
-          pubDate = a.seendate ? new Date(a.seendate).toISOString() : new Date().toISOString();
+          if (a.seendate) {
+            const s = String(a.seendate);
+            const normalized = s.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, '$1-$2-$3T$4:$5:$6Z');
+            pubDate = new Date(normalized).toISOString();
+          } else {
+            pubDate = new Date().toISOString();
+          }
         } catch {
           pubDate = new Date().toISOString();
         }

@@ -261,7 +261,7 @@ function VolcanoDrawer({ data }: { data: VolcanoEvent }) {
     : data.alert_level === 'WATCH' || data.alert_level === 'ORANGE' ? '#FF6B00'
     : data.alert_level === 'ADVISORY' || data.alert_level === 'YELLOW' ? '#FFB800'
     : '#00BFFF';
-  const statusColor = data.status === 'Erupting' ? '#FF4500' : '#FF8C00';
+  const statusColor = data.status === 'erupting' ? '#FF4500' : '#FF8C00';
   const gvpUrl = data.source || `https://volcano.si.edu/volcano.cfm?vn=${data.volcano_id}`;
 
   return (
