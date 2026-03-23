@@ -3,6 +3,7 @@ import { Activity, Menu, BarChart2, X } from 'lucide-react';
 interface HeaderProps {
   totalEvents: number;
   criticalEvents: number;
+  indiaScore: number;
   onSync: () => void;
   syncing: boolean;
   soundEnabled: boolean;
@@ -18,6 +19,7 @@ interface HeaderProps {
 export function Header({
   totalEvents,
   criticalEvents,
+  indiaScore,
   onSync,
   syncing,
   soundEnabled,
@@ -57,6 +59,12 @@ export function Header({
             {criticalEvents}
           </div>
           <div className="hs-l">CRITICAL</div>
+        </div>
+        <div className="hs" title="India threat posture — weighted score based on active geopolitical events in India's strategic neighbourhood">
+          <div className="hs-v" style={{ color: indiaScore >= 67 ? '#FF2255' : indiaScore >= 34 ? '#FFB800' : '#00D4A0' }}>
+            {indiaScore}
+          </div>
+          <div className="hs-l">IN POSTURE</div>
         </div>
       </div>
 

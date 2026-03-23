@@ -395,6 +395,14 @@ function App() {
   const criticalEvents = earthquakes.filter((e) => e.magnitude >= 6).length +
     disasters.filter((d) => d.category?.toLowerCase().includes('severe')).length;
 
+  const INDIA_COUNTRIES = new Set(['India','Pakistan','China','Bangladesh','Sri Lanka','Nepal','Myanmar','UAE','Afghanistan','Iran']);
+  const INDIA_KEYWORDS = /\b(IOR|Arabian Sea|Bay of Bengal|Line of Control|LoC|Strait of Hormuz|Malacca|nuclear|maritime|Kashmir|Ladakh|Aksai Chin)\b/i;
+  const indiaScore = Math.min(100, Math.round(
+    (geopolitical.filter(g =>
+      INDIA_COUNTRIES.has(g.country || '') || INDIA_KEYWORDS.test(g.title + ' ' + (g.description || ''))
+    ).reduce((sum, g) => sum + (g.severity === 'critical' ? 4 : g.severity === 'high' ? 2 : 1), 0) / Math.max(geopolitical.length, 1)) * 100
+  ));
+
   if (loading) {
     return (
       <div id="loading">
@@ -429,6 +437,7 @@ function App() {
       <Header
         totalEvents={earthquakes.length + disasters.length + news.length}
         criticalEvents={criticalEvents}
+        indiaScore={indiaScore}
         onSync={handleSync}
         syncing={syncing}
         soundEnabled={soundEnabled}
