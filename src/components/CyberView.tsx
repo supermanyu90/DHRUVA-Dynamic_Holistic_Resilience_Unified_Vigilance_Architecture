@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Shield, Activity, RefreshCw } from 'lucide-react';
-import { IntelligenceAPI, CyberThreat } from '../lib/intelligence-api';
+import { CyberThreat } from '../lib/intelligence-api';
 import { supabase } from '../lib/supabase';
 
 type TimeWindow = '1h' | '6h' | '24h' | '7d' | 'all';
