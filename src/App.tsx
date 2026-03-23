@@ -154,6 +154,38 @@ function App() {
     }, 6000);
   }, []);
 
+  const playAlert = useCallback((type: 'critical' | 'high' | 'info') => {
+    if (!soundEnabled) return;
+    try {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      if (type === 'critical') {
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        osc.frequency.setValueAtTime(660, ctx.currentTime + 0.1);
+        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.4);
+      } else if (type === 'high') {
+        osc.frequency.setValueAtTime(660, ctx.currentTime);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.25);
+      } else {
+        osc.frequency.setValueAtTime(440, ctx.currentTime);
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.15);
+      }
+    } catch {}
+  }, [soundEnabled]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -205,6 +237,7 @@ function App() {
       markNewEvent(earthquake.id);
       if (earthquake.magnitude >= 6.5) {
         addAlert('SEISMIC ALERT', `M${earthquake.magnitude.toFixed(1)} — ${earthquake.location}`);
+        playAlert('critical');
       }
     });
 
@@ -234,6 +267,7 @@ function App() {
       markNewEvent(volcano.id);
       if (volcano.status === 'erupting') {
         addAlert('VOLCANO ERUPTION', `${volcano.name}${volcano.country ? ` — ${volcano.country}` : ''}`);
+        playAlert('critical');
       }
     });
 
@@ -247,15 +281,19 @@ function App() {
       markNewEvent(event.id);
       if (event.severity === 'critical') {
         addAlert('CRITICAL ALERT', `${event.title}${event.country ? ` — ${event.country}` : ''}`);
+        playAlert('critical');
+      } else if (event.severity === 'high') {
+        playAlert('high');
       }
     });
 
     IntelligenceAPI.subscribeToCyberThreats((threat) => {
       if (threat.severity === 'critical') {
         addAlert('CYBER THREAT', threat.title);
+        playAlert('high');
       }
     });
-  }, [pushTickerEvent, markNewEvent, addAlert]);
+  }, [pushTickerEvent, markNewEvent, addAlert, playAlert]);
 
   useEffect(() => {
     loadData();
