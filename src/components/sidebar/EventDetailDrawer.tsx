@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ExternalLink, X, Radio, Globe, Tag, Clock, TrendingUp, TrendingDown, Minus, AlertTriangle, Activity, MapPin, Layers, Shield, Zap, Navigation, Anchor } from 'lucide-react';
 import { Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from '../../lib/intelligence-api';
 import { Vessel } from '../../lib/intelligence-api';
@@ -113,6 +114,51 @@ function SourceButton({ url, label }: { url: string; label: string }) {
   );
 }
 
+function SituationBrief({ title, description, country, category }: { title: string; description?: string; country?: string; category?: string }) {
+  const [brief, setBrief] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+  const [generated, setGenerated] = useState(false);
+
+  const generate = async () => {
+    setLoading(true);
+    try {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 120,
+          system: 'You are a concise geopolitical analyst writing for Indian national security decision-makers. Write exactly 2 sentences: one stating what happened and its immediate significance, one assessing the implication for India or the Indian Ocean Region. Be direct, factual, no preamble.',
+          messages: [{ role: 'user', content: `Event: ${title}\nCountry: ${country || 'Unknown'}\nCategory: ${category || 'geopolitical'}\nContext: ${description?.slice(0, 300) || 'No additional context.'}` }]
+        })
+      });
+      const data = await resp.json();
+      setBrief(data.content?.[0]?.text || '');
+      setGenerated(true);
+    } catch {
+      setBrief('Brief unavailable.');
+      setGenerated(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (generated) {
+    return (
+      <div style={{ background: 'rgba(0,212,160,0.06)', border: '1px solid rgba(0,212,160,0.2)', borderRadius: '3px', padding: '8px 10px' }}>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '9px', letterSpacing: '2px', color: 'var(--accent)', marginBottom: '5px' }}>ANALYST BRIEF · CLAUDE</div>
+        <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: '11px', color: 'rgba(232,240,248,0.9)', lineHeight: 1.55, margin: 0 }}>{brief}</p>
+      </div>
+    );
+  }
+
+  return (
+    <button onClick={generate} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,212,160,0.08)', border: '1px solid rgba(0,212,160,0.25)', borderRadius: '3px', padding: '6px 10px', color: 'var(--accent)', cursor: loading ? 'wait' : 'pointer', fontFamily: "'Bebas Neue', sans-serif", fontSize: '10px', letterSpacing: '1.5px', width: '100%', justifyContent: 'center' }}>
+      {loading ? '⏳ GENERATING BRIEF...' : '⚡ GENERATE ANALYST BRIEF'}
+    </button>
+  );
+}
+
 function NewsDrawer({ data }: { data: NewsEvent }) {
   const sentimentColor = data.sentiment === 'positive' ? '#00D4A0' : data.sentiment === 'negative' ? '#FF4C4C' : 'var(--dim)';
   const SentimentIcon = data.sentiment === 'positive' ? TrendingUp : data.sentiment === 'negative' ? TrendingDown : Minus;
@@ -138,6 +184,7 @@ function NewsDrawer({ data }: { data: NewsEvent }) {
           ))}
         </div>
       )}
+      <SituationBrief title={data.title} description={data.content} country={data.country} category={data.source} />
       {data.content && (
         <Section label="SUMMARY">
           <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: '11px', color: 'rgba(232,240,248,0.8)', lineHeight: 1.55 }}>
@@ -390,6 +437,7 @@ function GeopoliticalDrawer({ data, isCurfew }: { data: GeopoliticalEvent; isCur
           <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: '8px', color: 'var(--dim)' }}>{data.latitude.toFixed(4)}, {data.longitude?.toFixed(4)}</span>
         </div>
       )}
+      <SituationBrief title={data.title} description={data.description} country={data.country} category={data.category} />
       {data.description && (
         <Section label="SITUATION BRIEF">
           <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: '11px', color: 'rgba(232,240,248,0.8)', lineHeight: 1.55 }}>
