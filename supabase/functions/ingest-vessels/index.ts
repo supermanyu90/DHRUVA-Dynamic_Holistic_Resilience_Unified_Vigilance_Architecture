@@ -1,6 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+// VESSEL_API_KEY is an optional Supabase secret.
+// If not set, the function automatically falls back to built-in seed vessel data.
+// To enable live AIS tracking, add VESSEL_API_KEY to your Supabase project secrets.
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
