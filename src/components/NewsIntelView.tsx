@@ -81,7 +81,7 @@ export function NewsIntelView() {
 
   useEffect(() => {
     loadArticles();
-  }, [timeWindow, newsGroup]);
+  }, [timeWindow, newsGroup]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const channel = supabase
@@ -179,6 +179,20 @@ export function NewsIntelView() {
     }
   }, [timeWindow]);
 
+  const THEME_KEYWORDS: Record<string, string[]> = {
+    breaking:  ['breaking','explosion','blast','attack','assassin','urgent','killed','dead','kills','bombs','hostage','coup','overthrow','seized','collapse'],
+    disaster:  ['earthquake','flood','wildfire','fire','hurricane','typhoon','cyclone','tsunami','tornado','volcano','eruption','landslide','drought','famine','disaster'],
+    conflict:  ['war','warfare','airstrike','air strike','missile','shelling','troops','military','invasion','combat','ceasefire','offensive','frontline','casualties','weapons','nuclear','tank','drone strike','artillery'],
+    health:    ['outbreak','epidemic','pandemic','disease','virus','vaccine','WHO','health emergency','infection','pathogen','mpox','cholera','dengue','measles'],
+    climate:   ['climate','emissions','carbon','global warming','extreme weather','drought','sea level','COP','renewable','fossil fuel','net zero','glacier','heatwave'],
+    cyber:     ['cyberattack','ransomware','hacking','data breach','malware','phishing','cyber','CISA','vulnerability','CVE','exploit','darkweb'],
+    finance:   ['recession','inflation','sanctions','market crash','IMF','World Bank','interest rate','central bank','currency','debt crisis','default','stock market','GDP'],
+    india:     ['India','Indian','Modi','Mumbai','Delhi','Kolkata','Chennai','Bangalore','Kashmir','LoC','ISRO','BJP','Congress party','Rupee','RBI','Narendra'],
+    gulf:      ['Iran','UAE','Hormuz','tanker','Yemen','Houthi','Saudi Arabia','Gulf','Riyadh','Tehran','Red Sea','Bab el-Mandeb','OPEC','Persian Gulf'],
+    energy:    ['oil price','LNG','OPEC','energy crisis','natural gas','pipeline','petroleum','crude oil','fuel','power grid','nuclear power','coal','electricity'],
+    maritime:  ['vessel','tanker','maritime','naval','piracy','ship','fleet','port','strait','submarine','aircraft carrier','coast guard','sea lane','shipping'],
+  };
+
   const filteredArticles = useMemo(() => {
     return articles.filter(article => {
       const src = article.source?.toLowerCase();
@@ -191,12 +205,9 @@ export function NewsIntelView() {
         if (article.source === 'GDELT') return false;
         if (!cfg || cfg.group !== 'india') return false;
       } else if (newsGroup === 'gdelt') {
-        if (article.source !== 'GDELT') return false;
-        const themeUpper = gdeltTheme.toUpperCase();
-        const cats = (article.categories || []).map((c: string) => c.toUpperCase());
-        const hasTheme = cats.includes(themeUpper) ||
-                         (article.metadata?.theme || '').toUpperCase() === themeUpper;
-        if (!hasTheme) return false;
+        const keywords = THEME_KEYWORDS[gdeltTheme] || [];
+        const hay = ((article.title || '') + ' ' + (article.content || '')).toLowerCase();
+        if (!keywords.some(kw => hay.includes(kw))) return false;
       }
 
       if (selectedSource !== 'all') {
@@ -387,7 +398,7 @@ export function NewsIntelView() {
           <>
             {newsGroup === 'gdelt' && (
               <div className="gdelt-results-meta">
-                {filteredArticles.length} ARTICLES · GDELT 2.0 DOC API ·
+                {filteredArticles.length} ARTICLES · KEYWORD INTEL ·
                 {' '}{GDELT_THEMES.find(t => t.key === gdeltTheme)?.icon} {gdeltTheme.toUpperCase()} ·
                 {' '}{new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })} IST
               </div>

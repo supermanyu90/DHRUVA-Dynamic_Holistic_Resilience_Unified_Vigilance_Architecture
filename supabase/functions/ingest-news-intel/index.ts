@@ -29,19 +29,6 @@ const RSS_FEEDS: RSSFeed[] = [
   { key: 'ndma', name: 'NDMA/Govt India', urls: ['https://pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=3', 'https://ndma.gov.in/feed'], group: 'india' },
 ];
 
-const GDELT_THEMES: Record<string, string> = {
-  BREAKING: 'emergency OR explosion OR attack OR crisis',
-  DISASTER: 'earthquake OR flood OR wildfire OR hurricane OR tsunami',
-  CONFLICT: 'war OR military OR airstrike OR missile OR ceasefire',
-  HEALTH: 'outbreak OR epidemic OR pandemic OR disease OR WHO',
-  CLIMATE: 'climate OR emissions OR extreme weather OR drought',
-  CYBER: 'cyberattack OR ransomware OR hacking OR data breach',
-  FINANCE: 'recession OR inflation OR sanctions OR market crash',
-  INDIA: 'India OR Modi OR Mumbai OR Delhi OR Indian Army',
-  GULF: 'Iran OR UAE OR Hormuz OR tanker OR Yemen OR Houthi',
-  ENERGY: 'oil price OR LNG OR OPEC OR energy crisis',
-  MARITIME: 'vessel OR tanker OR maritime OR naval OR piracy',
-};
 
 function parseRSS(xml: string, feedKey: string, feedName: string, group: string) {
   const items: any[] = [];
@@ -147,60 +134,6 @@ async function fetchFeed(feed: RSSFeed): Promise<{ key: string; items: any[] }> 
   return { key: feed.key, items: [] };
 }
 
-async function fetchGdeltTheme(themeName: string, query: string): Promise<{ theme: string; items: any[] }> {
-  try {
-    const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 15000);
-    const gdeltUrl = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(query)}&mode=artlist&maxrecords=20&sort=datedesc&format=json&timespan=24h`;
-    const resp = await fetch(gdeltUrl, {
-      signal: ctrl.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; DHRUVA/2.0; Intelligence Platform)',
-        'Accept': 'application/json, */*',
-      },
-    });
-    clearTimeout(tid);
-    if (!resp.ok) {
-      console.warn(`[GDELT HTTP ${resp.status}] ${themeName}`);
-      return { theme: themeName, items: [] };
-    }
-    if (resp.ok) {
-      const data = await resp.json();
-      const articles = data.articles || [];
-      const items = articles.map((a: any) => {
-        let pubDate: string;
-        try {
-          if (a.seendate) {
-            const s = String(a.seendate);
-            const normalized = s.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, '$1-$2-$3T$4:$5:$6Z');
-            pubDate = new Date(normalized).toISOString();
-          } else {
-            pubDate = new Date().toISOString();
-          }
-        } catch {
-          pubDate = new Date().toISOString();
-        }
-        const toneVal = a.tone ? parseFloat(String(a.tone).split(',')[0]) : null;
-        return {
-          source: 'GDELT',
-          title: (a.title || 'Untitled').slice(0, 300),
-          url: a.url || '',
-          content: '',
-          published_at: pubDate,
-          categories: [themeName],
-          sentiment: toneVal != null ? (toneVal > 1 ? 'positive' : toneVal < -1 ? 'negative' : 'neutral') : null,
-          tone: toneVal,
-          metadata: { domain: a.domain, language: a.language, tone: toneVal, theme: themeName, sourcecountry: a.sourcecountry, category: 'gdelt', group: 'gdelt' },
-        };
-      });
-      console.log(`[OK] GDELT ${themeName}: ${items.length} articles`);
-      return { theme: themeName, items };
-    }
-  } catch (e: any) {
-    console.warn(`[FAIL] GDELT ${themeName}: ${e.message}`);
-  }
-  return { theme: themeName, items: [] };
-}
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -212,10 +145,7 @@ Deno.serve(async (req: Request) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const [rssResults, gdeltResults] = await Promise.all([
-      Promise.all(RSS_FEEDS.map(feed => fetchFeed(feed))),
-      Promise.all(Object.entries(GDELT_THEMES).map(([name, query]) => fetchGdeltTheme(name, query))),
-    ]);
+    const rssResults = await Promise.all(RSS_FEEDS.map(feed => fetchFeed(feed)));
 
     const allArticles: any[] = [];
     const feedResults: Record<string, number> = {};
@@ -223,12 +153,6 @@ Deno.serve(async (req: Request) => {
     for (const { key, items } of rssResults) {
       allArticles.push(...items);
       feedResults[key] = items.length;
-    }
-
-    for (const { theme, items } of gdeltResults) {
-      const validItems = items.filter((a: any) => a.url && a.url.length > 5);
-      allArticles.push(...validItems);
-      feedResults[`GDELT_${theme}`] = validItems.length;
     }
 
     console.log(`Total collected: ${allArticles.length}`);
