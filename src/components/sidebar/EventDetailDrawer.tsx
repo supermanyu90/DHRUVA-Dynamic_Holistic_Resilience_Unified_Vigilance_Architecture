@@ -122,21 +122,23 @@ function SituationBrief({ title, description, country, category }: { title: stri
   const generate = async () => {
     setLoading(true);
     try {
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 120,
-          system: 'You are a concise geopolitical analyst writing for Indian national security decision-makers. Write exactly 2 sentences: one stating what happened and its immediate significance, one assessing the implication for India or the Indian Ocean Region. Be direct, factual, no preamble.',
-          messages: [{ role: 'user', content: `Event: ${title}\nCountry: ${country || 'Unknown'}\nCategory: ${category || 'geopolitical'}\nContext: ${description?.slice(0, 300) || 'No additional context.'}` }]
-        })
-      });
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyst-brief`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ title, description, country, category }),
+        }
+      );
       const data = await resp.json();
-      setBrief(data.content?.[0]?.text || '');
+      if (data.error) throw new Error(data.error);
+      setBrief(data.brief || '');
       setGenerated(true);
     } catch {
-      setBrief('Brief unavailable.');
+      setBrief('Brief generation failed. Check that ANTHROPIC_API_KEY is set in Supabase secrets.');
       setGenerated(true);
     } finally {
       setLoading(false);
