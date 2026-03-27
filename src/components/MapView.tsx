@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
 import { WorldMapSVG } from './WorldMapSVG';
 import { Globe3D } from './Globe3D';
-import { Globe, Map } from 'lucide-react';
+import { Globe, Map, Tag } from 'lucide-react';
 
 interface MapViewProps {
   earthquakes: Earthquake[];
@@ -61,6 +61,7 @@ export function MapView({
 }: MapViewProps) {
   const [viewMode, setViewMode] = useState<'2d' | '3d'>('2d');
   const [activeRegion, setActiveRegion] = useState('globe');
+  const [showCableLabels, setShowCableLabels] = useState(false);
 
   const handleResetView = () => {
     setActiveRegion('globe');
@@ -115,6 +116,7 @@ export function MapView({
             activeRegion={activeRegion}
             onResetView={handleResetView}
             newEventIds={newEventIds}
+            showCableLabels={showCableLabels}
           />
         ) : (
           <Globe3D
@@ -129,6 +131,36 @@ export function MapView({
             showTooltip={showTooltip}
             hideTooltip={hideTooltip}
           />
+        )}
+
+        {viewMode === '2d' && layersEnabled.cables && (
+          <button
+            onClick={() => setShowCableLabels(v => !v)}
+            style={{
+              position: 'absolute',
+              top: '10px',
+              right: '10px',
+              zIndex: 20,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '5px 10px',
+              background: showCableLabels ? 'rgba(0,212,160,0.18)' : 'rgba(0,0,0,0.55)',
+              border: `1px solid ${showCableLabels ? 'rgba(0,212,160,0.7)' : 'rgba(0,212,160,0.28)'}`,
+              borderRadius: '3px',
+              color: showCableLabels ? '#00D4A0' : 'rgba(0,212,160,0.6)',
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: '10px',
+              letterSpacing: '1.5px',
+              cursor: 'pointer',
+              backdropFilter: 'blur(4px)',
+              transition: 'all 0.15s',
+              boxShadow: showCableLabels ? '0 0 8px rgba(0,212,160,0.25)' : 'none',
+            }}
+          >
+            <Tag size={10} />
+            {showCableLabels ? 'HIDE CABLE LABELS' : 'SHOW CABLE LABELS'}
+          </button>
         )}
 
         <div className="scanline"></div>

@@ -41,6 +41,7 @@ interface WorldMapSVGProps {
   activeRegion?: string;
   onResetView?: () => void;
   newEventIds?: Set<string>;
+  showCableLabels?: boolean;
 }
 
 interface TopoJSONTransform {
@@ -84,6 +85,7 @@ export function WorldMapSVG({
   activeRegion = 'globe',
   onResetView,
   newEventIds = new Set(),
+  showCableLabels = false,
 }: WorldMapSVGProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -183,6 +185,47 @@ export function WorldMapSVG({
     { name: 'Cernavoda NPP', lat: 44.32, lon: 28.06, country: 'RO', type: 'Romania NPP', status: 'ACTIVE' },
     { name: 'Mongu / Karachi KANUPP', lat: 24.85, lon: 67.10, country: 'PK', type: 'Pakistan KANUPP', status: 'ACTIVE' },
   ];
+
+  const cableLabelPositions = useMemo(() => {
+    const PILL_W = 68;
+    const PILL_H = 11;
+    const placed: Array<{ x: number; y: number; w: number; h: number }> = [];
+
+    return UNDERSEA_CABLES.map((cable) => {
+      const mid = cable.points[Math.floor(cable.points.length / 2)];
+      let baseX = lonToX(mid[0]);
+      let baseY = latToY(mid[1]);
+
+      let cx = baseX;
+      let cy = baseY;
+      const offsets = [0, 14, -14, 28, -28, 42, -42, 56, -56, 70, -70];
+      for (const dy of offsets) {
+        for (const dx of offsets) {
+          const tx = baseX + dx;
+          const ty = baseY + dy;
+          const overlap = placed.some(
+            (p) =>
+              Math.abs(p.x - tx) < (p.w + PILL_W) / 2 + 2 &&
+              Math.abs(p.y - ty) < (p.h + PILL_H) / 2 + 2
+          );
+          if (!overlap) {
+            cx = tx;
+            cy = ty;
+            break;
+          }
+        }
+        const overlap = placed.some(
+          (p) =>
+            Math.abs(p.x - cx) < (p.w + PILL_W) / 2 + 2 &&
+            Math.abs(p.y - cy) < (p.h + PILL_H) / 2 + 2
+        );
+        if (!overlap) break;
+      }
+
+      placed.push({ x: cx, y: cy, w: PILL_W, h: PILL_H });
+      return { name: cable.name, color: cable.color, x: cx, y: cy };
+    });
+  }, []);
 
   const dayNightPaths = useMemo(() => {
     const now = new Date();
@@ -813,6 +856,44 @@ export function WorldMapSVG({
                   onMouseEnter={(e) => handleMarkerHover(e, cable.name)}
                   onMouseLeave={hideTooltip}
                 />
+              );
+            })}
+          </g>
+        )}
+
+        {layersEnabled.cables && showCableLabels && (
+          <g className="cable-labels-layer" pointerEvents="none">
+            {cableLabelPositions.map((label) => {
+              const PILL_W = 68;
+              const PILL_H = 11;
+              const rx = 3;
+              return (
+                <g key={label.name}>
+                  <rect
+                    x={label.x - PILL_W / 2}
+                    y={label.y - PILL_H / 2}
+                    width={PILL_W}
+                    height={PILL_H}
+                    rx={rx}
+                    ry={rx}
+                    fill="rgba(2,5,8,0.82)"
+                    stroke={label.color}
+                    strokeWidth="0.7"
+                    opacity="0.95"
+                  />
+                  <text
+                    x={label.x}
+                    y={label.y + 3.5}
+                    fill={label.color}
+                    fontSize="3.8"
+                    fontFamily="'Share Tech Mono', monospace"
+                    textAnchor="middle"
+                    dominantBaseline="auto"
+                    opacity="1"
+                  >
+                    {label.name.length > 18 ? label.name.slice(0, 17) + '…' : label.name}
+                  </text>
+                </g>
               );
             })}
           </g>
