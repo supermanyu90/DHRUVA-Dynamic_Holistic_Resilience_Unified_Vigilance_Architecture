@@ -187,43 +187,63 @@ export function WorldMapSVG({
   ];
 
   const cableLabelPositions = useMemo(() => {
-    const PILL_W = 68;
-    const PILL_H = 11;
+    const FONT_SIZE = 4;
+    const LINE_H = FONT_SIZE + 1.8;
+    const PAD_X = 5;
+    const PAD_Y = 3.5;
+    const MAX_CHARS_PER_LINE = 16;
+
+    function wrapText(name: string): string[] {
+      const words = name.split(' ');
+      const lines: string[] = [];
+      let current = '';
+      for (const word of words) {
+        const candidate = current ? `${current} ${word}` : word;
+        if (candidate.length > MAX_CHARS_PER_LINE && current) {
+          lines.push(current);
+          current = word;
+        } else {
+          current = candidate;
+        }
+      }
+      if (current) lines.push(current);
+      return lines;
+    }
+
     const placed: Array<{ x: number; y: number; w: number; h: number }> = [];
 
     return UNDERSEA_CABLES.map((cable) => {
+      const lines = wrapText(cable.name);
+      const maxLineLen = Math.max(...lines.map((l) => l.length));
+      const PILL_W = maxLineLen * FONT_SIZE * 0.62 + PAD_X * 2;
+      const PILL_H = lines.length * LINE_H + PAD_Y * 2;
+
       const mid = cable.points[Math.floor(cable.points.length / 2)];
-      let baseX = lonToX(mid[0]);
-      let baseY = latToY(mid[1]);
+      const baseX = lonToX(mid[0]);
+      const baseY = latToY(mid[1]);
 
       let cx = baseX;
       let cy = baseY;
-      const offsets = [0, 14, -14, 28, -28, 42, -42, 56, -56, 70, -70];
-      for (const dy of offsets) {
+      const offsets = [0, 16, -16, 32, -32, 48, -48, 64, -64, 80, -80, 100, -100];
+      outer: for (const dy of offsets) {
         for (const dx of offsets) {
           const tx = baseX + dx;
           const ty = baseY + dy;
           const overlap = placed.some(
             (p) =>
-              Math.abs(p.x - tx) < (p.w + PILL_W) / 2 + 2 &&
-              Math.abs(p.y - ty) < (p.h + PILL_H) / 2 + 2
+              Math.abs(p.x - tx) < (p.w + PILL_W) / 2 + 3 &&
+              Math.abs(p.y - ty) < (p.h + PILL_H) / 2 + 3
           );
           if (!overlap) {
             cx = tx;
             cy = ty;
-            break;
+            break outer;
           }
         }
-        const overlap = placed.some(
-          (p) =>
-            Math.abs(p.x - cx) < (p.w + PILL_W) / 2 + 2 &&
-            Math.abs(p.y - cy) < (p.h + PILL_H) / 2 + 2
-        );
-        if (!overlap) break;
       }
 
       placed.push({ x: cx, y: cy, w: PILL_W, h: PILL_H });
-      return { name: cable.name, color: cable.color, x: cx, y: cy };
+      return { name: cable.name, lines, color: cable.color, x: cx, y: cy, w: PILL_W, h: PILL_H, lineH: LINE_H, padY: PAD_Y };
     });
   }, []);
 
@@ -864,35 +884,37 @@ export function WorldMapSVG({
         {layersEnabled.cables && showCableLabels && (
           <g className="cable-labels-layer" pointerEvents="none">
             {cableLabelPositions.map((label) => {
-              const PILL_W = 68;
-              const PILL_H = 11;
-              const rx = 3;
+              const rx = 2.5;
+              const totalTextH = label.lines.length * label.lineH;
+              const textStartY = label.y - totalTextH / 2 + label.lineH * 0.72;
               return (
                 <g key={label.name}>
                   <rect
-                    x={label.x - PILL_W / 2}
-                    y={label.y - PILL_H / 2}
-                    width={PILL_W}
-                    height={PILL_H}
+                    x={label.x - label.w / 2}
+                    y={label.y - label.h / 2}
+                    width={label.w}
+                    height={label.h}
                     rx={rx}
                     ry={rx}
-                    fill="rgba(2,5,8,0.82)"
+                    fill="rgba(2,5,8,0.88)"
                     stroke={label.color}
-                    strokeWidth="0.7"
-                    opacity="0.95"
+                    strokeWidth="0.65"
+                    opacity="0.97"
                   />
-                  <text
-                    x={label.x}
-                    y={label.y + 3.5}
-                    fill={label.color}
-                    fontSize="3.8"
-                    fontFamily="'Share Tech Mono', monospace"
-                    textAnchor="middle"
-                    dominantBaseline="auto"
-                    opacity="1"
-                  >
-                    {label.name.length > 18 ? label.name.slice(0, 17) + '…' : label.name}
-                  </text>
+                  {label.lines.map((line, i) => (
+                    <text
+                      key={i}
+                      x={label.x}
+                      y={textStartY + i * label.lineH}
+                      fill={label.color}
+                      fontSize="4"
+                      fontFamily="'Share Tech Mono', monospace"
+                      textAnchor="middle"
+                      dominantBaseline="auto"
+                    >
+                      {line}
+                    </text>
+                  ))}
                 </g>
               );
             })}
