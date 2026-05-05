@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { ExternalLink, X, Radio, Globe, Tag, Clock, TrendingUp, TrendingDown, Minus, AlertTriangle, Activity, MapPin, Layers, Shield, Zap, Navigation, Anchor } from 'lucide-react';
 import { Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from '../../lib/intelligence-api';
 import { Vessel } from '../../lib/intelligence-api';
@@ -114,52 +113,6 @@ function SourceButton({ url, label }: { url: string; label: string }) {
   );
 }
 
-function SituationBrief({ title, description, country, category }: { title: string; description?: string; country?: string; category?: string }) {
-  const [brief, setBrief] = useState<string>('');
-  const [loading, setLoading] = useState(false);
-  const [generated, setGenerated] = useState(false);
-
-  const generate = async () => {
-    setLoading(true);
-    try {
-      const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyst-brief`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({ title, description, country, category }),
-        }
-      );
-      const data = await resp.json();
-      if (data.error) throw new Error(data.error);
-      setBrief(data.brief || '');
-      setGenerated(true);
-    } catch {
-      setBrief('Brief generation failed. Check that ANTHROPIC_API_KEY is set in Supabase secrets.');
-      setGenerated(true);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (generated) {
-    return (
-      <div style={{ background: 'rgba(0,212,160,0.06)', border: '1px solid rgba(0,212,160,0.2)', borderRadius: '3px', padding: '8px 10px' }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '9px', letterSpacing: '2px', color: 'var(--accent)', marginBottom: '5px' }}>ANALYST BRIEF · CLAUDE</div>
-        <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: '11px', color: 'rgba(232,240,248,0.9)', lineHeight: 1.55, margin: 0 }}>{brief}</p>
-      </div>
-    );
-  }
-
-  return (
-    <button onClick={generate} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,212,160,0.08)', border: '1px solid rgba(0,212,160,0.25)', borderRadius: '3px', padding: '6px 10px', color: 'var(--accent)', cursor: loading ? 'wait' : 'pointer', fontFamily: "'Bebas Neue', sans-serif", fontSize: '10px', letterSpacing: '1.5px', width: '100%', justifyContent: 'center' }}>
-      {loading ? '⏳ GENERATING BRIEF...' : '⚡ GENERATE ANALYST BRIEF'}
-    </button>
-  );
-}
 
 function NewsDrawer({ data }: { data: NewsEvent }) {
   const sentimentColor = data.sentiment === 'positive' ? '#00D4A0' : data.sentiment === 'negative' ? '#FF4C4C' : 'var(--dim)';
@@ -186,7 +139,6 @@ function NewsDrawer({ data }: { data: NewsEvent }) {
           ))}
         </div>
       )}
-      <SituationBrief title={data.title} description={data.content} country={data.country} category={data.source} />
       {data.content && (
         <Section label="SUMMARY">
           <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: '11px', color: 'rgba(232,240,248,0.8)', lineHeight: 1.55 }}>
@@ -439,7 +391,6 @@ function GeopoliticalDrawer({ data, isCurfew }: { data: GeopoliticalEvent; isCur
           <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: '8px', color: 'var(--dim)' }}>{data.latitude.toFixed(4)}, {data.longitude?.toFixed(4)}</span>
         </div>
       )}
-      <SituationBrief title={data.title} description={data.description} country={data.country} category={data.category} />
       {data.description && (
         <Section label="SITUATION BRIEF">
           <p style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: '11px', color: 'rgba(232,240,248,0.8)', lineHeight: 1.55 }}>
