@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { GitMerge, MapPin, Users, Clock, Shield, Layers, Zap, ChevronDown, ChevronUp } from 'lucide-react';
+import { GitMerge, MapPin, Users, Clock, Shield, Layers, ChevronDown, ChevronUp, WifiOff } from 'lucide-react';
 import { IntelligenceAPI, FusedAlert } from '../lib/intelligence-api';
+import { withResilience } from '../lib/resilience';
 
 // ─── Colour maps ──────────────────────────────────────────────────────────────
 
@@ -179,6 +180,7 @@ export function FusedAlertsView() {
   const [alerts, setAlerts] = useState<FusedAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<ConfFilter>('all');
+  const [isStale, setIsStale] = useState(false);
   const mapRef = useRef<Map<string, FusedAlert>>(new Map());
 
   const mergeAndSort = (map: Map<string, FusedAlert>): FusedAlert[] =>
@@ -188,12 +190,13 @@ export function FusedAlertsView() {
     ).slice(0, 30);
 
   useEffect(() => {
-    IntelligenceAPI.getFusedAlerts({ limit: 30 })
-      .then(data => {
-        for (const a of data) mapRef.current.set(a.cluster_id, a);
+    withResilience('fused-alerts', () => IntelligenceAPI.getFusedAlerts({ limit: 30 }))
+      .then(res => {
+        for (const a of res.data) mapRef.current.set(a.cluster_id, a);
         setAlerts(mergeAndSort(mapRef.current));
+        setIsStale(res.stale);
       })
-      .catch(() => {})
+      .catch(() => { setIsStale(true); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -228,6 +231,12 @@ export function FusedAlertsView() {
 
   return (
     <div className="fa-container">
+      {isStale && (
+        <div className="panel-stale-notice">
+          <WifiOff size={9} />
+          <span>DATA MAY BE DELAYED — SHOWING CACHED INTELLIGENCE</span>
+        </div>
+      )}
       {/* Filter tabs */}
       <div className="fa-filter-row">
         {CONF_TABS.map(t => (

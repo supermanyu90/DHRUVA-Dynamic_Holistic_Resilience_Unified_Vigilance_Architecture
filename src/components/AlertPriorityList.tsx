@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, Zap, Users, MapPin, Clock, RefreshCw, Archive } from 'lucide-react';
+import { AlertTriangle, Zap, Users, MapPin, Clock, RefreshCw, Archive, WifiOff } from 'lucide-react';
 import { IntelligenceAPI, UnifiedAlert, computePriorityScore } from '../lib/intelligence-api';
 import { supabase } from '../lib/supabase';
+import { withResilience } from '../lib/resilience';
 
 type LifecycleState = 'active' | 'updated' | 'expired';
 
@@ -165,11 +166,11 @@ export function AlertPriorityList() {
   const [alerts, setAlerts] = useState<UnifiedAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterState>('active');
+  const [isStale, setIsStale] = useState(false);
   const allAlertsRef = useRef<Map<string, UnifiedAlert>>(new Map());
 
   const mergeAndSort = (map: Map<string, UnifiedAlert>): UnifiedAlert[] =>
     [...map.values()].sort((a, b) => {
-      // Active/updated before expired
       const stateRank = (s: string) => s === 'active' ? 0 : s === 'updated' ? 1 : 2;
       const sd = stateRank(a.lifecycle_state) - stateRank(b.lifecycle_state);
       if (sd !== 0) return sd;
@@ -177,17 +178,20 @@ export function AlertPriorityList() {
         new Date(b.effective_time).getTime() - new Date(a.effective_time).getTime();
     }).slice(0, 50);
 
-  // Initial load — fetch active+updated; also fetch recently expired for history view
+  // Initial load with resilience — falls back to localStorage cache on failure
   useEffect(() => {
     Promise.all([
-      IntelligenceAPI.getUnifiedAlerts({ limit: 30, lifecycleStates: ['active', 'updated'] }),
-      IntelligenceAPI.getUnifiedAlerts({ limit: 20, lifecycleStates: ['expired'] }),
-    ]).then(([live, expired]) => {
+      withResilience('alerts-live',    () => IntelligenceAPI.getUnifiedAlerts({ limit: 30, lifecycleStates: ['active', 'updated'] })),
+      withResilience('alerts-expired', () => IntelligenceAPI.getUnifiedAlerts({ limit: 20, lifecycleStates: ['expired'] })),
+    ]).then(([liveRes, expiredRes]) => {
       const map = new Map<string, UnifiedAlert>();
-      for (const a of [...live, ...expired]) map.set(a.id, a);
+      for (const a of [...liveRes.data, ...expiredRes.data]) map.set(a.id, a);
       allAlertsRef.current = map;
       setAlerts(mergeAndSort(map));
-    }).catch(() => {}).finally(() => setLoading(false));
+      setIsStale(liveRes.stale || expiredRes.stale);
+    }).catch(() => {
+      setIsStale(true);
+    }).finally(() => setLoading(false));
   }, []);
 
   // Realtime — INSERT and UPDATE (lifecycle transitions arrive as UPDATE)
@@ -233,6 +237,12 @@ export function AlertPriorityList() {
 
   return (
     <div className="apr-container">
+      {isStale && (
+        <div className="panel-stale-notice">
+          <WifiOff size={9} />
+          <span>DATA MAY BE DELAYED — SHOWING CACHED ALERTS</span>
+        </div>
+      )}
       {/* Filter tabs */}
       <div className="apr-filter-row">
         {FILTER_TABS.map(t => (

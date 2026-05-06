@@ -4258,6 +4258,42 @@ header,
   border-bottom-color: var(--accent);
 }
 
+/* ─── Stale-data banner ───────────────────────────────────────────────────── */
+
+.stale-banner {
+  position: relative;
+  z-index: 200;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 5px 12px;
+  background: rgba(245, 158, 11, 0.12);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.3);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: #F59E0B;
+  animation: stale-banner-in 0.3s ease;
+  flex-shrink: 0;
+}
+
+@keyframes stale-banner-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.stale-banner-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #F59E0B;
+  animation: statusPulse 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+  margin: 0 2px;
+}
+
 /* ─── Fused Alerts View ───────────────────────────────────────────────────── */
 
 .fa-container {
@@ -4967,6 +5003,21 @@ header,
 }
 .notif-bell-btn:hover { border-color: rgba(0,212,160,0.5); color: var(--accent); }
 .notif-bell-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,160,0.08); }
+
+/* ─── Panel-level stale notice (used by AlertPriorityList, FusedAlertsView) ── */
+
+.panel-stale-notice {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  background: rgba(245,158,11,0.08);
+  border-bottom: 1px solid rgba(245,158,11,0.15);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.8px;
+  color: #d4930a;
+}
 
 /* ─── Alert Priority List ─────────────────────────────────────────────────── */
 

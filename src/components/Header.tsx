@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Activity, Menu, BarChart2, X } from 'lucide-react';
+import { Activity, Menu, BarChart2, X, WifiOff } from 'lucide-react';
+import { useDataFreshness } from '../lib/DataFreshnessContext';
 
 interface HeaderProps {
   totalEvents: number;
@@ -40,7 +41,25 @@ export function Header({
   mobileRightPanelOpen,
 }: HeaderProps) {
   const [showPosture, setShowPosture] = useState(false);
+  const freshness = useDataFreshness();
+
   return (
+    <>
+    {freshness.isStale && (
+      <div className="stale-banner" role="alert">
+        <WifiOff size={11} />
+        <span>
+          DATA MAY BE DELAYED
+          {freshness.staleAge && freshness.staleAge !== 'unavailable'
+            ? ` — last successful fetch ${freshness.staleAge}`
+            : freshness.staleAge === 'unavailable'
+              ? ' — live feed unavailable'
+              : ''}
+        </span>
+        <span className="stale-banner-dot" />
+        SHOWING CACHED DATA
+      </div>
+    )}
     <header className="header">
       <button
         className={`mobile-panel-btn ${mobileSidebarOpen ? 'active' : ''}`}
@@ -177,5 +196,6 @@ export function Header({
         <span className="mobile-panel-btn-label">INTEL</span>
       </button>
     </header>
+    </>
   );
 }

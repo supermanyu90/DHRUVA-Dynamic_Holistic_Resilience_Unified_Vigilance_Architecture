@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { IntelligenceAPI, Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from './lib/intelligence-api';
+import { withResilience } from './lib/resilience';
+import { DataFreshnessContext, DataFreshnessState, formatStaleAge } from './lib/DataFreshnessContext';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { RightPanel } from './components/RightPanel';
@@ -126,6 +128,13 @@ function App() {
   const [showNotifPrefs, setShowNotifPrefs] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
+  const [dataFreshness, setDataFreshness] = useState<DataFreshnessState>({
+    isStale: false,
+    staleSince: null,
+    staleAge: null,
+  });
+  const stalenessTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const { prefs, update: updatePrefs } = useNotificationPreferences();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mobileRightPanelOpen, setMobileRightPanelOpen] = useState(false);
@@ -214,25 +223,51 @@ function App() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [earthquakesData, disastersData, newsData, vesselsData, volcanoesData, geopoliticalData] = await Promise.all([
-        IntelligenceAPI.getEarthquakes(4.0, 50),
-        IntelligenceAPI.getDisasters(50),
-        IntelligenceAPI.getNews(50),
-        IntelligenceAPI.getVessels(50),
-        IntelligenceAPI.getVolcanoes(50),
-        IntelligenceAPI.getGeopoliticalEvents(50),
+      // Each source is fetched independently with resilience so one failing
+      // source never blocks the others. Settled results are applied regardless.
+      const [eqRes, disRes, newsRes, vesRes, volRes, geoRes] = await Promise.all([
+        withResilience('earthquakes', () => IntelligenceAPI.getEarthquakes(4.0, 50)),
+        withResilience('disasters',   () => IntelligenceAPI.getDisasters(50)),
+        withResilience('news',        () => IntelligenceAPI.getNews(50)),
+        withResilience('vessels',     () => IntelligenceAPI.getVessels(50)),
+        withResilience('volcanoes',   () => IntelligenceAPI.getVolcanoes(50)),
+        withResilience('geopolitical',() => IntelligenceAPI.getGeopoliticalEvents(50)),
       ]);
-      setEarthquakes(earthquakesData);
-      setDisasters(disastersData);
-      setNews(newsData);
-      setVessels(vesselsData);
-      setVolcanoes(volcanoesData);
-      setGeopolitical(geopoliticalData);
 
-      const syncTime = await IntelligenceAPI.getLastSyncTime();
-      if (syncTime) setLastSyncTime(syncTime);
+      setEarthquakes(eqRes.data);
+      setDisasters(disRes.data);
+      setNews(newsRes.data);
+      setVessels(vesRes.data);
+      setVolcanoes(volRes.data);
+      setGeopolitical(geoRes.data);
+
+      // Determine overall freshness: stale if ANY source served cached data
+      const allResults = [eqRes, disRes, newsRes, vesRes, volRes, geoRes];
+      const staleResults = allResults.filter(r => r.stale && r.staleSince);
+      const isStale = staleResults.length > 0;
+      const oldestStale = isStale
+        ? staleResults.reduce((oldest, r) =>
+            !oldest || new Date(r.staleSince!).getTime() < new Date(oldest).getTime()
+              ? r.staleSince!
+              : oldest
+          , null as string | null)
+        : null;
+
+      setDataFreshness({
+        isStale,
+        staleSince: oldestStale,
+        staleAge: formatStaleAge(oldestStale),
+      });
+
+      if (!isStale) {
+        const syncTime = await IntelligenceAPI.getLastSyncTime().catch(() => null);
+        if (syncTime) setLastSyncTime(syncTime);
+      }
     } catch (error) {
+      // Complete cold failure (no cache at all for any source) — keep
+      // whatever is in state (empty arrays on first load) and mark stale
       console.error('Error loading data:', error);
+      setDataFreshness({ isStale: true, staleSince: null, staleAge: 'unavailable' });
     } finally {
       setLoading(false);
     }
@@ -333,9 +368,18 @@ function App() {
       setNextSyncIn(Math.max(0, remaining));
     }, 1000);
 
+    // Refresh the human-readable stale age every 30 s
+    stalenessTimerRef.current = setInterval(() => {
+      setDataFreshness(prev => prev.isStale
+        ? { ...prev, staleAge: formatStaleAge(prev.staleSince) }
+        : prev
+      );
+    }, 30_000);
+
     return () => {
       if (autoSyncTimerRef.current) clearInterval(autoSyncTimerRef.current);
       if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+      if (stalenessTimerRef.current) clearInterval(stalenessTimerRef.current);
     };
   }, []);
 
@@ -464,6 +508,7 @@ function App() {
   }
 
   return (
+    <DataFreshnessContext.Provider value={dataFreshness}>
     <div className="dhruva-app" onTouchStart={handleSwipeTouchStart} onTouchEnd={handleSwipeTouchEnd}>
       <div className="portrait-overlay">
         <div className="portrait-overlay-inner">
@@ -707,6 +752,7 @@ function App() {
       {tooltip && <Tooltip x={tooltip.x} y={tooltip.y} content={tooltip.content} />}
       {showAbout && <AboutDhruva onClose={() => setShowAbout(false)} theme={theme} />}
     </div>
+    </DataFreshnessContext.Provider>
   );
 }
 
