@@ -12,7 +12,11 @@ import { VesselView } from './components/VesselView';
 import { NewsIntelView } from './components/NewsIntelView';
 import { TimelineView } from './components/TimelineView';
 import { AlertToast } from './components/AlertToast';
+import { NotificationPreferencesPanel } from './components/NotificationPreferencesPanel';
 import { Tooltip } from './components/Tooltip';
+import { useNotificationPreferences } from './lib/useNotificationPreferences';
+import { useAlertNotifier } from './lib/useAlertNotifier';
+import type { AppNotification } from './lib/useAlertNotifier';
 import { LiveEventTicker, TickerEvent } from './components/LiveEventTicker';
 import { AboutDhruva } from './components/AboutDhruva';
 
@@ -112,12 +116,17 @@ function App() {
   });
   const [timeFilter, setTimeFilter] = useState('24H');
   const [tooltip, setTooltip] = useState<{ x: number; y: number; content: string } | null>(null);
-  const [alerts, setAlerts] = useState<Array<{ id: string; title: string; message: string }>>([]);
+  // legacy alerts state kept for non-unified-alert sources (earthquakes, volcanoes, etc.)
+  const [legacyAlerts, setLegacyAlerts] = useState<AppNotification[]>([]);
   const [tickerEvents, setTickerEvents] = useState<TickerEvent[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [nextSyncIn, setNextSyncIn] = useState<number>(AUTO_SYNC_INTERVAL_MS);
   const [newEventIds, setNewEventIds] = useState<Set<string>>(new Set());
   const [showAbout, setShowAbout] = useState(false);
+  const [showNotifPrefs, setShowNotifPrefs] = useState(false);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+
+  const { prefs, update: updatePrefs } = useNotificationPreferences();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mobileRightPanelOpen, setMobileRightPanelOpen] = useState(false);
 
@@ -146,12 +155,14 @@ function App() {
     }, 12000);
   }, []);
 
-  const addAlert = useCallback((title: string, message: string) => {
-    const id = Date.now().toString();
-    setAlerts((prev) => [...prev, { id, title, message }]);
-    setTimeout(() => {
-      setAlerts((prev) => prev.filter((a) => a.id !== id));
-    }, 6000);
+  const addAlert = useCallback((title: string, message: string, severity: 'high' | 'moderate' | 'low' = 'high') => {
+    const id = `legacy-${Date.now()}`;
+    const n: AppNotification = {
+      id, title, message, severity,
+      eventType: 'system', regionKey: 'global', count: 1, alertIds: [],
+    };
+    setLegacyAlerts(prev => [...prev, n]);
+    setTimeout(() => setLegacyAlerts(prev => prev.filter(a => a.id !== id)), 7000);
   }, []);
 
   const playAlert = useCallback((type: 'critical' | 'high' | 'info') => {
@@ -185,6 +196,20 @@ function App() {
       }
     } catch {}
   }, [soundEnabled]);
+
+  const handleNotification = useCallback((n: AppNotification) => {
+    setNotifications(prev => [...prev, n].slice(0, 5));
+  }, []);
+
+  const dismissNotification = useCallback((id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+    setLegacyAlerts(prev => prev.filter(n => n.id !== id));
+  }, []);
+
+  // Smart alert notifier (unified_alerts realtime + throttling)
+  useAlertNotifier(prefs, handleNotification, soundEnabled, playAlert);
+
+  const allNotifications = [...notifications, ...legacyAlerts];
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -637,6 +662,22 @@ function App() {
           <span className="sdot" style={{ background: theme === 'dark' ? '#00D4A0' : '#007A5E' }}></span>
           THEME: {theme.toUpperCase()}
         </div>
+        <div>
+          <button
+            className={`notif-bell-btn ${showNotifPrefs ? 'active' : ''}`}
+            onClick={() => setShowNotifPrefs(o => !o)}
+            title="Notification preferences"
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            ALERTS
+            {notifications.length > 0 && (
+              <span className="notif-bell-badge">{notifications.length}</span>
+            )}
+          </button>
+        </div>
         <div className="about-link-wrap">
           <button className="about-link-btn" onClick={() => setShowAbout(true)}>
             ABOUT DHRUVA
@@ -655,7 +696,14 @@ function App() {
         </div>
       </div>
 
-      <AlertToast alerts={alerts} />
+      <AlertToast notifications={allNotifications} onDismiss={dismissNotification} />
+      {showNotifPrefs && (
+        <NotificationPreferencesPanel
+          prefs={prefs}
+          onUpdate={updatePrefs}
+          onClose={() => setShowNotifPrefs(false)}
+        />
+      )}
       {tooltip && <Tooltip x={tooltip.x} y={tooltip.y} content={tooltip.content} />}
       {showAbout && <AboutDhruva onClose={() => setShowAbout(false)} theme={theme} />}
     </div>
