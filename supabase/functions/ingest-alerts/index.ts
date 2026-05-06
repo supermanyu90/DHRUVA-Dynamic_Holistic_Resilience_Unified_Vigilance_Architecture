@@ -369,6 +369,7 @@ async function pollSource(
   // Parse
   const alerts = source === 'GDACS' ? parseGDACS(rawXml) : parseSACHET(rawXml);
   let alertsWritten = 0;
+  let duplicatesDetected = 0;
   let writeError: string | null = null;
 
   if (alerts.length) {
@@ -402,22 +403,35 @@ async function pollSource(
           })
         )
       );
+      // First pass: detect hard errors
       for (const r of results) {
-        if (r.status === 'rejected') {
-          writeError = r.reason?.message ?? 'Unknown error';
-          break;
-        }
-        if (r.status === 'fulfilled' && r.value.error) {
-          writeError = r.value.error.message;
-          break;
+        if (r.status === 'rejected') { writeError = r.reason?.message ?? 'Unknown error'; break; }
+        if (r.status === 'fulfilled' && r.value.error) { writeError = r.value.error.message; break; }
+      }
+      // Second pass: tally written + duplicates
+      for (const r of results) {
+        if (r.status === 'fulfilled' && !r.value.error) {
+          alertsWritten++;
+          // upsert_alert_with_lifecycle returns 'updated' when an existing row was superseded
+          if (r.value.data === 'updated') duplicatesDetected++;
         }
       }
-      if (writeError === null) alertsWritten += batch.length;
     }
   }
 
   const dur = Date.now() - t0;
   const success = writeError === null;
+
+  // Write ingestion metrics (fire-and-forget — never blocks poll-state update)
+  if (success && alertsWritten > 0) {
+    const metricRows = [
+      { metric_name: 'alerts_ingested', source, value: alertsWritten },
+    ];
+    if (duplicatesDetected > 0) {
+      metricRows.push({ metric_name: 'duplicates_detected', source, value: duplicatesDetected });
+    }
+    supabase.from('system_metrics').insert(metricRows).then(() => {}).catch(() => {});
+  }
 
   await supabase.from('alert_poll_state').upsert({
     source,

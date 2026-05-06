@@ -21,8 +21,9 @@ import { useAlertNotifier } from './lib/useAlertNotifier';
 import type { AppNotification } from './lib/useAlertNotifier';
 import { LiveEventTicker, TickerEvent } from './components/LiveEventTicker';
 import { AboutDhruva } from './components/AboutDhruva';
+import { AdminDashboard } from './components/AdminDashboard';
 
-type ViewType = 'map' | 'timeline' | 'news' | 'sewa' | 'cyber' | 'infoops' | 'gov' | 'vessel';
+type ViewType = 'map' | 'timeline' | 'news' | 'sewa' | 'cyber' | 'infoops' | 'gov' | 'vessel' | 'admin';
 
 const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -568,6 +569,9 @@ function App() {
         <div className={`view-tab ${currentView === 'vessel' ? 'active' : ''}`} onClick={() => setCurrentView('vessel')} style={{ color: currentView === 'vessel' ? '' : '#00BFFF99' }}>
           ⚓ VESSEL INTEL
         </div>
+        <div className={`view-tab ${currentView === 'admin' ? 'active' : ''}`} onClick={() => setCurrentView('admin')} style={{ color: currentView === 'admin' ? '' : '#4D9FFF99' }}>
+          SYS MONITOR
+        </div>
       </div>
 
       <div className="mobile-view-tabs">
@@ -602,6 +606,10 @@ function App() {
         <button className={`mvt-btn ${currentView === 'vessel' ? 'active' : ''}`} onClick={() => setCurrentView('vessel')}>
           <span className="mvt-icon">⚓</span>
           <span className="mvt-label">VESSEL</span>
+        </button>
+        <button className={`mvt-btn ${currentView === 'admin' ? 'active' : ''}`} onClick={() => setCurrentView('admin')}>
+          <span className="mvt-icon">⚙</span>
+          <span className="mvt-label">SYS</span>
         </button>
       </div>
 
@@ -667,6 +675,7 @@ function App() {
           {currentView === 'infoops' && <InfoOpsView />}
           {currentView === 'gov' && <GovAnnouncementsView />}
           {currentView === 'vessel' && <VesselView />}
+          {currentView === 'admin' && <AdminDashboard />}
         </div>
 
         <RightPanel

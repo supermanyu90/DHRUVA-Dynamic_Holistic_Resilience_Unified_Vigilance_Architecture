@@ -4593,6 +4593,385 @@ header,
   letter-spacing: 0.5px;
 }
 
+/* ─── Admin Dashboard ────────────────────────────────────────────────────── */
+
+.adm-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.adm-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 100%;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: rgba(139,175,200,0.4);
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Top bar */
+.adm-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0,0,0,0.25);
+  flex-shrink: 0;
+}
+
+.adm-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.adm-topbar-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 14px;
+  letter-spacing: 3px;
+  color: #4D9FFF;
+}
+
+.adm-topbar-status {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+
+.adm-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.adm-refresh-time {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8.5px;
+  color: rgba(139,175,200,0.35);
+  letter-spacing: 0.5px;
+}
+
+.adm-refresh-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: rgba(77,159,255,0.08);
+  border: 1px solid rgba(77,159,255,0.25);
+  border-radius: 3px;
+  color: #4D9FFF;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.adm-refresh-btn:hover { background: rgba(77,159,255,0.15); }
+.adm-refresh-btn.spinning svg { animation: spin 0.8s linear infinite; }
+
+/* Scrollable body */
+.adm-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.adm-body::-webkit-scrollbar { width: 4px; }
+.adm-body::-webkit-scrollbar-thumb { background: rgba(77,159,255,0.15); border-radius: 2px; }
+
+/* Section title */
+.adm-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: rgba(139,175,200,0.5);
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  padding-bottom: 5px;
+}
+
+/* ── Stat tiles ── */
+.adm-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.adm-tile {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.adm-tile:hover { background: rgba(255,255,255,0.05); }
+
+.adm-tile-icon {
+  margin-top: 1px;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.adm-tile-body { flex: 1; min-width: 0; }
+
+.adm-tile-value {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: 1px;
+}
+
+.adm-tile-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 7.5px;
+  letter-spacing: 0.8px;
+  color: rgba(139,175,200,0.45);
+  margin-top: 3px;
+}
+
+.adm-tile-sub {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8px;
+  color: rgba(139,175,200,0.3);
+  margin-top: 2px;
+}
+
+.adm-tile-trend { align-self: center; margin-left: auto; }
+
+/* ── Source health cards ── */
+.adm-source-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+
+.adm-source-card {
+  background: rgba(0,0,0,0.2);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-left-width: 3px;
+  border-radius: 4px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.adm-source-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.adm-source-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 15px;
+  letter-spacing: 2px;
+  flex: 1;
+}
+
+.adm-source-status {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+.adm-source-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.adm-source-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.adm-src-lbl {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.3px;
+  color: rgba(139,175,200,0.35);
+  flex-shrink: 0;
+}
+
+.adm-src-val {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  color: rgba(200,216,232,0.75);
+  text-align: right;
+}
+
+.adm-source-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 5px 7px;
+  background: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: 3px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8px;
+  color: #EF4444;
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+.adm-source-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Metric bar charts ── */
+.adm-charts-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.adm-metric-chart {
+  background: rgba(0,0,0,0.2);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 4px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.adm-metric-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+}
+
+.adm-metric-total {
+  font-size: 8px;
+  opacity: 0.6;
+}
+
+.adm-metric-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 50px;
+}
+
+.adm-metric-bar-col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.adm-metric-bar {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 1px 1px 0 0;
+  transition: height 0.4s ease;
+}
+
+.adm-metric-axis {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 7.5px;
+  color: rgba(139,175,200,0.25);
+  letter-spacing: 0.3px;
+}
+
+/* ── Poll log table ── */
+.adm-log-wrap {
+  overflow-x: auto;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 4px;
+}
+
+.adm-log-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+}
+
+.adm-log-table th {
+  padding: 7px 10px;
+  text-align: left;
+  font-size: 8px;
+  letter-spacing: 0.8px;
+  color: rgba(139,175,200,0.4);
+  background: rgba(0,0,0,0.25);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  white-space: nowrap;
+}
+
+.adm-log-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  color: rgba(200,216,232,0.65);
+  white-space: nowrap;
+}
+
+.adm-log-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+.adm-log-src {
+  display: inline-block;
+  padding: 1px 5px;
+  background: rgba(0,212,160,0.08);
+  border: 1px solid rgba(0,212,160,0.2);
+  border-radius: 2px;
+  color: #00D4A0;
+  font-size: 8px;
+}
+
+.adm-log-ok {
+  display: flex; align-items: center; gap: 3px; color: #00D4A0;
+}
+.adm-log-fail {
+  display: flex; align-items: center; gap: 3px; color: #EF4444;
+}
+.adm-log-err {
+  color: rgba(239,68,68,0.6);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adm-empty {
+  padding: 16px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  color: rgba(139,175,200,0.3);
+  letter-spacing: 0.5px;
+}
+
 /* ─── Alert Toast Stack ───────────────────────────────────────────────────── */
 
 @keyframes toastIn {

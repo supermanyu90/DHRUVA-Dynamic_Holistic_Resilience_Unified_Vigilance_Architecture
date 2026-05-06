@@ -212,6 +212,61 @@ export interface FusedAlert {
   updated_at: string;
 }
 
+export interface PollState {
+  source: string;
+  last_fetch_at: string | null;
+  last_success_at: string | null;
+  last_payload_hash: string | null;
+  consecutive_failures: number;
+  next_retry_at: string;
+  last_error: string | null;
+  total_fetches: number;
+  total_changes: number;
+  updated_at: string;
+}
+
+export interface PollLogEntry {
+  id: string;
+  source: string;
+  fetched_at: string;
+  success: boolean;
+  changed: boolean;
+  alerts_written: number;
+  error: string | null;
+  duration_ms: number | null;
+}
+
+export interface IngestionStat {
+  source: string;
+  day: string;
+  total_fetches: number;
+  successful_fetches: number;
+  failed_fetches: number;
+  success_rate: number | null;
+  total_alerts_written: number;
+  avg_duration_ms: number | null;
+  last_fetch_at: string | null;
+  last_success_at: string | null;
+  last_error: string | null;
+  consecutive_failures: number;
+  lifetime_fetches: number;
+  lifetime_changes: number;
+}
+
+export interface SystemMetric {
+  id: string;
+  metric_name: string;
+  source: string;
+  value: number;
+  recorded_at: string;
+}
+
+export interface LifecycleCounts {
+  active: number;
+  updated: number;
+  expired: number;
+}
+
 export interface UAETwitter {
   id: string;
   tweet_id: string;
@@ -609,6 +664,69 @@ export class IntelligenceAPI {
       },
       body,
     });
+  }
+
+  // ── Monitoring ───────────────────────────────────────────────────────────────
+
+  /** Per-source poll state (current health, last sync times, failure counts). */
+  static async getPollState(): Promise<PollState[]> {
+    const { data, error } = await supabase
+      .from('alert_poll_state')
+      .select('*')
+      .order('source');
+    if (error) throw error;
+    return data || [];
+  }
+
+  /** Recent poll log entries (most recent first). */
+  static async getPollLog(limit = 100): Promise<PollLogEntry[]> {
+    const { data, error } = await supabase
+      .from('alert_poll_log')
+      .select('*')
+      .order('fetched_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return data || [];
+  }
+
+  /** Aggregated ingestion stats per source per day. */
+  static async getIngestionStats(days = 7): Promise<IngestionStat[]> {
+    const since = new Date(Date.now() - days * 86_400_000).toISOString();
+    const { data, error } = await supabase
+      .from('ingestion_stats')
+      .select('*')
+      .gte('day', since)
+      .order('day', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  /** Recent system_metrics rows for chart / counter data. */
+  static async getSystemMetrics(metricNames: string[], hours = 24): Promise<SystemMetric[]> {
+    const since = new Date(Date.now() - hours * 3_600_000).toISOString();
+    const { data, error } = await supabase
+      .from('system_metrics')
+      .select('*')
+      .in('metric_name', metricNames)
+      .gte('recorded_at', since)
+      .order('recorded_at', { ascending: false })
+      .limit(500);
+    if (error) throw error;
+    return data || [];
+  }
+
+  /** Total lifecycle counts from unified_alerts. */
+  static async getAlertLifecycleCounts(): Promise<LifecycleCounts> {
+    const { data, error } = await supabase
+      .from('unified_alerts')
+      .select('lifecycle_state');
+    if (error) throw error;
+    const rows = data || [];
+    return {
+      active:  rows.filter(r => r.lifecycle_state === 'active').length,
+      updated: rows.filter(r => r.lifecycle_state === 'updated').length,
+      expired: rows.filter(r => r.lifecycle_state === 'expired').length,
+    };
   }
 
   static async getLastSyncTime(): Promise<string | null> {
