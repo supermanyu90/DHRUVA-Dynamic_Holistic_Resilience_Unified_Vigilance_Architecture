@@ -144,8 +144,28 @@ export interface UnifiedAlert {
   raw_payload: Record<string, unknown>;
   cluster_id: string | null;
   is_primary: boolean;
+  priority_score: number;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Client-side mirror of the DB scoring formula.
+ * Used to score Realtime-delivered alerts before DB confirms priority_score,
+ * and as a fallback when priority_score is absent (older rows).
+ */
+export function computePriorityScore(alert: Pick<UnifiedAlert,
+  'severity' | 'urgency' | 'population_impact' | 'country' | 'state'>
+): number {
+  const BASE: Record<string, number> = { high: 70, moderate: 40, low: 10 };
+  let score = BASE[alert.severity] ?? 10;
+
+  if ((alert.urgency ?? '').toLowerCase() === 'immediate') score += 15;
+  if ((alert.population_impact ?? 0) > 1_000_000)          score += 10;
+  if ((alert.country ?? '').toLowerCase() === 'india' ||
+      (alert.state ?? '') !== '')                           score += 5;
+
+  return Math.max(0, Math.min(100, score));
 }
 
 export interface AlertCluster {
@@ -413,37 +433,44 @@ export class IntelligenceAPI {
   static async getUnifiedAlerts(options: {
     sources?: ('GDACS' | 'SACHET')[];
     severity?: ('low' | 'moderate' | 'high')[];
+    minPriority?: number;
     limit?: number;
   } = {}): Promise<UnifiedAlert[]> {
     let query = supabase
       .from('unified_alerts')
       .select('*')
+      // Primary sort: priority_score desc; secondary: recency
+      .order('priority_score', { ascending: false })
       .order('effective_time', { ascending: false })
       .limit(options.limit ?? 200);
 
-    if (options.sources?.length) query = query.in('source', options.sources);
-    if (options.severity?.length) query = query.in('severity', options.severity);
+    if (options.sources?.length)   query = query.in('source', options.sources);
+    if (options.severity?.length)  query = query.in('severity', options.severity);
+    if (options.minPriority != null) query = query.gte('priority_score', options.minPriority);
 
     const { data, error } = await query;
     if (error) throw error;
     return data || [];
   }
 
-  /** Returns only the primary alert per cluster — safe for notification deduplication. */
+  /** Returns only the primary alert per cluster, sorted by priority_score. */
   static async getPrimaryAlerts(options: {
     sources?: ('GDACS' | 'SACHET')[];
     severity?: ('low' | 'moderate' | 'high')[];
+    minPriority?: number;
     limit?: number;
   } = {}): Promise<UnifiedAlert[]> {
     let query = supabase
       .from('unified_alerts')
       .select('*')
       .eq('is_primary', true)
+      .order('priority_score', { ascending: false })
       .order('effective_time', { ascending: false })
       .limit(options.limit ?? 200);
 
-    if (options.sources?.length) query = query.in('source', options.sources);
-    if (options.severity?.length) query = query.in('severity', options.severity);
+    if (options.sources?.length)   query = query.in('source', options.sources);
+    if (options.severity?.length)  query = query.in('severity', options.severity);
+    if (options.minPriority != null) query = query.gte('priority_score', options.minPriority);
 
     const { data, error } = await query;
     if (error) throw error;

@@ -1,5 +1,6 @@
 import { Activity, AlertTriangle, FileText, Zap, Waves, Flame, Wind, Droplets, Globe, Ship, Radio } from 'lucide-react';
 import type { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
+import { AlertPriorityList } from './AlertPriorityList';
 
 interface RightPanelProps {
   earthquakes: Earthquake[];
@@ -105,6 +106,26 @@ export function RightPanel({ earthquakes, disasters, news, vessels, volcanoes, g
 
   return (
     <div className={`right-panel${mobileOpen ? ' mobile-open' : ''}`} style={{ display: 'flex', flexDirection: 'column', gap: '0', overflowY: 'auto' }}>
+
+      {/* ── Priority alert feed ── */}
+      <div style={{
+        fontFamily: "'Bebas Neue', sans-serif",
+        fontSize: '10px',
+        letterSpacing: '3px',
+        color: '#EF4444',
+        padding: '8px 10px 6px',
+        borderBottom: '1px solid rgba(239,68,68,0.2)',
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+      }}>
+        <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#EF4444', animation: 'statusPulse 1.5s ease-in-out infinite' }} />
+        PRIORITY ALERTS
+      </div>
+      <div style={{ borderBottom: '1px solid var(--border)' }}>
+        <AlertPriorityList />
+      </div>
 
       <div style={{
         fontFamily: "'Bebas Neue', sans-serif",

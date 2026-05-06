@@ -4,20 +4,24 @@
  * Subscribes to unified_alerts INSERT events from Supabase Realtime and
  * applies the full notification throttling pipeline:
  *
- *   1. Active-status gate  — alert must not be expired
- *   2. Severity gate        — severity must be >= prefs.min_severity
- *   3. Urgency gate         — urgency must be in prefs.urgency_filter
- *   4. Event-type filter    — prefs.event_types whitelist (empty = all)
- *   5. Location filter      — prefs.location_filter whitelist (empty = all)
- *   6. Region cooldown      — max 1 notification per region per 15 min.
- *                             Pending alerts within the window are buffered
- *                             and flushed as an aggregated notification when
- *                             the cooldown expires.
+ *   1. Active-status gate    — alert must not be expired
+ *   2. Priority gate         — priority_score (computed client-side via
+ *                              computePriorityScore) must meet the threshold
+ *                              derived from prefs.min_severity:
+ *                                high     → score >= 70
+ *                                moderate → score >= 40
+ *                                low      → score >= 10
+ *   3. Preference filters    — urgency, event_type, location whitelists
+ *   4. Region cooldown       — max 1 notification per region per 15 min.
+ *                              Pending alerts within the window are buffered
+ *                              and flushed as an aggregated notification when
+ *                              the cooldown expires, sorted by priority_score
+ *                              so the highest-priority alert is representative.
  */
 
 import { useCallback, useEffect, useRef } from 'react';
 import { supabase } from './supabase';
-import { UnifiedAlert } from './intelligence-api';
+import { UnifiedAlert, computePriorityScore } from './intelligence-api';
 import { NotificationPreferences, matchesPreferences } from './notification-preferences';
 
 export interface AppNotification {
@@ -27,18 +31,24 @@ export interface AppNotification {
   severity: 'high' | 'moderate' | 'low';
   eventType: string;
   regionKey: string;
-  count: number;         // 1 = single alert; >1 = aggregated
+  priorityScore: number;
+  count: number;
   alertIds: string[];
 }
 
-const COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes
+const COOLDOWN_MS = 15 * 60 * 1000;
+
+// Minimum priority_score threshold per min_severity pref setting
+const PRIORITY_THRESHOLD: Record<string, number> = {
+  high: 70,
+  moderate: 40,
+  low: 10,
+};
 
 function regionKey(alert: UnifiedAlert): string {
-  const parts = [
-    alert.country || '',
-    alert.state   || '',
-    alert.district || '',
-  ].map(s => s.trim().toLowerCase()).filter(Boolean);
+  const parts = [alert.country, alert.state, alert.district]
+    .map(s => (s ?? '').trim().toLowerCase())
+    .filter(Boolean);
   return parts.join(':') || 'global';
 }
 
@@ -50,6 +60,14 @@ function regionLabel(alert: UnifiedAlert): string {
 function isActive(alert: UnifiedAlert): boolean {
   if (!alert.expiry_time) return true;
   return new Date(alert.expiry_time) > new Date();
+}
+
+/** Resolve effective priority: prefer DB-computed value, fall back to client formula. */
+function effectivePriority(alert: UnifiedAlert): number {
+  if (typeof alert.priority_score === 'number' && alert.priority_score > 0) {
+    return alert.priority_score;
+  }
+  return computePriorityScore(alert);
 }
 
 interface CooldownEntry {
@@ -64,8 +82,41 @@ export function useAlertNotifier(
   soundEnabled: boolean,
   playAlert: (type: 'critical' | 'high' | 'info') => void,
 ) {
-  // In-memory cooldown map: regionKey → CooldownEntry
   const cooldowns = useRef<Map<string, CooldownEntry>>(new Map());
+
+  const buildNotification = useCallback((alerts: UnifiedAlert[], key: string): AppNotification => {
+    // Sort pending by priority descending so the representative is the most critical
+    const sorted = [...alerts].sort((a, b) => effectivePriority(b) - effectivePriority(a));
+    const rep = sorted[0];
+    const score = effectivePriority(rep);
+    const count = sorted.length;
+
+    if (count === 1) {
+      return {
+        id: `notif-${rep.id}`,
+        title: `${rep.event_type.replace(/_/g, ' ').toUpperCase()} ALERT`,
+        message: rep.location_name || regionLabel(rep),
+        severity: rep.severity,
+        eventType: rep.event_type,
+        regionKey: key,
+        priorityScore: score,
+        count: 1,
+        alertIds: [rep.id],
+      };
+    }
+
+    return {
+      id: `notif-agg-${key}-${Date.now()}`,
+      title: `${count} HIGH-RISK ALERTS`,
+      message: `Multiple alerts in ${regionLabel(rep)} region`,
+      severity: rep.severity,
+      eventType: rep.event_type,
+      regionKey: key,
+      priorityScore: score,
+      count,
+      alertIds: sorted.map(a => a.id),
+    };
+  }, []);
 
   const flushRegion = useCallback((key: string) => {
     const entry = cooldowns.current.get(key);
@@ -76,44 +127,26 @@ export function useAlertNotifier(
     entry.lastNotifiedAt = Date.now();
     entry.timerHandle = null;
 
-    // Persist cooldown to DB (fire-and-forget)
     supabase.from('notification_cooldowns').upsert(
       { region_key: key, last_notified_at: new Date().toISOString(), alert_count: alerts.length },
       { onConflict: 'region_key' }
     ).then(() => {});
 
-    const representative = alerts[0];
-    const count = alerts.length;
-
-    const notification: AppNotification = count === 1 ? {
-      id: `notif-${representative.id}`,
-      title: `${representative.event_type.replace(/_/g, ' ').toUpperCase()} ALERT`,
-      message: representative.location_name || regionLabel(representative),
-      severity: representative.severity,
-      eventType: representative.event_type,
-      regionKey: key,
-      count: 1,
-      alertIds: [representative.id],
-    } : {
-      id: `notif-agg-${key}-${Date.now()}`,
-      title: `${count} HIGH-RISK ALERTS`,
-      message: `Multiple alerts in ${regionLabel(representative)} region`,
-      severity: 'high',
-      eventType: representative.event_type,
-      regionKey: key,
-      count,
-      alertIds: alerts.map(a => a.id),
-    };
-
+    const notification = buildNotification(alerts, key);
     onNotify(notification);
-    playAlert(representative.severity === 'high' ? 'critical' : 'high');
-  }, [onNotify, playAlert]);
+    playAlert(notification.priorityScore >= 70 ? 'critical' : 'high');
+  }, [onNotify, playAlert, buildNotification]);
 
   const handleAlert = useCallback((alert: UnifiedAlert) => {
     // 1. Active-status gate
     if (!isActive(alert)) return;
 
-    // 2–5. Preference filters
+    // 2. Priority gate — use numeric threshold derived from min_severity pref
+    const score = effectivePriority(alert);
+    const threshold = PRIORITY_THRESHOLD[prefs.min_severity] ?? 70;
+    if (score < threshold) return;
+
+    // 3. Preference filters (urgency, event_type, location)
     if (!matchesPreferences(alert, prefs)) return;
 
     const key = regionKey(alert);
@@ -128,40 +161,26 @@ export function useAlertNotifier(
     const sinceLast = now - entry.lastNotifiedAt;
 
     if (sinceLast >= COOLDOWN_MS && entry.pending.length === 0) {
-      // Cooldown expired and nothing pending — notify immediately
       entry.lastNotifiedAt = now;
-      entry.pending = [];
 
       supabase.from('notification_cooldowns').upsert(
         { region_key: key, last_notified_at: new Date().toISOString(), alert_count: 1 },
         { onConflict: 'region_key' }
       ).then(() => {});
 
-      const notification: AppNotification = {
-        id: `notif-${alert.id}`,
-        title: `${alert.event_type.replace(/_/g, ' ').toUpperCase()} ALERT`,
-        message: alert.location_name || regionLabel(alert),
-        severity: alert.severity,
-        eventType: alert.event_type,
-        regionKey: key,
-        count: 1,
-        alertIds: [alert.id],
-      };
-
+      const notification = buildNotification([alert], key);
       onNotify(notification);
-      playAlert(alert.severity === 'high' ? 'critical' : 'high');
+      playAlert(score >= 70 ? 'critical' : 'high');
     } else {
-      // Within cooldown — buffer and schedule a flush
       entry.pending.push(alert);
-
       if (!entry.timerHandle) {
         const remaining = Math.max(0, COOLDOWN_MS - sinceLast);
         entry.timerHandle = setTimeout(() => flushRegion(key), remaining);
       }
     }
-  }, [prefs, onNotify, playAlert, flushRegion]);
+  }, [prefs, onNotify, playAlert, flushRegion, buildNotification]);
 
-  // Hydrate cooldown state from DB on mount so page refreshes respect server-side cooldowns
+  // Hydrate cooldown state from DB on mount
   useEffect(() => {
     supabase
       .from('notification_cooldowns')
@@ -169,8 +188,7 @@ export function useAlertNotifier(
       .then(({ data }) => {
         if (!data) return;
         for (const row of data) {
-          const existing = cooldowns.current.get(row.region_key);
-          if (!existing) {
+          if (!cooldowns.current.has(row.region_key)) {
             cooldowns.current.set(row.region_key, {
               lastNotifiedAt: new Date(row.last_notified_at).getTime(),
               pending: [],
@@ -181,7 +199,7 @@ export function useAlertNotifier(
       });
   }, []);
 
-  // Realtime subscription to unified_alerts INSERT
+  // Realtime subscription
   useEffect(() => {
     const channel = supabase
       .channel('alert-notifier')
