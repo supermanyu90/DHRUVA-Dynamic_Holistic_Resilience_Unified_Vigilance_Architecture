@@ -121,6 +121,31 @@ export interface InfoOp {
   first_detected: string;
 }
 
+export interface UnifiedAlert {
+  id: string;
+  alert_id: string;
+  source: 'GDACS' | 'SACHET';
+  event_type: string;
+  severity: 'low' | 'moderate' | 'high';
+  urgency: string;
+  certainty: string;
+  alert_level: string | null;
+  location_name: string;
+  country: string;
+  state: string;
+  district: string;
+  latitude: number | null;
+  longitude: number | null;
+  geometry: Record<string, unknown> | null;
+  population_impact: number | null;
+  effective_time: string;
+  expiry_time: string | null;
+  description: string;
+  raw_payload: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface UAETwitter {
   id: string;
   tweet_id: string;
@@ -365,6 +390,38 @@ export class IntelligenceAPI {
         table: 'geopolitical_events',
       }, (payload) => {
         callback(payload.new as GeopoliticalEvent);
+      })
+      .subscribe();
+  }
+
+  static async getUnifiedAlerts(options: {
+    sources?: ('GDACS' | 'SACHET')[];
+    severity?: ('low' | 'moderate' | 'high')[];
+    limit?: number;
+  } = {}): Promise<UnifiedAlert[]> {
+    let query = supabase
+      .from('unified_alerts')
+      .select('*')
+      .order('effective_time', { ascending: false })
+      .limit(options.limit ?? 200);
+
+    if (options.sources?.length) query = query.in('source', options.sources);
+    if (options.severity?.length) query = query.in('severity', options.severity);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  }
+
+  static subscribeToUnifiedAlerts(callback: (alert: UnifiedAlert) => void) {
+    return supabase
+      .channel('unified-alerts-channel')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'unified_alerts',
+      }, (payload) => {
+        callback(payload.new as UnifiedAlert);
       })
       .subscribe();
   }
