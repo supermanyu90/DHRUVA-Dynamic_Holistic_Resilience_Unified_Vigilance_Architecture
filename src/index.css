@@ -4258,6 +4258,305 @@ header,
   border-bottom-color: var(--accent);
 }
 
+/* ─── Fused Alerts View ───────────────────────────────────────────────────── */
+
+.fa-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.fa-filter-row {
+  display: flex;
+  gap: 1px;
+  padding: 5px 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  flex-shrink: 0;
+}
+
+.fa-filter-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: rgba(139,175,200,0.4);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.fa-filter-tab:hover { color: var(--dim); border-color: rgba(255,255,255,0.08); }
+.fa-filter-tab.active {
+  color: #4D9FFF;
+  border-color: rgba(77,159,255,0.3);
+  background: rgba(77,159,255,0.06);
+}
+
+.fa-filter-count {
+  background: rgba(255,255,255,0.07);
+  color: var(--dim);
+  font-size: 8px;
+  padding: 0 4px;
+  border-radius: 8px;
+  font-family: 'Share Tech Mono', monospace;
+  min-width: 14px;
+  text-align: center;
+}
+.fa-filter-tab.active .fa-filter-count {
+  background: rgba(77,159,255,0.12);
+  color: #4D9FFF;
+}
+
+.fa-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 380px;
+  overflow-y: auto;
+  padding: 4px 4px;
+}
+.fa-list::-webkit-scrollbar { width: 3px; }
+.fa-list::-webkit-scrollbar-thumb { background: rgba(77,159,255,0.2); border-radius: 2px; }
+
+.fa-card {
+  background: rgba(0,0,0,0.2);
+  border-radius: 3px;
+  border: 1px solid rgba(255,255,255,0.05);
+  border-left-width: 3px;
+  transition: background 0.15s;
+  overflow: hidden;
+}
+.fa-card:hover { background: rgba(0,0,0,0.35); }
+
+.fa-card-header {
+  padding: 8px 10px 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.fa-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.fa-sev-badge {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  color: #fff;
+  padding: 1px 4px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.fa-event-type {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #d0dce8;
+  text-transform: capitalize;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fa-multi-source-badge {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 7.5px;
+  letter-spacing: 0.5px;
+  color: #4D9FFF;
+  background: rgba(77,159,255,0.10);
+  border: 1px solid rgba(77,159,255,0.25);
+  border-radius: 2px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+
+.fa-lifecycle-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Confidence bar */
+.fa-conf-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fa-conf-bar-track {
+  flex: 1;
+  height: 3px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.fa-conf-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+.fa-conf-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 7.5px;
+  letter-spacing: 0.8px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.fa-conf-score {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  flex-shrink: 0;
+  min-width: 20px;
+  text-align: right;
+}
+
+/* Source chips */
+.fa-card-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fa-source-chips {
+  display: flex;
+  gap: 4px;
+}
+
+.fa-source-chip {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 7.5px;
+  letter-spacing: 0.8px;
+  color: rgba(0,212,160,0.7);
+  background: rgba(0,212,160,0.08);
+  border: 1px solid rgba(0,212,160,0.18);
+  border-radius: 2px;
+  padding: 1px 5px;
+}
+
+.fa-version {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 7.5px;
+  color: rgba(139,175,200,0.3);
+  letter-spacing: 0.5px;
+}
+
+/* Card body */
+.fa-card-body {
+  padding: 6px 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fa-card-loc {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  color: var(--dim);
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fa-card-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fa-stat {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8px;
+  color: rgba(139,175,200,0.4);
+  letter-spacing: 0.3px;
+}
+
+.fa-expand-btn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  color: rgba(77,159,255,0.5);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 2px;
+  transition: color 0.15s;
+}
+.fa-expand-btn:hover { color: #4D9FFF; }
+
+.fa-description {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 11px;
+  color: rgba(200,216,232,0.75);
+  line-height: 1.55;
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: rgba(255,255,255,0.03);
+  border-left: 2px solid rgba(77,159,255,0.2);
+  border-radius: 0 2px 2px 0;
+}
+
+.fa-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 10px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  color: rgba(139,175,200,0.4);
+  letter-spacing: 1px;
+}
+
+.fa-loading-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4D9FFF;
+  flex-shrink: 0;
+  animation: statusPulse 1s ease-in-out infinite;
+}
+
+.fa-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 10px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  color: rgba(139,175,200,0.3);
+  letter-spacing: 0.5px;
+}
+
 /* ─── Alert Toast Stack ───────────────────────────────────────────────────── */
 
 @keyframes toastIn {

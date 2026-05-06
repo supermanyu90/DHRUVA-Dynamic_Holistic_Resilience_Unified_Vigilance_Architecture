@@ -265,8 +265,6 @@ Deno.serve(async (req: Request) => {
     const BATCH = 100;
     for (let i = 0; i < alertUpdates.length; i += BATCH) {
       const batch = alertUpdates.slice(i, i + BATCH);
-      // Build a case-when update via RPC isn't needed; we update row by row
-      // but use Promise.all to parallelise within each batch.
       await Promise.all(
         batch.map(({ id, cluster_id, is_primary }) =>
           supabase
@@ -274,6 +272,21 @@ Deno.serve(async (req: Request) => {
             .update({ cluster_id, is_primary })
             .eq('id', id)
         )
+      );
+    }
+
+    // ── Trigger fusion for all affected clusters (fire-and-forget) ────────────
+    if (clusterUpserts.length) {
+      const fuseUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/fuse-alerts`;
+      EdgeRuntime.waitUntil(
+        fetch(fuseUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify({ cluster_ids: clusterUpserts.map(c => c.id) }),
+        }).catch(() => { /* fusion failure must not break clustering */ })
       );
     }
 

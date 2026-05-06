@@ -183,6 +183,35 @@ export interface AlertCluster {
   updated_at: string;
 }
 
+export interface FusedAlert {
+  id: string;
+  cluster_id: string;
+  event_type: string;
+  combined_severity: 'low' | 'moderate' | 'high';
+  confidence: 'low' | 'medium' | 'high' | 'confirmed';
+  confidence_score: number;
+  source_count: number;
+  sources: string[];
+  location_name: string;
+  country: string;
+  state: string;
+  district: string;
+  centroid_lat: number | null;
+  centroid_lon: number | null;
+  population_impact: number | null;
+  effective_time: string;
+  expiry_time: string | null;
+  enriched_description: string;
+  member_alert_ids: string[];
+  primary_alert_id: string | null;
+  priority_score: number;
+  lifecycle_state: 'active' | 'updated' | 'expired';
+  version: number;
+  fused_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface UAETwitter {
   id: string;
   tweet_id: string;
@@ -530,6 +559,56 @@ export class IntelligenceAPI {
         callback(payload.new as UnifiedAlert);
       })
       .subscribe();
+  }
+
+  static async getFusedAlerts(options: {
+    lifecycleStates?: ('active' | 'updated' | 'expired')[];
+    minConfidenceScore?: number;
+    limit?: number;
+  } = {}): Promise<FusedAlert[]> {
+    let query = supabase
+      .from('fused_alerts')
+      .select('*')
+      .order('priority_score', { ascending: false })
+      .order('fused_at', { ascending: false })
+      .limit(options.limit ?? 100);
+
+    const states = options.lifecycleStates ?? ['active', 'updated'];
+    query = query.in('lifecycle_state', states);
+    if (options.minConfidenceScore != null)
+      query = query.gte('confidence_score', options.minConfidenceScore);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  }
+
+  static subscribeToFusedAlerts(callback: (alert: FusedAlert) => void) {
+    return supabase
+      .channel('fused-alerts-channel')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'fused_alerts',
+      }, (payload) => callback(payload.new as FusedAlert))
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'fused_alerts',
+      }, (payload) => callback(payload.new as FusedAlert))
+      .subscribe();
+  }
+
+  static async triggerFusion(clusterIds?: string[]): Promise<void> {
+    const body = clusterIds ? JSON.stringify({ cluster_ids: clusterIds }) : undefined;
+    await fetch(`${this.functionsUrl}/fuse-alerts`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body,
+    });
   }
 
   static async getLastSyncTime(): Promise<string | null> {

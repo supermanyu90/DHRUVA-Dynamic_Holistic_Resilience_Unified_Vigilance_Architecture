@@ -1,6 +1,7 @@
 import { Activity, AlertTriangle, FileText, Zap, Waves, Flame, Wind, Droplets, Globe, Ship, Radio } from 'lucide-react';
 import type { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
 import { AlertPriorityList } from './AlertPriorityList';
+import { FusedAlertsView } from './FusedAlertsView';
 
 interface RightPanelProps {
   earthquakes: Earthquake[];
@@ -136,6 +137,26 @@ export function RightPanel({ earthquakes, disasters, news, vessels, volcanoes, g
         borderBottom: '1px solid var(--border)',
         flexShrink: 0,
       }}>INTEL SUMMARY</div>
+
+      {/* ── Fused Intelligence Feed ── */}
+      <div style={{
+        fontFamily: "'Bebas Neue', sans-serif",
+        fontSize: '10px',
+        letterSpacing: '3px',
+        color: '#4D9FFF',
+        padding: '8px 10px 6px',
+        borderBottom: '1px solid rgba(77,159,255,0.18)',
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+      }}>
+        <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#4D9FFF', animation: 'statusPulse 2s ease-in-out infinite' }} />
+        FUSED INTELLIGENCE
+      </div>
+      <div style={{ borderBottom: '1px solid var(--border)' }}>
+        <FusedAlertsView />
+      </div>
 
       <div style={{ padding: '8px 8px', display: 'flex', flexDirection: 'column', gap: '7px', flex: 1 }}>
 
