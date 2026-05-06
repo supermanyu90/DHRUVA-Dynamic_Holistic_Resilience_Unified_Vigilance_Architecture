@@ -303,16 +303,15 @@ Deno.serve(async (req: Request) => {
       results.SACHET = { ingested: sachetAlerts.length, errors: errs };
     }
 
-    // Trigger clustering in the background after ingestion
-    const clusterUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/cluster-alerts`;
+    const baseUrl = Deno.env.get('SUPABASE_URL');
+    const svcKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const bgHeaders = { 'Authorization': `Bearer ${svcKey}`, 'Content-Type': 'application/json' };
+
+    // Normalise locations first, then cluster — both run in background
     EdgeRuntime.waitUntil(
-      fetch(clusterUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-          'Content-Type': 'application/json',
-        },
-      }).catch(() => { /* clustering failure must not break ingestion response */ })
+      fetch(`${baseUrl}/functions/v1/normalize-location`, { method: 'POST', headers: bgHeaders })
+        .then(() => fetch(`${baseUrl}/functions/v1/cluster-alerts`, { method: 'POST', headers: bgHeaders }))
+        .catch(() => { /* background failures must not affect response */ })
     );
 
     return new Response(JSON.stringify({ ok: true, results }), {
