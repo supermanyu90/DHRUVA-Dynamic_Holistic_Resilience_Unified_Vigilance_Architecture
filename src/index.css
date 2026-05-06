@@ -4799,6 +4799,70 @@ header,
   animation: statusPulse 1s ease-in-out infinite;
 }
 
+.apr-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.apr-filter-row {
+  display: flex;
+  gap: 1px;
+  padding: 5px 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  flex-shrink: 0;
+}
+
+.apr-filter-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: rgba(139,175,200,0.4);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.apr-filter-tab:hover { color: var(--dim); border-color: rgba(255,255,255,0.08); }
+.apr-filter-tab.active {
+  color: var(--accent);
+  border-color: rgba(0,212,160,0.3);
+  background: rgba(0,212,160,0.06);
+}
+
+.apr-filter-count {
+  background: rgba(255,255,255,0.08);
+  color: var(--dim);
+  font-size: 8px;
+  padding: 0 4px;
+  border-radius: 8px;
+  font-family: 'Share Tech Mono', monospace;
+  min-width: 14px;
+  text-align: center;
+}
+.apr-filter-tab.active .apr-filter-count {
+  background: rgba(0,212,160,0.12);
+  color: var(--accent);
+}
+
+.apr-lifecycle-pill {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 7.5px;
+  letter-spacing: 0.5px;
+  border: 1px solid;
+  border-radius: 2px;
+  padding: 0 4px;
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+
 .apr-empty {
   display: flex;
   align-items: center;

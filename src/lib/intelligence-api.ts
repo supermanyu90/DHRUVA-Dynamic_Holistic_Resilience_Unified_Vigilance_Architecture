@@ -145,6 +145,7 @@ export interface UnifiedAlert {
   cluster_id: string | null;
   is_primary: boolean;
   priority_score: number;
+  lifecycle_state: 'active' | 'updated' | 'expired';
   created_at: string;
   updated_at: string;
 }
@@ -433,19 +434,23 @@ export class IntelligenceAPI {
   static async getUnifiedAlerts(options: {
     sources?: ('GDACS' | 'SACHET')[];
     severity?: ('low' | 'moderate' | 'high')[];
+    lifecycleStates?: ('active' | 'updated' | 'expired')[];
     minPriority?: number;
     limit?: number;
   } = {}): Promise<UnifiedAlert[]> {
     let query = supabase
       .from('unified_alerts')
       .select('*')
-      // Primary sort: priority_score desc; secondary: recency
       .order('priority_score', { ascending: false })
       .order('effective_time', { ascending: false })
       .limit(options.limit ?? 200);
 
-    if (options.sources?.length)   query = query.in('source', options.sources);
-    if (options.severity?.length)  query = query.in('severity', options.severity);
+    // Default: only active and updated (exclude expired unless caller opts in)
+    const states = options.lifecycleStates ?? ['active', 'updated'];
+    query = query.in('lifecycle_state', states);
+
+    if (options.sources?.length)     query = query.in('source', options.sources);
+    if (options.severity?.length)    query = query.in('severity', options.severity);
     if (options.minPriority != null) query = query.gte('priority_score', options.minPriority);
 
     const { data, error } = await query;
@@ -457,6 +462,7 @@ export class IntelligenceAPI {
   static async getPrimaryAlerts(options: {
     sources?: ('GDACS' | 'SACHET')[];
     severity?: ('low' | 'moderate' | 'high')[];
+    lifecycleStates?: ('active' | 'updated' | 'expired')[];
     minPriority?: number;
     limit?: number;
   } = {}): Promise<UnifiedAlert[]> {
@@ -468,11 +474,25 @@ export class IntelligenceAPI {
       .order('effective_time', { ascending: false })
       .limit(options.limit ?? 200);
 
-    if (options.sources?.length)   query = query.in('source', options.sources);
-    if (options.severity?.length)  query = query.in('severity', options.severity);
+    const states = options.lifecycleStates ?? ['active', 'updated'];
+    query = query.in('lifecycle_state', states);
+
+    if (options.sources?.length)     query = query.in('source', options.sources);
+    if (options.severity?.length)    query = query.in('severity', options.severity);
     if (options.minPriority != null) query = query.gte('priority_score', options.minPriority);
 
     const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  }
+
+  /** Fetch the full change history for a single alert_id, newest first. */
+  static async getAlertHistory(alertId: string): Promise<Record<string, unknown>[]> {
+    const { data, error } = await supabase
+      .from('alert_history')
+      .select('*')
+      .eq('alert_id', alertId)
+      .order('changed_at', { ascending: false });
     if (error) throw error;
     return data || [];
   }

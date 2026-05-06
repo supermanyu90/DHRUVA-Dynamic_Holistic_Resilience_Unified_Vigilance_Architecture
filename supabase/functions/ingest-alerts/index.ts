@@ -372,13 +372,47 @@ async function pollSource(
   let writeError: string | null = null;
 
   if (alerts.length) {
-    const { error } = await supabase
-      .from('unified_alerts')
-      .upsert(alerts, { onConflict: 'alert_id', ignoreDuplicates: false });
-    if (error) {
-      writeError = error.message;
-    } else {
-      alertsWritten = alerts.length;
+    // Use the lifecycle-aware DB function instead of a plain upsert.
+    // Process in batches of 10 to avoid overwhelming the DB connection pool.
+    const BATCH = 10;
+    for (let i = 0; i < alerts.length && writeError === null; i += BATCH) {
+      const batch = alerts.slice(i, i + BATCH);
+      const results = await Promise.allSettled(
+        batch.map(a =>
+          supabase.rpc('upsert_alert_with_lifecycle', {
+            p_alert_id:          a.alert_id,
+            p_source:            a.source,
+            p_event_type:        a.event_type,
+            p_severity:          a.severity,
+            p_urgency:           a.urgency,
+            p_certainty:         a.certainty,
+            p_alert_level:       a.alert_level ?? null,
+            p_location_name:     a.location_name,
+            p_country:           a.country,
+            p_state:             a.state,
+            p_district:          a.district,
+            p_latitude:          a.latitude ?? null,
+            p_longitude:         a.longitude ?? null,
+            p_geometry:          a.geometry ?? null,
+            p_population_impact: a.population_impact ?? null,
+            p_effective_time:    a.effective_time,
+            p_expiry_time:       a.expiry_time ?? null,
+            p_description:       a.description,
+            p_raw_payload:       a.raw_payload,
+          })
+        )
+      );
+      for (const r of results) {
+        if (r.status === 'rejected') {
+          writeError = r.reason?.message ?? 'Unknown error';
+          break;
+        }
+        if (r.status === 'fulfilled' && r.value.error) {
+          writeError = r.value.error.message;
+          break;
+        }
+      }
+      if (writeError === null) alertsWritten += batch.length;
     }
   }
 

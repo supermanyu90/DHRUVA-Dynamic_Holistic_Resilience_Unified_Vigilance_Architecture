@@ -147,11 +147,13 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    // Load all alerts from the last 7 days (older events won't cluster with new ones)
+    // Load active/updated alerts from the last 7 days.
+    // Expired alerts are excluded — they should not form or join new clusters.
     const since = new Date(Date.now() - 7 * 24 * 3_600_000).toISOString();
     const { data: alerts, error: fetchErr } = await supabase
       .from('unified_alerts')
       .select('id, alert_id, source, event_type, severity, country, latitude, longitude, effective_time, expiry_time, cluster_id, is_primary')
+      .in('lifecycle_state', ['active', 'updated'])
       .gte('effective_time', since)
       .order('effective_time', { ascending: true });
 
