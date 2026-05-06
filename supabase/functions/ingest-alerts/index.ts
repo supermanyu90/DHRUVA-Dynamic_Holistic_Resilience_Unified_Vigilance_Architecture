@@ -303,6 +303,18 @@ Deno.serve(async (req: Request) => {
       results.SACHET = { ingested: sachetAlerts.length, errors: errs };
     }
 
+    // Trigger clustering in the background after ingestion
+    const clusterUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/cluster-alerts`;
+    EdgeRuntime.waitUntil(
+      fetch(clusterUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+      }).catch(() => { /* clustering failure must not break ingestion response */ })
+    );
+
     return new Response(JSON.stringify({ ok: true, results }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

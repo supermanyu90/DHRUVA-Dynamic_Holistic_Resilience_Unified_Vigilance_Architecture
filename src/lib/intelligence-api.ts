@@ -142,6 +142,22 @@ export interface UnifiedAlert {
   expiry_time: string | null;
   description: string;
   raw_payload: Record<string, unknown>;
+  cluster_id: string | null;
+  is_primary: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AlertCluster {
+  id: string;
+  event_type: string;
+  primary_source: string;
+  member_count: number;
+  centroid_lat: number | null;
+  centroid_lon: number | null;
+  first_seen: string;
+  last_seen: string;
+  notified_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -409,6 +425,49 @@ export class IntelligenceAPI {
     if (options.severity?.length) query = query.in('severity', options.severity);
 
     const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  }
+
+  /** Returns only the primary alert per cluster — safe for notification deduplication. */
+  static async getPrimaryAlerts(options: {
+    sources?: ('GDACS' | 'SACHET')[];
+    severity?: ('low' | 'moderate' | 'high')[];
+    limit?: number;
+  } = {}): Promise<UnifiedAlert[]> {
+    let query = supabase
+      .from('unified_alerts')
+      .select('*')
+      .eq('is_primary', true)
+      .order('effective_time', { ascending: false })
+      .limit(options.limit ?? 200);
+
+    if (options.sources?.length) query = query.in('source', options.sources);
+    if (options.severity?.length) query = query.in('severity', options.severity);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  }
+
+  static async getAlertClusters(limit = 100): Promise<AlertCluster[]> {
+    const { data, error } = await supabase
+      .from('alert_clusters')
+      .select('*')
+      .order('first_seen', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  static async getClusterMembers(clusterId: string): Promise<UnifiedAlert[]> {
+    const { data, error } = await supabase
+      .from('unified_alerts')
+      .select('*')
+      .eq('cluster_id', clusterId)
+      .order('effective_time', { ascending: false });
+
     if (error) throw error;
     return data || [];
   }
