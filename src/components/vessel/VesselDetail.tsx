@@ -146,17 +146,17 @@ export function VesselDetail({ vessel, onClose }: VesselDetailProps) {
       {/* Source badge */}
       <div style={{
         marginTop: 12, padding: '5px 8px',
-        background: isLive ? 'rgba(0,212,160,0.05)' : 'rgba(0,191,255,0.04)',
-        border: `1px solid ${isLive ? 'rgba(0,212,160,0.15)' : 'rgba(0,191,255,0.1)'}`,
+        background: isLive ? 'rgba(0,212,160,0.05)' : 'rgba(255,184,0,0.04)',
+        border: `1px solid ${isLive ? 'rgba(0,212,160,0.15)' : 'rgba(255,184,0,0.12)'}`,
         borderRadius: 2,
       }}>
-        <div style={{ fontSize: 7, color: isLive ? 'rgba(0,212,160,0.5)' : 'rgba(0,191,255,0.4)', marginBottom: 2, letterSpacing: 1 }}>
+        <div style={{ fontSize: 7, color: isLive ? 'rgba(0,212,160,0.5)' : 'rgba(255,184,0,0.5)', marginBottom: 2, letterSpacing: 1 }}>
           DATA SOURCE
         </div>
         <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>
           {isLive
             ? 'Live AIS position via VesselFinder API with master data.'
-            : 'Simulated position data. Add VESSEL_API_KEY for live VesselFinder AIS.'}
+            : 'Simulated AIS position. Press SYNC AIS to fetch live data.'}
         </div>
       </div>
     </div>
