@@ -52,7 +52,7 @@ export function VesselDetail({ vessel, onClose }: VesselDetailProps) {
   const speedStatus = vessel.speed > 15 ? 'HIGH SPEED' : vessel.speed > 0.5 ? 'UNDERWAY' : 'MOORED';
   const speedColor = vessel.speed > 15 ? '#FF4500' : vessel.speed > 0.5 ? '#00D4A0' : '#FFB800';
   const props = vessel.properties || {};
-  const isLive = typeof props.source === 'string' && props.source.startsWith('vesselapi');
+  const isLive = typeof props.source === 'string' && (props.source.startsWith('aishub') || props.source.startsWith('vesselapi'));
 
   const compassDir = (deg: number) => {
     const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
@@ -155,7 +155,7 @@ export function VesselDetail({ vessel, onClose }: VesselDetailProps) {
         </div>
         <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>
           {isLive
-            ? 'Live AIS position via VesselFinder API with master data.'
+            ? 'Live AIS position via AISHub network.'
             : 'Simulated AIS position. Press SYNC AIS to fetch live data.'}
         </div>
       </div>

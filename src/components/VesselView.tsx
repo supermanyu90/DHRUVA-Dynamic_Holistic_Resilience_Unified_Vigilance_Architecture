@@ -34,7 +34,7 @@ export function VesselView() {
     try {
       const data = await IntelligenceAPI.getVessels(100);
       // Detect whether any vessel came from a live AIS source
-      const hasLive = data.some(v => typeof (v.properties as any)?.source === 'string' && (v.properties as any).source.startsWith('vesselapi'));
+      const hasLive = data.some(v => { const s = (v.properties as any)?.source; return typeof s === 'string' && (s.startsWith('aishub') || s.startsWith('vesselapi')); });
       setDataSource(hasLive ? 'live' : 'seed');
       setVessels(data);
       setLastUpdated(new Date());
@@ -54,7 +54,7 @@ export function VesselView() {
           headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
         });
         const json = await res.json().catch(() => ({}));
-        if (json.source && String(json.source).startsWith('vesselapi')) setDataSource('live');
+        if (json.source && (String(json.source).startsWith('aishub') || String(json.source).startsWith('vesselapi'))) setDataSource('live');
       } catch { /* silent */ }
       loadVessels();
     };
@@ -73,7 +73,7 @@ export function VesselView() {
         headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
       });
       const json = await res.json().catch(() => ({}));
-      if (json.source && String(json.source).startsWith('vesselapi')) setDataSource('live');
+      if (json.source && (String(json.source).startsWith('aishub') || String(json.source).startsWith('vesselapi'))) setDataSource('live');
       setTimeout(loadVessels, 1500);
     } catch (e) {
       console.error(e);
