@@ -7,77 +7,135 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const AIS_SHIP_TYPES: Record<number, string> = {
-  20: "Wing in Ground", 21: "Wing in Ground", 22: "Wing in Ground",
-  30: "Fishing", 31: "Towing", 32: "Towing", 33: "Dredger",
-  34: "Diving", 35: "Military", 36: "Sailing", 37: "Pleasure",
-  40: "High-Speed", 41: "High-Speed", 42: "High-Speed", 43: "High-Speed", 44: "High-Speed", 45: "High-Speed",
-  50: "Pilot", 51: "Search and Rescue", 52: "Tug", 53: "Port Tender", 54: "Anti-pollution",
-  55: "Law Enforcement", 58: "Medical Transport", 59: "Noncombatant",
-  60: "Passenger", 61: "Passenger", 62: "Passenger", 63: "Passenger", 64: "Passenger",
-  65: "Passenger", 66: "Passenger", 67: "Passenger", 68: "Passenger", 69: "Passenger",
-  70: "Cargo", 71: "Cargo", 72: "Cargo", 73: "Cargo", 74: "Cargo",
-  75: "Cargo", 76: "Cargo", 77: "Cargo", 78: "Cargo", 79: "Cargo",
-  80: "Tanker", 81: "Tanker", 82: "Tanker", 83: "Tanker", 84: "Tanker",
-  85: "Tanker", 86: "Tanker", 87: "Tanker", 88: "Tanker", 89: "Tanker",
-  90: "Other", 91: "Other", 92: "Other", 93: "Other", 94: "Other",
-  95: "Other", 96: "Other", 97: "Other", 98: "Other", 99: "Other",
-};
+interface VesselAPIPosition {
+  mmsi: number;
+  imo?: number;
+  vessel_name: string;
+  latitude: number;
+  longitude: number;
+  cog?: number;
+  sog?: number;
+  heading?: number;
+  nav_status?: number;
+  timestamp: string;
+  suspected_glitch?: boolean;
+}
 
-async function lookupVesselFinder(
-  apiKey: string,
-  mmsi?: string,
-  imoList?: string
-): Promise<any[]> {
-  const url = new URL("https://api.vesselfinder.com/vessels");
-  url.searchParams.set("userkey", apiKey);
-  url.searchParams.set("extradata", "master");
-  url.searchParams.set("format", "json");
+interface VesselAPIStatic {
+  mmsi: number;
+  imo?: number;
+  name: string;
+  vessel_type?: string;
+  country?: string;
+  length?: number;
+  breadth?: number;
+  draft?: number;
+  gross_tonnage?: number;
+  deadweight_tonnage?: number;
+  year_built?: number;
+  call_sign?: string;
+  owner_name?: string;
+}
 
-  if (mmsi) url.searchParams.set("mmsi", mmsi);
-  else if (imoList) url.searchParams.set("imo", imoList);
-  else return [];
+async function livePositionByMMSI(apiKey: string, mmsi: string): Promise<any | null> {
+  try {
+    const res = await fetch(
+      `https://api.vesselapi.com/v1/vessel/${mmsi}/position?filter.idType=mmsi`,
+      { headers: { Authorization: `Bearer ${apiKey}` } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const pos: VesselAPIPosition = data.position || data;
+    if (!pos?.mmsi) return null;
 
-  const res = await fetch(url.toString());
-  if (!res.ok) return [];
+    // Also fetch static data for type/flag enrichment
+    let stat: VesselAPIStatic | null = null;
+    try {
+      const sr = await fetch(
+        `https://api.vesselapi.com/v1/vessel/${mmsi}?filter.idType=mmsi`,
+        { headers: { Authorization: `Bearer ${apiKey}` } }
+      );
+      if (sr.ok) {
+        const sd = await sr.json();
+        stat = sd.vessel || null;
+      }
+    } catch { /* enrichment is optional */ }
 
-  const records = await res.json();
-  if (!Array.isArray(records)) return [];
-
-  return records.map((record: any) => {
-    const ais = record.AIS || {};
-    const master = record.MASTERDATA || {};
     return {
-      mmsi: String(ais.MMSI || ""),
-      name: ais.NAME?.trim() || `VESSEL-${ais.MMSI}`,
-      type: AIS_SHIP_TYPES[ais.TYPE ?? 0] || master.TYPE_NAME || "Unknown",
-      latitude: ais.LATITUDE,
-      longitude: ais.LONGITUDE,
-      speed: ais.SPEED ?? 0,
-      course: ais.COURSE ?? 0,
-      heading: ais.HEADING ?? ais.COURSE ?? 0,
-      destination: ais.DESTINATION?.trim() || "",
-      flag: master.FLAG || "",
-      last_position_time: ais.TIMESTAMP
-        ? new Date(ais.TIMESTAMP).toISOString()
+      mmsi: String(pos.mmsi),
+      name: (stat?.name || pos.vessel_name)?.trim() || `VESSEL-${pos.mmsi}`,
+      type: stat?.vessel_type || "Unknown",
+      latitude: pos.latitude,
+      longitude: pos.longitude,
+      speed: pos.sog ?? 0,
+      course: pos.cog ?? 0,
+      heading: pos.heading ?? pos.cog ?? 0,
+      destination: "",
+      flag: stat?.country || "",
+      last_position_time: pos.timestamp
+        ? new Date(pos.timestamp).toISOString()
         : new Date().toISOString(),
       properties: {
-        source: "vesselfinder",
-        imo: ais.IMO,
-        callsign: ais.CALLSIGN,
-        navstat: ais.NAVSTAT,
-        draught: ais.DRAUGHT,
-        locode: ais.LOCODE,
-        eta: ais.ETA_AIS,
-        zone: ais.ZONE,
-        length: master.LENGTH,
-        beam: master.BEAM,
-        gt: master.GT,
-        dwt: master.DWT,
-        year_built: master.YEAR_BUILT,
+        source: "vesselapi-live",
+        imo: pos.imo ?? stat?.imo,
+        callsign: stat?.call_sign,
+        nav_status: pos.nav_status,
+        suspected_glitch: pos.suspected_glitch,
+        length: stat?.length,
+        beam: stat?.breadth,
+        draft: stat?.draft,
+        gt: stat?.gross_tonnage,
+        dwt: stat?.deadweight_tonnage,
+        year_built: stat?.year_built,
+        owner: stat?.owner_name,
       },
     };
-  });
+  } catch {
+    return null;
+  }
+}
+
+async function searchByName(apiKey: string, name: string, limit: number): Promise<any[]> {
+  try {
+    const params = new URLSearchParams({
+      "filter.name": name,
+      "pagination.limit": String(Math.min(limit, 50)),
+    });
+    const res = await fetch(
+      `https://api.vesselapi.com/v1/search/vessels?${params}`,
+      { headers: { Authorization: `Bearer ${apiKey}` } }
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    const vessels: VesselAPIStatic[] = data.vessels || [];
+    return vessels.map(v => ({
+      mmsi: String(v.mmsi),
+      name: v.name?.trim() || `VESSEL-${v.mmsi}`,
+      type: v.vessel_type || "Unknown",
+      latitude: null,
+      longitude: null,
+      speed: 0,
+      course: 0,
+      heading: 0,
+      destination: "",
+      flag: v.country || "",
+      last_position_time: null,
+      properties: {
+        source: "vesselapi-search",
+        imo: v.imo,
+        callsign: v.call_sign,
+        length: v.length,
+        beam: v.breadth,
+        draft: v.draft,
+        gt: v.gross_tonnage,
+        dwt: v.deadweight_tonnage,
+        year_built: v.year_built,
+        owner: v.owner_name,
+      },
+    }));
+  } catch {
+    return [];
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -88,9 +146,9 @@ Deno.serve(async (req: Request) => {
   try {
     const url = new URL(req.url);
     const query = url.searchParams.get("q") || "";
-    const mmsi = url.searchParams.get("mmsi") || "";
-    const type = url.searchParams.get("type") || "";
-    const flag = url.searchParams.get("flag") || "";
+    const mmsi  = url.searchParams.get("mmsi") || "";
+    const type  = url.searchParams.get("type") || "";
+    const flag  = url.searchParams.get("flag") || "";
     const limit = Math.min(parseInt(url.searchParams.get("limit") || "50"), 200);
 
     const supabase = createClient(
@@ -98,53 +156,54 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const vesselApiKey = Deno.env.get("VESSEL_API_KEY") || "";
+    const apiKey = Deno.env.get("VESSEL_API_KEY") || "";
 
-    // If MMSI lookup and API key present, try VesselFinder first for live data
-    if (mmsi && vesselApiKey) {
-      const liveResults = await lookupVesselFinder(vesselApiKey, mmsi);
-      if (liveResults.length > 0) {
-        // Upsert live result into DB for caching
-        for (const v of liveResults) {
-          if (v.mmsi) {
-            await supabase.from("vessels").upsert(
-              { ...v, updated_at: new Date().toISOString() },
-              { onConflict: "mmsi" }
-            );
-          }
-        }
+    // Live MMSI lookup via VesselAPI
+    if (mmsi && apiKey) {
+      const live = await livePositionByMMSI(apiKey, mmsi);
+      if (live) {
+        await supabase
+          .from("vessels")
+          .upsert({ ...live, updated_at: new Date().toISOString() }, { onConflict: "mmsi" });
         return new Response(
-          JSON.stringify({ success: true, count: liveResults.length, vessels: liveResults, source: "vesselfinder-live" }),
+          JSON.stringify({ success: true, count: 1, vessels: [live], source: "vesselapi-live" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
     }
 
-    // DB query
-    let queryBuilder = supabase
+    // Live name search via VesselAPI
+    if (query && apiKey) {
+      const liveResults = await searchByName(apiKey, query, limit);
+      if (liveResults.length > 0) {
+        return new Response(
+          JSON.stringify({ success: true, count: liveResults.length, vessels: liveResults, source: "vesselapi-search" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Fall back to DB query
+    let qb = supabase
       .from("vessels")
       .select("*")
       .order("last_position_time", { ascending: false })
       .limit(limit);
 
     if (mmsi) {
-      queryBuilder = queryBuilder.eq("mmsi", mmsi);
+      qb = qb.eq("mmsi", mmsi);
     } else if (query) {
-      queryBuilder = queryBuilder.or(
-        `name.ilike.%${query}%,destination.ilike.%${query}%,mmsi.ilike.%${query}%`
-      );
+      qb = qb.or(`name.ilike.%${query}%,destination.ilike.%${query}%,mmsi.ilike.%${query}%`);
     }
 
-    if (type) queryBuilder = queryBuilder.ilike("type", `%${type}%`);
-    if (flag) queryBuilder = queryBuilder.ilike("flag", flag);
+    if (type) qb = qb.ilike("type", `%${type}%`);
+    if (flag) qb = qb.ilike("flag", flag);
 
-    const { data, error } = await queryBuilder;
+    const { data, error } = await qb;
     if (error) throw error;
 
-    const source = vesselApiKey ? "vesselfinder-db" : "db-seed";
-
     return new Response(
-      JSON.stringify({ success: true, count: data?.length || 0, vessels: data || [], source }),
+      JSON.stringify({ success: true, count: data?.length || 0, vessels: data || [], source: apiKey ? "vesselapi-db" : "db-seed" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
