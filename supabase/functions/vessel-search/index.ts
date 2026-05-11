@@ -37,80 +37,92 @@ function mmsiToFlag(mmsi: string): string {
   return map[mid] || "";
 }
 
-interface AISHubRecord {
-  MMSI: number;
-  TIME: string;
-  LONGITUDE: number;
-  LATITUDE: number;
-  COG: number;
-  SOG: number;
-  HEADING: number;
-  NAVSTAT: number;
-  IMO: number;
-  NAME: string;
-  CALLSIGN: string;
-  TYPE: number;
-  A: number;
-  B: number;
-  C: number;
-  D: number;
-  DRAUGHT: number;
-  DEST: string;
-  ETA: string;
-}
+// Stream AISStream for a single MMSI for up to durationMs, return first match
+function streamForMMSI(apiKey: string, mmsi: string, durationMs: number): Promise<any | null> {
+  return new Promise((resolve) => {
+    let ws: WebSocket;
+    let settled = false;
 
-function mapRecord(v: AISHubRecord) {
-  const mmsiStr = String(v.MMSI);
-  const length = (v.A || 0) + (v.B || 0);
-  const beam = (v.C || 0) + (v.D || 0);
-  return {
-    mmsi: mmsiStr,
-    name: (v.NAME || "").trim() || `VESSEL-${v.MMSI}`,
-    type: aisTypeToString(v.TYPE || 0),
-    latitude: v.LATITUDE,
-    longitude: v.LONGITUDE,
-    speed: v.SOG === 102.4 ? 0 : (v.SOG ?? 0),
-    course: v.COG === 360 ? 0 : (v.COG ?? 0),
-    heading: v.HEADING === 511 ? (v.COG === 360 ? 0 : (v.COG ?? 0)) : (v.HEADING ?? 0),
-    destination: (v.DEST || "").trim(),
-    flag: mmsiToFlag(mmsiStr),
-    last_position_time: v.TIME
-      ? new Date(v.TIME.replace(" GMT", "Z")).toISOString()
-      : new Date().toISOString(),
-    properties: {
-      source: "aishub",
-      imo: v.IMO && v.IMO > 0 ? v.IMO : undefined,
-      callsign: (v.CALLSIGN || "").trim() || undefined,
-      nav_status: v.NAVSTAT,
-      draught: v.DRAUGHT ? v.DRAUGHT : undefined,
-      length: length > 0 ? length : undefined,
-      beam: beam > 0 ? beam : undefined,
-      eta: (v.ETA || "").trim() || undefined,
-      type_code: v.TYPE,
-    },
-    updated_at: new Date().toISOString(),
-  };
-}
+    const finish = (result: any | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { ws?.close(); } catch { /* ignore */ }
+      resolve(result);
+    };
 
-async function fetchByMMSI(username: string, mmsi: string): Promise<AISHubRecord | null> {
-  try {
-    const params = new URLSearchParams({
-      username,
-      format: "1",
-      output: "json",
-      compress: "0",
-      mmsi,
-    });
-    const res = await fetch(`https://data.aishub.net/ws.php?${params}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!Array.isArray(data) || data.length < 2) return null;
-    if (data[0].ERROR) return null;
-    const records: AISHubRecord[] = data[1];
-    return Array.isArray(records) && records.length > 0 ? records[0] : null;
-  } catch {
-    return null;
-  }
+    const timer = setTimeout(() => finish(null), durationMs);
+
+    try {
+      ws = new WebSocket("wss://stream.aisstream.io/v0/stream");
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({
+          APIKey: apiKey,
+          BoundingBoxes: [[[-90, -180], [90, 180]]],
+          FiltersShipMMSI: [mmsi],
+          FilterMessageTypes: ["PositionReport", "ShipStaticData", "StandardClassBPositionReport", "ExtendedClassBPositionReport"],
+        }));
+      };
+
+      const accum: Record<string, any> = { mmsi };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.error) { finish(null); return; }
+
+          const meta = msg.MetaData || {};
+          if (String(meta.MMSI || "") !== mmsi) return;
+
+          if (meta.ShipName) accum.name = (meta.ShipName as string).trim();
+          accum.time_utc = meta.time_utc || accum.time_utc;
+
+          if (msg.MessageType === "PositionReport") {
+            const p = msg.Message?.PositionReport || {};
+            accum.latitude = p.Latitude ?? meta.latitude;
+            accum.longitude = p.Longitude ?? meta.longitude;
+            accum.sog = p.Sog;
+            accum.cog = p.Cog;
+            accum.heading = p.TrueHeading !== 511 ? p.TrueHeading : p.Cog;
+            accum.nav_status = p.NavigationalStatus;
+            accum.hasPosition = true;
+          } else if (msg.MessageType === "ShipStaticData") {
+            const s = msg.Message?.ShipStaticData || {};
+            if (s.Name) accum.name = s.Name.trim();
+            accum.type = s.Type;
+            accum.callsign = s.CallSign?.trim();
+            accum.imo = s.ImoNumber;
+            accum.destination = s.Destination?.trim();
+            accum.draught = s.MaximumStaticDraught;
+            if (s.Dimension) {
+              accum.length = (s.Dimension.A || 0) + (s.Dimension.B || 0);
+              accum.beam   = (s.Dimension.C || 0) + (s.Dimension.D || 0);
+            }
+          } else if (msg.MessageType === "StandardClassBPositionReport" || msg.MessageType === "ExtendedClassBPositionReport") {
+            const p = msg.Message?.[msg.MessageType] || {};
+            accum.latitude = p.Latitude ?? meta.latitude;
+            accum.longitude = p.Longitude ?? meta.longitude;
+            accum.sog = p.Sog;
+            accum.cog = p.Cog;
+            accum.heading = p.TrueHeading !== 511 ? p.TrueHeading : p.Cog;
+            if (p.Name) accum.name = p.Name.trim();
+            if (p.Type) accum.type = p.Type;
+            accum.hasPosition = true;
+          }
+
+          // Once we have a position, that's enough to return
+          if (accum.hasPosition) finish(accum);
+        } catch { /* ignore */ }
+      };
+
+      ws.onerror = () => finish(null);
+      ws.onclose = () => finish(settled ? null : accum.hasPosition ? accum : null);
+    } catch {
+      clearTimeout(timer);
+      resolve(null);
+    }
+  });
 }
 
 Deno.serve(async (req: Request) => {
@@ -131,24 +143,47 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const username = Deno.env.get("VESSEL_API_KEY") || "";
+    const apiKey = Deno.env.get("AISSTREAM_API_KEY") || Deno.env.get("VESSEL_API_KEY") || "";
 
-    // Live MMSI lookup via AISHub
-    if (mmsi && username) {
-      const raw = await fetchByMMSI(username, mmsi);
-      if (raw) {
-        const vessel = mapRecord(raw);
-        await supabase
-          .from("vessels")
-          .upsert({ ...vessel }, { onConflict: "mmsi" });
+    // Live MMSI lookup via AISStream (10s window)
+    if (mmsi && apiKey) {
+      const raw = await streamForMMSI(apiKey, mmsi, 10_000);
+      if (raw?.hasPosition) {
+        const vessel = {
+          mmsi: String(raw.mmsi),
+          name: raw.name || `VESSEL-${raw.mmsi}`,
+          type: aisTypeToString(raw.type || 0),
+          latitude: raw.latitude,
+          longitude: raw.longitude,
+          speed: raw.sog ?? 0,
+          course: raw.cog ?? 0,
+          heading: raw.heading ?? raw.cog ?? 0,
+          destination: raw.destination || "",
+          flag: mmsiToFlag(String(raw.mmsi)),
+          last_position_time: raw.time_utc
+            ? new Date(raw.time_utc).toISOString()
+            : new Date().toISOString(),
+          properties: {
+            source: "aisstream",
+            imo: raw.imo || undefined,
+            callsign: raw.callsign || undefined,
+            nav_status: raw.nav_status,
+            draught: raw.draught || undefined,
+            length: raw.length && raw.length > 0 ? raw.length : undefined,
+            beam: raw.beam && raw.beam > 0 ? raw.beam : undefined,
+            type_code: raw.type || undefined,
+          },
+          updated_at: new Date().toISOString(),
+        };
+        await supabase.from("vessels").upsert(vessel, { onConflict: "mmsi" });
         return new Response(
-          JSON.stringify({ success: true, count: 1, vessels: [vessel], source: "aishub" }),
+          JSON.stringify({ success: true, count: 1, vessels: [vessel], source: "aisstream" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
     }
 
-    // Fall back to DB query (name search, type/flag filters)
+    // Fall back to DB query
     let qb = supabase
       .from("vessels")
       .select("*")
@@ -172,7 +207,7 @@ Deno.serve(async (req: Request) => {
         success: true,
         count: data?.length || 0,
         vessels: data || [],
-        source: username ? "aishub-db" : "db-seed",
+        source: apiKey ? "aisstream-db" : "db-seed",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

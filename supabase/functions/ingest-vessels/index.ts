@@ -7,8 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-// AIS TYPE codes → readable vessel type
-// https://www.navcen.uscg.gov/?pageName=AISMessagesA
+// AIS TYPE → readable label
 function aisTypeToString(type: number): string {
   if (type >= 80 && type <= 89) return "Tanker";
   if (type >= 70 && type <= 79) return "Cargo";
@@ -18,11 +17,10 @@ function aisTypeToString(type: number): string {
   if (type === 35) return "Military";
   if (type >= 40 && type <= 49) return "High Speed Craft";
   if (type >= 50 && type <= 59) return "Special Craft";
-  if (type >= 20 && type <= 29) return "Wing In Ground";
   return "Unknown";
 }
 
-// MMSI prefix → ISO-2 flag approximation
+// MMSI MID prefix → ISO-2 flag
 function mmsiToFlag(mmsi: string): string {
   const mid = mmsi.substring(0, 3);
   const map: Record<string, string> = {
@@ -41,97 +39,43 @@ function mmsiToFlag(mmsi: string): string {
   return map[mid] || "";
 }
 
-// Strategic maritime zones to monitor around India / Indian Ocean
-const WATCH_ZONES = [
-  // Broad Indian Ocean sweep (no size limit for AISHub)
-  { name: "Arabian Sea",       latmin: 8,   latmax: 28,  lonmin: 55,  lonmax: 78  },
-  { name: "Bay of Bengal",     latmin: 5,   latmax: 23,  lonmin: 80,  lonmax: 100 },
-  { name: "Persian Gulf",      latmin: 23,  latmax: 30,  lonmin: 48,  lonmax: 60  },
-  { name: "Red Sea / Aden",    latmin: 10,  latmax: 22,  lonmin: 38,  lonmax: 52  },
-  { name: "Strait of Malacca", latmin: 0,   latmax: 7,   lonmin: 98,  lonmax: 108 },
-  { name: "Indian Ocean C",    latmin: -15, latmax: 5,   lonmin: 60,  lonmax: 85  },
+// Strategic maritime bounding boxes [[lat1, lon1], [lat2, lon2]]
+const BOUNDING_BOXES = [
+  // Arabian Sea + West Indian coast
+  [[8.0, 55.0], [28.0, 78.0]],
+  // Bay of Bengal
+  [[5.0, 80.0], [23.0, 100.0]],
+  // Persian Gulf + Hormuz
+  [[23.0, 48.0], [30.0, 60.0]],
+  // Red Sea + Gulf of Aden
+  [[10.0, 38.0], [22.0, 52.0]],
+  // Strait of Malacca + Singapore
+  [[0.0, 98.0], [7.0, 108.0]],
+  // Central Indian Ocean
+  [[-15.0, 60.0], [5.0, 85.0]],
 ];
 
-interface AISHubRecord {
-  MMSI: number;
-  TIME: string;
-  LONGITUDE: number;
-  LATITUDE: number;
-  COG: number;
-  SOG: number;
-  HEADING: number;
-  NAVSTAT: number;
-  IMO: number;
-  NAME: string;
-  CALLSIGN: string;
-  TYPE: number;
-  A: number;
-  B: number;
-  C: number;
-  D: number;
-  DRAUGHT: number;
-  DEST: string;
-  ETA: string;
-}
-
-function mapRecord(v: AISHubRecord) {
-  const mmsiStr = String(v.MMSI);
-  const length = (v.A || 0) + (v.B || 0);
-  const beam   = (v.C || 0) + (v.D || 0);
-  return {
-    mmsi: mmsiStr,
-    name: (v.NAME || "").trim() || `VESSEL-${v.MMSI}`,
-    type: aisTypeToString(v.TYPE || 0),
-    latitude: v.LATITUDE,
-    longitude: v.LONGITUDE,
-    speed: v.SOG === 102.4 ? 0 : (v.SOG ?? 0),
-    course: v.COG === 360 ? 0 : (v.COG ?? 0),
-    heading: v.HEADING === 511 ? (v.COG === 360 ? 0 : (v.COG ?? 0)) : (v.HEADING ?? 0),
-    destination: (v.DEST || "").trim(),
-    flag: mmsiToFlag(mmsiStr),
-    last_position_time: v.TIME ? new Date(v.TIME.replace(" GMT", "Z")).toISOString() : new Date().toISOString(),
-    properties: {
-      source: "aishub",
-      imo: v.IMO && v.IMO > 0 ? v.IMO : undefined,
-      callsign: (v.CALLSIGN || "").trim() || undefined,
-      nav_status: v.NAVSTAT,
-      draught: v.DRAUGHT ? v.DRAUGHT : undefined,
-      length: length > 0 ? length : undefined,
-      beam: beam > 0 ? beam : undefined,
-      eta: (v.ETA || "").trim() || undefined,
-      type_code: v.TYPE,
-    },
-    updated_at: new Date().toISOString(),
-  };
-}
-
-async function fetchZone(
-  username: string,
-  zone: typeof WATCH_ZONES[0]
-): Promise<AISHubRecord[]> {
-  try {
-    const params = new URLSearchParams({
-      username,
-      format: "1",
-      output: "json",
-      compress: "0",
-      latmin: String(zone.latmin),
-      latmax: String(zone.latmax),
-      lonmin: String(zone.lonmin),
-      lonmax: String(zone.lonmax),
-    });
-    const res = await fetch(`https://data.aishub.net/ws.php?${params}`);
-    if (!res.ok) return [];
-    const data = await res.json();
-    // Response: [{meta}, [vessels...]]
-    if (!Array.isArray(data) || data.length < 2) return [];
-    const meta = data[0];
-    if (meta.ERROR) return [];
-    const records = data[1];
-    return Array.isArray(records) ? records : [];
-  } catch {
-    return [];
-  }
+// Vessel record accumulator
+interface VesselAccum {
+  mmsi: string;
+  name: string;
+  type: number;
+  latitude: number;
+  longitude: number;
+  sog: number;
+  cog: number;
+  heading: number;
+  nav_status: number;
+  destination: string;
+  callsign: string;
+  imo: number;
+  draught: number;
+  dim_a: number;
+  dim_b: number;
+  dim_c: number;
+  dim_d: number;
+  time_utc: string;
+  updated: boolean;
 }
 
 const SEED_VESSELS = [
@@ -154,6 +98,124 @@ const SEED_VESSELS = [
   { mmsi: "232001001", name: "HMS DEFENDER",          type: "Military", lat: 51.5,   lon: -4.0,    speed: 18.0, course: 90,  flag: "GB", destination: "PORTSMOUTH" },
 ];
 
+// Connect to AISStream via WebSocket, collect messages for `durationMs`, resolve with map of vessels
+function streamAIS(apiKey: string, durationMs: number): Promise<Map<string, VesselAccum>> {
+  return new Promise((resolve) => {
+    const vessels = new Map<string, VesselAccum>();
+    let ws: WebSocket;
+    let settled = false;
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      try { ws?.close(); } catch { /* ignore */ }
+      resolve(vessels);
+    };
+
+    const timer = setTimeout(finish, durationMs);
+
+    try {
+      ws = new WebSocket("wss://stream.aisstream.io/v0/stream");
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({
+          APIKey: apiKey,
+          BoundingBoxes: BOUNDING_BOXES,
+          FilterMessageTypes: ["PositionReport", "ShipStaticData", "StandardClassBPositionReport", "ExtendedClassBPositionReport"],
+        }));
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.error) {
+            clearTimeout(timer);
+            finish();
+            return;
+          }
+
+          const meta = msg.MetaData || {};
+          const mmsi = String(meta.MMSI || "");
+          if (!mmsi || mmsi === "0") return;
+
+          if (!vessels.has(mmsi)) {
+            vessels.set(mmsi, {
+              mmsi,
+              name: (meta.ShipName || "").trim(),
+              type: 0,
+              latitude: meta.latitude ?? 0,
+              longitude: meta.longitude ?? 0,
+              sog: 0,
+              cog: 0,
+              heading: 0,
+              nav_status: 15,
+              destination: "",
+              callsign: "",
+              imo: 0,
+              draught: 0,
+              dim_a: 0, dim_b: 0, dim_c: 0, dim_d: 0,
+              time_utc: meta.time_utc || new Date().toISOString(),
+              updated: false,
+            });
+          }
+
+          const v = vessels.get(mmsi)!;
+
+          if (msg.MessageType === "PositionReport") {
+            const p = msg.Message?.PositionReport || {};
+            v.latitude = p.Latitude ?? meta.latitude ?? v.latitude;
+            v.longitude = p.Longitude ?? meta.longitude ?? v.longitude;
+            v.sog = p.Sog ?? v.sog;
+            v.cog = p.Cog ?? v.cog;
+            v.heading = (p.TrueHeading !== 511 ? p.TrueHeading : null) ?? v.cog;
+            v.nav_status = p.NavigationalStatus ?? v.nav_status;
+            v.time_utc = meta.time_utc || v.time_utc;
+            v.updated = true;
+          } else if (msg.MessageType === "StandardClassBPositionReport" || msg.MessageType === "ExtendedClassBPositionReport") {
+            const p = msg.Message?.[msg.MessageType] || {};
+            v.latitude = p.Latitude ?? meta.latitude ?? v.latitude;
+            v.longitude = p.Longitude ?? meta.longitude ?? v.longitude;
+            v.sog = p.Sog ?? v.sog;
+            v.cog = p.Cog ?? v.cog;
+            v.heading = (p.TrueHeading !== 511 ? p.TrueHeading : null) ?? v.cog;
+            v.time_utc = meta.time_utc || v.time_utc;
+            v.updated = true;
+            if (p.Name) v.name = p.Name.trim();
+            if (p.Type) v.type = p.Type;
+            if (p.Dimension) {
+              v.dim_a = p.Dimension.A || 0;
+              v.dim_b = p.Dimension.B || 0;
+              v.dim_c = p.Dimension.C || 0;
+              v.dim_d = p.Dimension.D || 0;
+            }
+          } else if (msg.MessageType === "ShipStaticData") {
+            const s = msg.Message?.ShipStaticData || {};
+            if (s.Name) v.name = s.Name.trim();
+            if (s.Type) v.type = s.Type;
+            if (s.CallSign) v.callsign = s.CallSign.trim();
+            if (s.ImoNumber) v.imo = s.ImoNumber;
+            if (s.Destination) v.destination = s.Destination.trim();
+            if (s.MaximumStaticDraught) v.draught = s.MaximumStaticDraught;
+            if (s.Dimension) {
+              v.dim_a = s.Dimension.A || 0;
+              v.dim_b = s.Dimension.B || 0;
+              v.dim_c = s.Dimension.C || 0;
+              v.dim_d = s.Dimension.D || 0;
+            }
+          }
+        } catch { /* ignore malformed messages */ }
+      };
+
+      ws.onerror = () => { clearTimeout(timer); finish(); };
+      ws.onclose = () => { clearTimeout(timer); finish(); };
+
+    } catch {
+      clearTimeout(timer);
+      resolve(vessels);
+    }
+  });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -167,43 +229,58 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const username = Deno.env.get("VESSEL_API_KEY") || "";
+    const apiKey = Deno.env.get("AISSTREAM_API_KEY") || Deno.env.get("VESSEL_API_KEY") || "";
     let insertCount = 0;
     let source = "seed";
     let apiError: string | undefined;
 
-    if (username) {
-      source = "aishub";
-      // Fetch all zones sequentially to respect 1-req/min rate limit per zone
-      // We stagger them with small delays
-      const seen = new Set<string>();
-      const vessels: ReturnType<typeof mapRecord>[] = [];
-
-      for (const zone of WATCH_ZONES) {
-        const records = await fetchZone(username, zone);
-        for (const v of records) {
-          const key = String(v.MMSI);
-          if (!key || key === "0" || seen.has(key)) continue;
-          seen.add(key);
-          vessels.push(mapRecord(v));
-        }
-        // Small pause between zones to be a good citizen
-        await new Promise(r => setTimeout(r, 200));
-      }
+    if (apiKey) {
+      // Collect messages for 20 seconds — enough to fill the strategic zones
+      const vesselMap = await streamAIS(apiKey, 20_000);
+      const vessels = Array.from(vesselMap.values()).filter(v => v.updated && v.latitude !== 0 && v.longitude !== 0);
 
       if (vessels.length > 0) {
-        for (const vessel of vessels) {
+        source = "aisstream";
+        for (const v of vessels) {
+          const length = (v.dim_a + v.dim_b) || undefined;
+          const beam   = (v.dim_c + v.dim_d) || undefined;
+          const record = {
+            mmsi: v.mmsi,
+            name: v.name || `VESSEL-${v.mmsi}`,
+            type: aisTypeToString(v.type),
+            latitude: v.latitude,
+            longitude: v.longitude,
+            speed: v.sog,
+            course: v.cog,
+            heading: v.heading || v.cog,
+            destination: v.destination,
+            flag: mmsiToFlag(v.mmsi),
+            last_position_time: v.time_utc
+              ? new Date(v.time_utc).toISOString()
+              : new Date().toISOString(),
+            properties: {
+              source: "aisstream",
+              imo: v.imo || undefined,
+              callsign: v.callsign || undefined,
+              nav_status: v.nav_status,
+              draught: v.draught || undefined,
+              length: length && length > 0 ? length : undefined,
+              beam: beam && beam > 0 ? beam : undefined,
+              type_code: v.type || undefined,
+            },
+            updated_at: new Date().toISOString(),
+          };
           const { error } = await supabase
             .from("vessels")
-            .upsert(vessel, { onConflict: "mmsi" });
+            .upsert(record, { onConflict: "mmsi" });
           if (!error) insertCount++;
         }
       } else {
-        apiError = "AISHub returned no vessels for monitored zones";
+        apiError = "AISStream returned no vessels — check AISSTREAM_API_KEY";
       }
     }
 
-    // Fall back to seed if live ingestion yielded nothing
+    // Fall back to seed data
     if (insertCount === 0) {
       source = "seed";
       for (const vessel of SEED_VESSELS) {
