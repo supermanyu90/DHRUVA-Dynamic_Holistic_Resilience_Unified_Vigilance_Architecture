@@ -46,7 +46,19 @@ export function VesselView() {
   }, []);
 
   useEffect(() => {
-    loadVessels();
+    // Auto-sync on mount to ensure DB reflects live AIS if key is configured
+    const autoSync = async () => {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/ingest-vessels`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
+        });
+        const json = await res.json().catch(() => ({}));
+        if (json.source && json.source !== 'seed') setDataSource('live');
+      } catch { /* silent */ }
+      loadVessels();
+    };
+    autoSync();
     const sub = IntelligenceAPI.subscribeToVessels((updated) => {
       setVessels(prev => prev.map(v => v.mmsi === updated.mmsi ? updated : v));
     });
