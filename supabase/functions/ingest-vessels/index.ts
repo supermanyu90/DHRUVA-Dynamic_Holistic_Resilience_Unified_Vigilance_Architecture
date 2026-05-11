@@ -104,67 +104,125 @@ interface VesselFinderRecord {
   MASTERDATA?: VesselFinderMaster;
 }
 
+// Strategically relevant maritime zones (Indian Ocean + adjacent chokepoints).
+// VesselFinder /vessels?bbox= returns vessels inside a lat/lon bounding box.
+// Each zone is fetched in parallel; results are deduped by MMSI.
+const WATCH_ZONES = [
+  { name: "Arabian Sea",        bbox: "55,10,75,25"  },
+  { name: "Bay of Bengal",      bbox: "80,8,100,22"  },
+  { name: "Indian Ocean",       bbox: "60,-10,90,10" },
+  { name: "Red Sea",            bbox: "32,12,44,30"  },
+  { name: "Persian Gulf",       bbox: "48,22,60,30"  },
+  { name: "Strait of Malacca",  bbox: "98,-2,106,8"  },
+  { name: "Gulf of Aden",       bbox: "42,10,52,16"  },
+];
+
+function recordToVessel(record: VesselFinderRecord) {
+  const ais = record.AIS;
+  const master = record.MASTERDATA;
+  if (!ais?.MMSI) return null;
+  return {
+    mmsi: String(ais.MMSI),
+    name: ais.NAME?.trim() || `VESSEL-${ais.MMSI}`,
+    type: AIS_SHIP_TYPES[ais.TYPE ?? 0] || master?.TYPE_NAME || "Unknown",
+    latitude: ais.LATITUDE,
+    longitude: ais.LONGITUDE,
+    speed: ais.SPEED ?? 0,
+    course: ais.COURSE ?? 0,
+    heading: ais.HEADING ?? ais.COURSE ?? 0,
+    destination: ais.DESTINATION?.trim() || "",
+    flag: master?.FLAG || "",
+    last_position_time: ais.TIMESTAMP
+      ? new Date(ais.TIMESTAMP).toISOString()
+      : new Date().toISOString(),
+    properties: {
+      source: "vesselfinder",
+      imo: ais.IMO,
+      callsign: ais.CALLSIGN,
+      navstat: ais.NAVSTAT,
+      draught: ais.DRAUGHT,
+      locode: ais.LOCODE,
+      eta: ais.ETA_AIS,
+      zone: ais.ZONE,
+      length: master?.LENGTH,
+      beam: master?.BEAM,
+      gt: master?.GT,
+      dwt: master?.DWT,
+      year_built: master?.YEAR_BUILT,
+    },
+    updated_at: new Date().toISOString(),
+  };
+}
+
+async function fetchZone(apiKey: string, bbox: string): Promise<VesselFinderRecord[]> {
+  const url = new URL("https://api.vesselfinder.com/vessels");
+  url.searchParams.set("userkey", apiKey);
+  url.searchParams.set("bbox", bbox);
+  url.searchParams.set("extradata", "master");
+  url.searchParams.set("format", "json");
+  // Limit per zone to avoid quota bursts
+  url.searchParams.set("count", "50");
+
+  try {
+    const res = await fetch(url.toString());
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
 async function ingestFromVesselFinder(
   supabase: ReturnType<typeof createClient>,
   apiKey: string
 ): Promise<{ count: number; error?: string }> {
-  const url = new URL("https://api.vesselfinder.com/vessels");
-  url.searchParams.set("userkey", apiKey);
-  url.searchParams.set("mmsi", SEED_MMSI_LIST);
-  url.searchParams.set("extradata", "master");
-  url.searchParams.set("format", "json");
+  // Fetch all zones in parallel
+  const zoneResults = await Promise.allSettled(
+    WATCH_ZONES.map(z => fetchZone(apiKey, z.bbox))
+  );
 
-  const res = await fetch(url.toString());
-
-  if (!res.ok) {
-    const body = await res.text();
-    return { count: 0, error: `VesselFinder API error ${res.status}: ${body}` };
+  // Deduplicate by MMSI
+  const seen = new Set<string>();
+  const vessels: ReturnType<typeof recordToVessel>[] = [];
+  for (const result of zoneResults) {
+    if (result.status !== "fulfilled") continue;
+    for (const record of result.value) {
+      const v = recordToVessel(record);
+      if (!v || seen.has(v.mmsi)) continue;
+      seen.add(v.mmsi);
+      vessels.push(v);
+    }
   }
 
-  const records: VesselFinderRecord[] = await res.json();
+  if (vessels.length === 0) {
+    // Fall back to tracking the seed MMSI list directly
+    const url = new URL("https://api.vesselfinder.com/vessels");
+    url.searchParams.set("userkey", apiKey);
+    url.searchParams.set("mmsi", SEED_MMSI_LIST);
+    url.searchParams.set("extradata", "master");
+    url.searchParams.set("format", "json");
+    const res = await fetch(url.toString());
+    if (!res.ok) {
+      const body = await res.text();
+      return { count: 0, error: `VesselFinder API error ${res.status}: ${body}` };
+    }
+    const records: VesselFinderRecord[] = await res.json();
+    if (Array.isArray(records)) {
+      for (const r of records) {
+        const v = recordToVessel(r);
+        if (v && !seen.has(v.mmsi)) { seen.add(v.mmsi); vessels.push(v); }
+      }
+    }
+  }
 
-  if (!Array.isArray(records) || records.length === 0) {
-    return { count: 0, error: "VesselFinder returned empty or invalid response" };
+  if (vessels.length === 0) {
+    return { count: 0, error: "VesselFinder returned no vessels for monitored zones" };
   }
 
   let count = 0;
-  for (const record of records) {
-    const ais = record.AIS;
-    const master = record.MASTERDATA;
-    if (!ais?.MMSI) continue;
-
-    const vessel = {
-      mmsi: String(ais.MMSI),
-      name: ais.NAME?.trim() || `VESSEL-${ais.MMSI}`,
-      type: AIS_SHIP_TYPES[ais.TYPE ?? 0] || master?.TYPE_NAME || "Unknown",
-      latitude: ais.LATITUDE,
-      longitude: ais.LONGITUDE,
-      speed: ais.SPEED ?? 0,
-      course: ais.COURSE ?? 0,
-      heading: ais.HEADING ?? ais.COURSE ?? 0,
-      destination: ais.DESTINATION?.trim() || "",
-      flag: master?.FLAG || "",
-      last_position_time: ais.TIMESTAMP
-        ? new Date(ais.TIMESTAMP).toISOString()
-        : new Date().toISOString(),
-      properties: {
-        source: "vesselfinder",
-        imo: ais.IMO,
-        callsign: ais.CALLSIGN,
-        navstat: ais.NAVSTAT,
-        draught: ais.DRAUGHT,
-        locode: ais.LOCODE,
-        eta: ais.ETA_AIS,
-        zone: ais.ZONE,
-        length: master?.LENGTH,
-        beam: master?.BEAM,
-        gt: master?.GT,
-        dwt: master?.DWT,
-        year_built: master?.YEAR_BUILT,
-      },
-      updated_at: new Date().toISOString(),
-    };
-
+  for (const vessel of vessels) {
+    if (!vessel) continue;
     const { error } = await supabase.from("vessels").upsert(vessel, { onConflict: "mmsi" });
     if (!error) count++;
   }

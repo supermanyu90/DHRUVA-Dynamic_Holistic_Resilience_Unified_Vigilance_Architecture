@@ -27,11 +27,15 @@ export function VesselView() {
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [flagFilter, setFlagFilter] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [dataSource, setDataSource] = useState<'live' | 'seed'>('seed');
 
   const loadVessels = useCallback(async () => {
     setLoading(true);
     try {
       const data = await IntelligenceAPI.getVessels(100);
+      // Detect whether any vessel came from a live AIS source
+      const hasLive = data.some(v => (v.properties as any)?.source === 'vesselfinder');
+      setDataSource(hasLive ? 'live' : 'seed');
       setVessels(data);
       setLastUpdated(new Date());
     } catch (e) {
@@ -52,10 +56,12 @@ export function VesselView() {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      await fetch(`${SUPABASE_URL}/functions/v1/ingest-vessels`, {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/ingest-vessels`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
       });
+      const json = await res.json().catch(() => ({}));
+      if (json.source && json.source !== 'seed') setDataSource('live');
       setTimeout(loadVessels, 1500);
     } catch (e) {
       console.error(e);
@@ -128,6 +134,23 @@ export function VesselView() {
       }}>
         <Anchor size={14} style={{ color: '#00BFFF' }} />
         <span style={{ fontSize: 12, fontFamily: 'Bebas Neue', letterSpacing: 2, color: '#00BFFF' }}>VESSEL INTELLIGENCE</span>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+          padding: '2px 7px',
+          background: dataSource === 'live' ? 'rgba(0,212,160,0.12)' : 'rgba(255,184,0,0.1)',
+          border: `1px solid ${dataSource === 'live' ? 'rgba(0,212,160,0.35)' : 'rgba(255,184,0,0.3)'}`,
+          borderRadius: 2,
+          fontSize: 8, fontFamily: 'Share Tech Mono', letterSpacing: 1,
+          color: dataSource === 'live' ? '#00D4A0' : '#FFB800',
+        }}>
+          <span style={{
+            width: 5, height: 5, borderRadius: '50%',
+            background: dataSource === 'live' ? '#00D4A0' : '#FFB800',
+            animation: dataSource === 'live' ? 'statusPulse 1.5s ease-in-out infinite' : 'none',
+            flexShrink: 0,
+          }} />
+          {dataSource === 'live' ? 'LIVE AIS' : 'SIMULATED'}
+        </span>
 
         <div style={{ display: 'flex', gap: 1 }}>
           {(['live', 'search'] as TabType[]).map(t => (
@@ -313,10 +336,12 @@ export function VesselView() {
             </div>
           </div>
 
-          <div style={{ marginTop: 8, padding: '6px 10px', background: 'rgba(0,191,255,0.04)', border: '1px solid rgba(0,191,255,0.1)', fontSize: 9, fontFamily: 'Share Tech Mono', color: 'rgba(0,191,255,0.4)', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ marginTop: 8, padding: '6px 10px', background: dataSource === 'live' ? 'rgba(0,212,160,0.04)' : 'rgba(0,191,255,0.04)', border: `1px solid ${dataSource === 'live' ? 'rgba(0,212,160,0.15)' : 'rgba(0,191,255,0.1)'}`, fontSize: 9, fontFamily: 'Share Tech Mono', color: dataSource === 'live' ? 'rgba(0,212,160,0.6)' : 'rgba(0,191,255,0.4)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <Satellite size={9} />
-            For live AIS data, set your <span style={{ color: '#00BFFF' }}>VesselFinder</span> API key as the VESSEL_API_KEY secret. MMSI searches will return live positions + master data.
-            Currently showing {vessels.length} tracked vessels.
+            {dataSource === 'live'
+              ? <>VesselFinder AIS active — live positions from Indian Ocean, Arabian Sea, Red Sea, Persian Gulf, Strait of Malacca + Bay of Bengal. Currently tracking {vessels.length} vessels.</>
+              : <>Live AIS via <span style={{ color: '#00BFFF' }}>VesselFinder</span> — MMSI searches return real-time positions + master data. Currently showing {vessels.length} simulated vessels.</>
+            }
           </div>
         </div>
       )}
