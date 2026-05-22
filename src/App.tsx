@@ -168,7 +168,7 @@ function App() {
     const id = `legacy-${Date.now()}`;
     const n: AppNotification = {
       id, title, message, severity,
-      eventType: 'system', regionKey: 'global', count: 1, alertIds: [],
+      eventType: 'system', regionKey: 'global', priorityScore: 0, count: 1, alertIds: [],
     };
     setLegacyAlerts(prev => [...prev, n]);
     setTimeout(() => setLegacyAlerts(prev => prev.filter(a => a.id !== id)), 7000);

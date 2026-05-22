@@ -63,7 +63,7 @@ interface CooldownEntry {
 export function useAlertNotifier(
   prefs: NotificationPreferences,
   onNotify: (n: AppNotification) => void,
-  soundEnabled: boolean,
+  _soundEnabled: boolean,
   playAlert: (type: 'critical' | 'high' | 'info') => void,
 ) {
   const cooldowns = useRef<Map<string, CooldownEntry>>(new Map());

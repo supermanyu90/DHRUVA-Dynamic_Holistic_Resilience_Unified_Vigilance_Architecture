@@ -12,11 +12,6 @@ const TIME_WINDOWS: { key: TimeWindow; label: string }[] = [
   { key: 'all', label: 'ALL'  },
 ];
 
-function getWindowStart(w: TimeWindow): string | null {
-  if (w === 'all') return null;
-  const ms = { '1h': 3600000, '6h': 21600000, '24h': 86400000, '7d': 604800000 }[w];
-  return new Date(Date.now() - ms).toISOString();
-}
 
 function getStatusColor(status: string) {
   switch (status) {
