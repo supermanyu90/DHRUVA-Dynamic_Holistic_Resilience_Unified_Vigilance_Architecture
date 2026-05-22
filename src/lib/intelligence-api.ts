@@ -1,4 +1,6 @@
-import { supabase } from './supabase';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const ANON_KEY     = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const FUNCTIONS_URL = `${SUPABASE_URL}/functions/v1`;
 
 export interface Earthquake {
   id: string;
@@ -150,22 +152,15 @@ export interface UnifiedAlert {
   updated_at: string;
 }
 
-/**
- * Client-side mirror of the DB scoring formula.
- * Used to score Realtime-delivered alerts before DB confirms priority_score,
- * and as a fallback when priority_score is absent (older rows).
- */
 export function computePriorityScore(alert: Pick<UnifiedAlert,
   'severity' | 'urgency' | 'population_impact' | 'country' | 'state'>
 ): number {
   const BASE: Record<string, number> = { high: 70, moderate: 40, low: 10 };
   let score = BASE[alert.severity] ?? 10;
-
   if ((alert.urgency ?? '').toLowerCase() === 'immediate') score += 15;
   if ((alert.population_impact ?? 0) > 1_000_000)          score += 10;
   if ((alert.country ?? '').toLowerCase() === 'india' ||
       (alert.state ?? '') !== '')                           score += 5;
-
   return Math.max(0, Math.min(100, score));
 }
 
@@ -277,466 +272,160 @@ export interface UAETwitter {
   hashtags: string[];
 }
 
+// ── USGS earthquake feed parsing ─────────────────────────────────────────────
+
+interface USGSFeature {
+  id: string;
+  properties: {
+    mag: number;
+    place: string;
+    time: number;
+    updated: number;
+    type: string;
+    detail: string;
+  };
+  geometry: { coordinates: [number, number, number] };
+}
+
+function usgsFeatureToEarthquake(f: USGSFeature): Earthquake {
+  const [lng, lat, depth] = f.geometry.coordinates;
+  return {
+    id: f.id,
+    event_id: f.id,
+    magnitude: f.properties.mag ?? 0,
+    location: f.properties.place ?? 'Unknown',
+    latitude: lat,
+    longitude: lng,
+    depth: depth ?? 0,
+    event_time: new Date(f.properties.time).toISOString(),
+    properties: f.properties as any,
+  };
+}
+
+// ── GDACS disaster feed parsing ───────────────────────────────────────────────
+
+interface GDACSEntry {
+  guid: string;
+  title: string;
+  'gdacs:eventtype': string;
+  'gdacs:latitude': string;
+  'gdacs:longitude': string;
+  pubDate: string;
+}
+
+function gdacsEntryToDisaster(e: GDACSEntry): Disaster {
+  return {
+    id: e.guid,
+    event_id: e.guid,
+    title: e.title,
+    category: e['gdacs:eventtype'] ?? 'unknown',
+    latitude: parseFloat(e['gdacs:latitude'] ?? '0') || null,
+    longitude: parseFloat(e['gdacs:longitude'] ?? '0') || null,
+    event_date: e.pubDate ? new Date(e.pubDate).toISOString() : new Date().toISOString(),
+    closed: false,
+    properties: e as any,
+  };
+}
+
+// ── Edge function helper ──────────────────────────────────────────────────────
+
+async function callEdgeFunction<T>(slug: string, params?: Record<string, string>): Promise<T[]> {
+  const url = new URL(`${FUNCTIONS_URL}/${slug}`);
+  if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${ANON_KEY}` },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) throw new Error(`Edge function ${slug} returned ${res.status}`);
+  const json = await res.json();
+  return Array.isArray(json) ? json : (json.data ?? []);
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
 export class IntelligenceAPI {
-  private static functionsUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
-
   static async getEarthquakes(minMagnitude = 0, limit = 100): Promise<Earthquake[]> {
-    const { data, error } = await supabase
-      .from('earthquakes')
-      .select('*')
-      .gte('magnitude', minMagnitude)
-      .order('event_time', { ascending: false })
-      .limit(limit);
-
-    if (error) throw error;
-    return data || [];
+    const url = `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude=${minMagnitude}&orderby=time&limit=${Math.min(limit, 200)}&starttime=${new Date(Date.now() - 7 * 86_400_000).toISOString()}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+    if (!res.ok) throw new Error(`USGS ${res.status}`);
+    const json = await res.json();
+    return (json.features as USGSFeature[]).map(usgsFeatureToEarthquake);
   }
 
   static async getDisasters(limit = 100): Promise<Disaster[]> {
-    const { data, error } = await supabase
-      .from('disasters')
-      .select('*')
-      .eq('closed', false)
-      .order('event_date', { ascending: false })
-      .limit(limit);
-
-    if (error) throw error;
-    return data || [];
+    const url = `https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?alertlevel=Green&fromDate=${new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0,10)}&toDate=${new Date().toISOString().slice(0,10)}&orderby=alertscore&pagesize=${Math.min(limit, 100)}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+    if (!res.ok) throw new Error(`GDACS ${res.status}`);
+    const json = await res.json();
+    const items: GDACSEntry[] = json?.features ?? json?.Results ?? [];
+    return items.map(gdacsEntryToDisaster);
   }
 
   static async getNews(limit = 100): Promise<NewsEvent[]> {
-    const { data, error } = await supabase
-      .from('news_events')
-      .select('*')
-      .order('published_at', { ascending: false })
-      .limit(limit);
-
-    if (error) throw error;
-    return data || [];
+    try {
+      return await callEdgeFunction<NewsEvent>('ingest-news-intel', { limit: String(limit) });
+    } catch {
+      return [];
+    }
   }
 
   static async getVessels(limit = 100): Promise<Vessel[]> {
-    const { data, error } = await supabase
-      .from('vessels')
-      .select('*')
-      .order('last_position_time', { ascending: false })
-      .limit(limit);
-
-    if (error) throw error;
-    return data || [];
+    try {
+      return await callEdgeFunction<Vessel>('ingest-vessels', { limit: String(limit) });
+    } catch {
+      return [];
+    }
   }
 
   static async getVolcanoes(limit = 100): Promise<VolcanoEvent[]> {
-    const { data, error } = await supabase
-      .from('volcanoes')
-      .select('*')
-      .in('status', ['erupting', 'unrest'])
-      .order('updated_at', { ascending: false })
-      .limit(limit);
-
-    if (error) throw error;
-    return data || [];
+    try {
+      return await callEdgeFunction<VolcanoEvent>('ingest-volcanoes', { limit: String(limit) });
+    } catch {
+      return [];
+    }
   }
 
   static async getGeopoliticalEvents(limit = 100): Promise<GeopoliticalEvent[]> {
-    const { data, error } = await supabase
-      .from('geopolitical_events')
-      .select('*')
-      .eq('is_active', true)
-      .order('updated_at', { ascending: false })
-      .limit(limit);
-
-    if (error) throw error;
-    return data || [];
-  }
-
-  static subscribeToVessels(callback: (vessel: Vessel) => void) {
-    return supabase
-      .channel('vessels-channel')
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'vessels',
-      }, (payload) => {
-        callback(payload.new as Vessel);
-      })
-      .subscribe();
-  }
-
-  static async getCyberThreats(limit = 100): Promise<CyberThreat[]> {
-    const { data, error } = await supabase
-      .from('cyber_threats')
-      .select('*')
-      .eq('is_active', true)
-      .order('first_seen', { ascending: false })
-      .limit(limit);
-
-    if (error) throw error;
-    return data || [];
-  }
-
-  static async getBankEvents(limit = 100): Promise<BankEvent[]> {
-    const { data, error } = await supabase
-      .from('bank_events')
-      .select('*')
-      .order('event_time', { ascending: false })
-      .limit(limit);
-
-    if (error) throw error;
-    return data || [];
-  }
-
-  static async getInfoOps(limit = 100): Promise<InfoOp[]> {
-    const { data, error } = await supabase
-      .from('info_ops')
-      .select('*')
-      .eq('is_active', true)
-      .order('first_detected', { ascending: false })
-      .limit(limit);
-
-    if (error) throw error;
-    return data || [];
-  }
-
-  static async getUAETwitter(limit = 100): Promise<UAETwitter[]> {
-    const { data, error } = await supabase
-      .from('uae_twitter_feed')
-      .select('*')
-      .order('posted_at', { ascending: false })
-      .limit(limit);
-
-    if (error) throw error;
-    return data || [];
-  }
-
-  static async getAllIntelligence() {
-    const response = await fetch(`${this.functionsUrl}/get-intelligence?type=all`, {
-      headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch intelligence data');
+    try {
+      return await callEdgeFunction<GeopoliticalEvent>('ingest-geopolitical', { limit: String(limit) });
+    } catch {
+      return [];
     }
-
-    const result = await response.json();
-    return result.data;
   }
+
+  static async getCyberThreats(_limit = 100): Promise<CyberThreat[]> { return []; }
+  static async getBankEvents(_limit = 100): Promise<BankEvent[]> { return []; }
+  static async getInfoOps(_limit = 100): Promise<InfoOp[]> { return []; }
+  static async getUAETwitter(_limit = 100): Promise<UAETwitter[]> { return []; }
+  static async getUnifiedAlerts(_options = {}): Promise<UnifiedAlert[]> { return []; }
+  static async getFusedAlerts(_options = {}): Promise<FusedAlert[]> { return []; }
+  static async getPollState(): Promise<PollState[]> { return []; }
+  static async getPollLog(_limit = 100): Promise<PollLogEntry[]> { return []; }
+  static async getIngestionStats(_days = 7): Promise<IngestionStat[]> { return []; }
+  static async getSystemMetrics(_names: string[], _hours = 24): Promise<SystemMetric[]> { return []; }
+  static async getAlertLifecycleCounts(): Promise<LifecycleCounts> { return { active: 0, updated: 0, expired: 0 }; }
+  static async getLastSyncTime(): Promise<string | null> { return null; }
 
   static async triggerDataSync(): Promise<void> {
-    const response = await fetch(`${this.functionsUrl}/scheduler`, {
+    await fetch(`${FUNCTIONS_URL}/scheduler`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to trigger data sync');
-    }
-  }
-
-  static subscribeToEarthquakes(callback: (earthquake: Earthquake) => void) {
-    return supabase
-      .channel('earthquakes-channel')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'earthquakes',
-      }, (payload) => {
-        callback(payload.new as Earthquake);
-      })
-      .subscribe();
-  }
-
-  static subscribeToDisasters(callback: (disaster: Disaster) => void) {
-    return supabase
-      .channel('disasters-channel')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'disasters',
-      }, (payload) => {
-        callback(payload.new as Disaster);
-      })
-      .subscribe();
-  }
-
-  static subscribeToNews(callback: (news: NewsEvent) => void) {
-    return supabase
-      .channel('news-channel')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'news_events',
-      }, (payload) => {
-        callback(payload.new as NewsEvent);
-      })
-      .subscribe();
-  }
-
-  static subscribeToCyberThreats(callback: (threat: CyberThreat) => void) {
-    return supabase
-      .channel('threats-channel')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'cyber_threats',
-      }, (payload) => {
-        callback(payload.new as CyberThreat);
-      })
-      .subscribe();
-  }
-
-  static subscribeToVolcanoes(callback: (volcano: VolcanoEvent) => void) {
-    return supabase
-      .channel('volcanoes-channel')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'volcanoes',
-      }, (payload) => {
-        callback(payload.new as VolcanoEvent);
-      })
-      .subscribe();
-  }
-
-  static subscribeToGeopolitical(callback: (event: GeopoliticalEvent) => void) {
-    return supabase
-      .channel('geopolitical-channel')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'geopolitical_events',
-      }, (payload) => {
-        callback(payload.new as GeopoliticalEvent);
-      })
-      .subscribe();
-  }
-
-  static async getUnifiedAlerts(options: {
-    sources?: ('GDACS' | 'SACHET')[];
-    severity?: ('low' | 'moderate' | 'high')[];
-    lifecycleStates?: ('active' | 'updated' | 'expired')[];
-    minPriority?: number;
-    limit?: number;
-  } = {}): Promise<UnifiedAlert[]> {
-    let query = supabase
-      .from('unified_alerts')
-      .select('*')
-      .order('priority_score', { ascending: false })
-      .order('effective_time', { ascending: false })
-      .limit(options.limit ?? 200);
-
-    // Default: only active and updated (exclude expired unless caller opts in)
-    const states = options.lifecycleStates ?? ['active', 'updated'];
-    query = query.in('lifecycle_state', states);
-
-    if (options.sources?.length)     query = query.in('source', options.sources);
-    if (options.severity?.length)    query = query.in('severity', options.severity);
-    if (options.minPriority != null) query = query.gte('priority_score', options.minPriority);
-
-    const { data, error } = await query;
-    if (error) throw error;
-    return data || [];
-  }
-
-  /** Returns only the primary alert per cluster, sorted by priority_score. */
-  static async getPrimaryAlerts(options: {
-    sources?: ('GDACS' | 'SACHET')[];
-    severity?: ('low' | 'moderate' | 'high')[];
-    lifecycleStates?: ('active' | 'updated' | 'expired')[];
-    minPriority?: number;
-    limit?: number;
-  } = {}): Promise<UnifiedAlert[]> {
-    let query = supabase
-      .from('unified_alerts')
-      .select('*')
-      .eq('is_primary', true)
-      .order('priority_score', { ascending: false })
-      .order('effective_time', { ascending: false })
-      .limit(options.limit ?? 200);
-
-    const states = options.lifecycleStates ?? ['active', 'updated'];
-    query = query.in('lifecycle_state', states);
-
-    if (options.sources?.length)     query = query.in('source', options.sources);
-    if (options.severity?.length)    query = query.in('severity', options.severity);
-    if (options.minPriority != null) query = query.gte('priority_score', options.minPriority);
-
-    const { data, error } = await query;
-    if (error) throw error;
-    return data || [];
-  }
-
-  /** Fetch the full change history for a single alert_id, newest first. */
-  static async getAlertHistory(alertId: string): Promise<Record<string, unknown>[]> {
-    const { data, error } = await supabase
-      .from('alert_history')
-      .select('*')
-      .eq('alert_id', alertId)
-      .order('changed_at', { ascending: false });
-    if (error) throw error;
-    return data || [];
-  }
-
-  static async getAlertClusters(limit = 100): Promise<AlertCluster[]> {
-    const { data, error } = await supabase
-      .from('alert_clusters')
-      .select('*')
-      .order('first_seen', { ascending: false })
-      .limit(limit);
-
-    if (error) throw error;
-    return data || [];
-  }
-
-  static async getClusterMembers(clusterId: string): Promise<UnifiedAlert[]> {
-    const { data, error } = await supabase
-      .from('unified_alerts')
-      .select('*')
-      .eq('cluster_id', clusterId)
-      .order('effective_time', { ascending: false });
-
-    if (error) throw error;
-    return data || [];
-  }
-
-  static subscribeToUnifiedAlerts(callback: (alert: UnifiedAlert) => void) {
-    return supabase
-      .channel('unified-alerts-channel')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'unified_alerts',
-      }, (payload) => {
-        callback(payload.new as UnifiedAlert);
-      })
-      .subscribe();
-  }
-
-  static async getFusedAlerts(options: {
-    lifecycleStates?: ('active' | 'updated' | 'expired')[];
-    minConfidenceScore?: number;
-    limit?: number;
-  } = {}): Promise<FusedAlert[]> {
-    let query = supabase
-      .from('fused_alerts')
-      .select('*')
-      .order('priority_score', { ascending: false })
-      .order('fused_at', { ascending: false })
-      .limit(options.limit ?? 100);
-
-    const states = options.lifecycleStates ?? ['active', 'updated'];
-    query = query.in('lifecycle_state', states);
-    if (options.minConfidenceScore != null)
-      query = query.gte('confidence_score', options.minConfidenceScore);
-
-    const { data, error } = await query;
-    if (error) throw error;
-    return data || [];
-  }
-
-  static subscribeToFusedAlerts(callback: (alert: FusedAlert) => void) {
-    return supabase
-      .channel('fused-alerts-channel')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'fused_alerts',
-      }, (payload) => callback(payload.new as FusedAlert))
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'fused_alerts',
-      }, (payload) => callback(payload.new as FusedAlert))
-      .subscribe();
-  }
-
-  static async triggerFusion(clusterIds?: string[]): Promise<void> {
-    const body = clusterIds ? JSON.stringify({ cluster_ids: clusterIds }) : undefined;
-    await fetch(`${this.functionsUrl}/fuse-alerts`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body,
+      headers: { Authorization: `Bearer ${ANON_KEY}` },
     });
   }
 
-  // ── Monitoring ───────────────────────────────────────────────────────────────
-
-  /** Per-source poll state (current health, last sync times, failure counts). */
-  static async getPollState(): Promise<PollState[]> {
-    const { data, error } = await supabase
-      .from('alert_poll_state')
-      .select('*')
-      .order('source');
-    if (error) throw error;
-    return data || [];
+  // Realtime subscriptions are no-ops without DB — return a dummy unsubscribable object
+  private static noopChannel() {
+    return { unsubscribe: () => {} };
   }
 
-  /** Recent poll log entries (most recent first). */
-  static async getPollLog(limit = 100): Promise<PollLogEntry[]> {
-    const { data, error } = await supabase
-      .from('alert_poll_log')
-      .select('*')
-      .order('fetched_at', { ascending: false })
-      .limit(limit);
-    if (error) throw error;
-    return data || [];
-  }
-
-  /** Aggregated ingestion stats per source per day. */
-  static async getIngestionStats(days = 7): Promise<IngestionStat[]> {
-    const since = new Date(Date.now() - days * 86_400_000).toISOString();
-    const { data, error } = await supabase
-      .from('ingestion_stats')
-      .select('*')
-      .gte('day', since)
-      .order('day', { ascending: false });
-    if (error) throw error;
-    return data || [];
-  }
-
-  /** Recent system_metrics rows for chart / counter data. */
-  static async getSystemMetrics(metricNames: string[], hours = 24): Promise<SystemMetric[]> {
-    const since = new Date(Date.now() - hours * 3_600_000).toISOString();
-    const { data, error } = await supabase
-      .from('system_metrics')
-      .select('*')
-      .in('metric_name', metricNames)
-      .gte('recorded_at', since)
-      .order('recorded_at', { ascending: false })
-      .limit(500);
-    if (error) throw error;
-    return data || [];
-  }
-
-  /** Total lifecycle counts from unified_alerts. */
-  static async getAlertLifecycleCounts(): Promise<LifecycleCounts> {
-    const { data, error } = await supabase
-      .from('unified_alerts')
-      .select('lifecycle_state');
-    if (error) throw error;
-    const rows = data || [];
-    return {
-      active:  rows.filter(r => r.lifecycle_state === 'active').length,
-      updated: rows.filter(r => r.lifecycle_state === 'updated').length,
-      expired: rows.filter(r => r.lifecycle_state === 'expired').length,
-    };
-  }
-
-  static async getLastSyncTime(): Promise<string | null> {
-    const { data } = await supabase
-      .from('data_cache')
-      .select('data, updated_at')
-      .eq('cache_key', 'last_sync')
-      .maybeSingle();
-
-    if (!data) return null;
-    return (data.data as any)?.timestamp || data.updated_at || null;
-  }
+  static subscribeToEarthquakes(_cb: (e: Earthquake) => void)       { return this.noopChannel(); }
+  static subscribeToDisasters(_cb: (d: Disaster) => void)           { return this.noopChannel(); }
+  static subscribeToNews(_cb: (n: NewsEvent) => void)               { return this.noopChannel(); }
+  static subscribeToCyberThreats(_cb: (t: CyberThreat) => void)    { return this.noopChannel(); }
+  static subscribeToVolcanoes(_cb: (v: VolcanoEvent) => void)       { return this.noopChannel(); }
+  static subscribeToGeopolitical(_cb: (e: GeopoliticalEvent) => void){ return this.noopChannel(); }
+  static subscribeToVessels(_cb: (v: Vessel) => void)               { return this.noopChannel(); }
+  static subscribeToUnifiedAlerts(_cb: (a: UnifiedAlert) => void)   { return this.noopChannel(); }
+  static subscribeToFusedAlerts(_cb: (a: FusedAlert) => void)       { return this.noopChannel(); }
+  static triggerFusion(_clusterIds?: string[]): Promise<void>       { return Promise.resolve(); }
 }

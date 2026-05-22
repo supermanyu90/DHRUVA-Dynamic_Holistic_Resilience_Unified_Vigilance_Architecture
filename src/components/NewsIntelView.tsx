@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { NewsSourceBar } from './news/NewsSourceBar';
 import { NewsCard } from './news/NewsCard';
 
@@ -77,90 +76,15 @@ export function NewsIntelView() {
   const [gdeltTheme, setGdeltTheme] = useState<GdeltTheme>('breaking');
   const [searchQuery, setSearchQuery] = useState('');
   const [timeWindow, setTimeWindow] = useState<TimeWindow>('24h');
-  const hasTriggeredIngestion = useRef(false);
 
   useEffect(() => {
     loadArticles();
   }, [timeWindow, newsGroup]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    const channel = supabase
-      .channel('news-intel-live')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'news_events' }, () => {
-        loadArticles();
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [timeWindow]);
-
-  const triggerIngestion = useCallback(async () => {
-    try {
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ingest-news-intel`;
-      await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      });
-    } catch {
-    }
-  }, []);
-
   const loadArticles = async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from('news_events')
-        .select('*')
-        .neq('source', 'GDELT')
-        .order('published_at', { ascending: false })
-        .limit(500);
-      const since = getWindowStart(timeWindow);
-      if (since) query = query.gte('published_at', since);
-
-      const gdeltQuery = supabase
-        .from('news_events')
-        .select('*')
-        .eq('source', 'GDELT')
-        .order('published_at', { ascending: false })
-        .limit(300);
-
-      const [{ data: rssData, error: rssError }, { data: gdeltData }] = await Promise.all([
-        query,
-        gdeltQuery,
-      ]);
-
-      if (rssError) throw rssError;
-      const rssRows = rssData || [];
-      const gdeltRows = gdeltData || [];
-      const allRows = [...rssRows, ...gdeltRows];
-
-      if (rssRows.length === 0 && timeWindow !== 'all') {
-        const { data: fallback } = await supabase
-          .from('news_events')
-          .neq('source', 'GDELT')
-          .select('*')
-          .order('published_at', { ascending: false })
-          .limit(500);
-        const fallbackRows = fallback || [];
-        if (fallbackRows.length > 0) {
-          setArticles([...fallbackRows, ...gdeltRows]);
-          setTimeWindow('all');
-        } else {
-          setArticles(gdeltRows);
-          if (!hasTriggeredIngestion.current) {
-            hasTriggeredIngestion.current = true;
-            triggerIngestion().then(() =>
-              new Promise(r => setTimeout(r, 4000)).then(loadArticles)
-            );
-          }
-        }
-      } else {
-        setArticles(allRows);
-      }
-    } catch (err) {
-      console.error('Failed to load news:', err);
+      setArticles([]);
     } finally {
       setLoading(false);
     }
@@ -169,11 +93,7 @@ export function NewsIntelView() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await triggerIngestion();
-      await new Promise(r => setTimeout(r, 12000));
       await loadArticles();
-    } catch (err) {
-      console.error('Refresh failed:', err);
     } finally {
       setRefreshing(false);
     }

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Zap, Users, MapPin, Clock, RefreshCw, WifiOff } from 'lucide-react';
 import { IntelligenceAPI, UnifiedAlert, computePriorityScore } from '../lib/intelligence-api';
-import { supabase } from '../lib/supabase';
 import { withResilience } from '../lib/resilience';
 
 type LifecycleState = 'active' | 'updated';
@@ -170,26 +169,6 @@ export function AlertPriorityList() {
       }).finally(() => setLoading(false));
   }, []);
 
-  // Realtime — INSERT and UPDATE (lifecycle transitions arrive as UPDATE)
-  useEffect(() => {
-    const channel = supabase
-      .channel('apr-unified-alerts')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'unified_alerts' },
-        (p) => {
-          const a = p.new as UnifiedAlert;
-          allAlertsRef.current.set(a.id, a);
-          setAlerts(mergeAndSort(allAlertsRef.current));
-        })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'unified_alerts' },
-        (p) => {
-          const a = p.new as UnifiedAlert;
-          allAlertsRef.current.set(a.id, a);
-          setAlerts(mergeAndSort(allAlertsRef.current));
-        })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, []);
 
   const counts: Record<FilterState, number> = {
     all:     alerts.length,

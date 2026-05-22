@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Brain, Activity, RefreshCw } from 'lucide-react';
 import { InfoOp } from '../lib/intelligence-api';
-import { supabase } from '../lib/supabase';
 
 type TimeWindow = '1h' | '6h' | '24h' | '7d' | 'all';
 
@@ -52,19 +51,8 @@ export function InfoOpsView() {
 
   const loadOps = useCallback(async () => {
     try {
-      let query = supabase
-        .from('info_ops')
-        .select('*')
-        .order('first_detected', { ascending: false })
-        .limit(100);
-      const since = getWindowStart(timeWindow);
-      if (since) query = query.gte('first_detected', since);
-      const { data, error } = await query;
-      if (error) throw error;
-      setOperations((data as InfoOp[]) || []);
+      setOperations([]);
       setLastUpdated(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-    } catch (err) {
-      console.error('Failed to load info ops:', err);
     } finally {
       setLoading(false);
     }
@@ -95,15 +83,6 @@ export function InfoOpsView() {
     loadOps();
   }, [loadOps]);
 
-  useEffect(() => {
-    const channel = supabase
-      .channel('info-ops-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'info_ops' }, () => {
-        loadOps();
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [loadOps]);
 
   const signals = {
     campaigns: operations.length,

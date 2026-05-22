@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Shield, Activity, RefreshCw } from 'lucide-react';
 import { CyberThreat } from '../lib/intelligence-api';
-import { supabase } from '../lib/supabase';
 
 type TimeWindow = '1h' | '6h' | '24h' | '7d' | 'all';
 
@@ -41,19 +40,8 @@ export function CyberView() {
 
   const loadThreats = useCallback(async () => {
     try {
-      let query = supabase
-        .from('cyber_threats')
-        .select('*')
-        .order('first_seen', { ascending: false })
-        .limit(100);
-      const since = getWindowStart(timeWindow);
-      if (since) query = query.gte('first_seen', since);
-      const { data, error } = await query;
-      if (error) throw error;
-      setThreats((data as CyberThreat[]) || []);
+      setThreats([]);
       setLastUpdated(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-    } catch (err) {
-      console.error('Failed to load cyber threats:', err);
     } finally {
       setLoading(false);
     }
@@ -84,15 +72,6 @@ export function CyberView() {
     loadThreats();
   }, [loadThreats]);
 
-  useEffect(() => {
-    const channel = supabase
-      .channel('cyber-threats-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cyber_threats' }, () => {
-        loadThreats();
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [loadThreats]);
 
   const threatLevels = {
     critical: threats.filter(t => t.severity === 'critical').length,

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Activity } from 'lucide-react';
 import { IntelligenceAPI } from '../lib/intelligence-api';
-import { supabase } from '../lib/supabase';
 
 function fmtAge(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -43,19 +42,6 @@ export function UaeView() {
 
   useEffect(() => {
     loadTweets();
-
-    const channel = supabase
-      .channel('uae-twitter-realtime')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'uae_twitter_feed',
-      }, (payload) => {
-        setTweets(prev => [payload.new as any, ...prev]);
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const stats = {

@@ -243,13 +243,12 @@ function App() {
       if (volR.status  === 'fulfilled') setVolcanoes(volR.value.data);
       if (geoR.status  === 'fulfilled') setGeopolitical(geoR.value.data);
 
-      // Determine overall freshness: stale if ANY source served cached data or failed
+      // Only show stale banner when withResilience actually fell back to localStorage cache
       const fulfilled = settled.filter(r => r.status === 'fulfilled') as PromiseFulfilledResult<{ data: any; stale: boolean; staleSince: string | null }>[];
-      const failed    = settled.filter(r => r.status === 'rejected').length;
       const staleResults = fulfilled.filter(r => r.value.stale && r.value.staleSince);
-      const isStale = staleResults.length > 0 || failed > 0;
+      const isStale = staleResults.length > 0;
 
-      const oldestStale = staleResults.length > 0
+      const oldestStale = isStale
         ? staleResults.reduce((oldest, r) =>
             !oldest || new Date(r.value.staleSince!).getTime() < new Date(oldest).getTime()
               ? r.value.staleSince!
@@ -260,13 +259,8 @@ function App() {
       setDataFreshness({
         isStale,
         staleSince: oldestStale,
-        staleAge: failed > 0 && staleResults.length === 0 ? 'unavailable' : formatStaleAge(oldestStale),
+        staleAge: formatStaleAge(oldestStale),
       });
-
-      if (!isStale) {
-        const syncTime = await IntelligenceAPI.getLastSyncTime().catch(() => null);
-        if (syncTime) setLastSyncTime(syncTime);
-      }
     } catch (error) {
       console.error('Error loading data:', error);
       setDataFreshness({ isStale: true, staleSince: null, staleAge: 'unavailable' });

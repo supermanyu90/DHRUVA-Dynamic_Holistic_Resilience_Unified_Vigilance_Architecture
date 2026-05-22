@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase } from '../lib/supabase';
 import { ExternalLink, RefreshCw, Globe, Search, X, Radio, Filter, Clock } from 'lucide-react';
 
 type TimeWindow = '1h' | '6h' | '24h' | '7d' | 'all';
@@ -172,18 +171,7 @@ export function GovAnnouncementsView() {
   const loadAnnouncements = useCallback(async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from('gov_announcements')
-        .select('*')
-        .order('published_at', { ascending: false })
-        .limit(500);
-      const since = getWindowStart(timeWindow);
-      if (since) query = query.gte('published_at', since);
-      const { data, error } = await query;
-      if (error) throw error;
-      setAnnouncements(data || []);
-    } catch (err) {
-      console.error('Failed to load announcements:', err);
+      setAnnouncements([]);
     } finally {
       setLoading(false);
     }
@@ -191,15 +179,6 @@ export function GovAnnouncementsView() {
 
   useEffect(() => { loadAnnouncements(); }, [loadAnnouncements]);
 
-  useEffect(() => {
-    const channel = supabase
-      .channel('gov-announcements-live')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'gov_announcements' }, () => {
-        loadAnnouncements();
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [loadAnnouncements]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
