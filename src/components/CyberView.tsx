@@ -35,8 +35,79 @@ export function CyberView() {
 
   const loadThreats = useCallback(async () => {
     try {
-      setThreats([]);
+      const [feodoRes, urlhausRes, ransomRes] = await Promise.allSettled([
+        fetch('https://feodotracker.abuse.ch/downloads/ipblocklist_aggressive.csv', { signal: AbortSignal.timeout(12_000) }),
+        fetch('https://urlhaus.abuse.ch/feeds/csv_recent/', { signal: AbortSignal.timeout(12_000) }),
+        fetch('https://api.gdeltproject.org/api/v2/doc/doc?query=ransomware+OR+cyberattack+OR+malware+OR+%22data+breach%22&mode=ArtList&format=json&maxrecords=30&timespan=10080min&sort=DateDesc', { signal: AbortSignal.timeout(12_000) }),
+      ]);
+
+      const newThreats: CyberThreat[] = [];
+      let idx = 0;
+
+      if (feodoRes.status === 'fulfilled' && feodoRes.value.ok) {
+        const text = await feodoRes.value.text();
+        const lines = text.split('\n').filter((l: string) => l && !l.startsWith('#') && l.trim());
+        for (const line of lines.slice(0, 40)) {
+          const parts = line.split(',');
+          if (parts.length >= 2) {
+            const ip = parts[0]?.trim();
+            const port = parts[1]?.trim() || '?';
+            newThreats.push({
+              id: `feodo-${idx++}`, threat_id: `feodo-${ip}`,
+              title: `C2 Server: ${ip}`,
+              description: `Botnet C2 infrastructure — Port ${port}`,
+              severity: 'high', threat_type: 'c2_server', is_active: true,
+              first_seen: new Date().toISOString(),
+              last_seen: new Date().toISOString(),
+            });
+          }
+        }
+      }
+
+      if (urlhausRes.status === 'fulfilled' && urlhausRes.value.ok) {
+        const text = await urlhausRes.value.text();
+        const lines = text.split('\n').filter((l: string) => l && !l.startsWith('#') && !l.startsWith('"id"'));
+        for (const line of lines.slice(0, 30)) {
+          const parts = line.split('","').map((p: string) => p.replace(/^"|"$/g, ''));
+          if (parts.length >= 4) {
+            const severity: 'critical' | 'high' | 'medium' | 'low' = parts[5]?.includes('malware_download') ? 'critical' : 'medium';
+            newThreats.push({
+              id: `urlhaus-${idx++}`, threat_id: `urlhaus-${parts[0] || idx}`,
+              title: `Malware Host: ${(parts[2] || 'Unknown URL').slice(0, 60)}`,
+              description: `${parts[4] || 'Malware distribution'} — ${parts[5] || ''}`,
+              severity, threat_type: 'malware_host', is_active: true,
+              first_seen: parts[1] || new Date().toISOString(),
+              last_seen: new Date().toISOString(),
+            });
+          }
+        }
+      }
+
+      if (ransomRes.status === 'fulfilled' && ransomRes.value.ok) {
+        const json = await ransomRes.value.json();
+        const articles: any[] = json?.articles ?? [];
+        for (const a of articles) {
+          const title = (a.title ?? '') as string;
+          const lower = title.toLowerCase();
+          const severity: 'critical' | 'high' | 'medium' | 'low' = lower.includes('critical') || lower.includes('breach') ? 'critical'
+            : lower.includes('ransomware') || lower.includes('attack') ? 'high' : 'medium';
+          newThreats.push({
+            id: `cyber-news-${idx++}`, threat_id: `cyber-gdelt-${idx}`,
+            title: title.slice(0, 120),
+            description: `Source: ${a.domain ?? 'unknown'} — ${title}`,
+            severity, threat_type: lower.includes('ransomware') ? 'ransomware' : lower.includes('phish') ? 'phishing' : 'apt',
+            is_active: true,
+            first_seen: a.seendate ? new Date(a.seendate.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')).toISOString() : new Date().toISOString(),
+            last_seen: new Date().toISOString(),
+          });
+        }
+      }
+
+      setThreats(newThreats);
       setLastUpdated(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    } catch (err) {
+      console.error('Load threats failed:', err);
+      setThreats([]);
     } finally {
       setLoading(false);
     }
@@ -44,22 +115,9 @@ export function CyberView() {
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    try {
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ingest-cyber-threats`;
-      await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      await new Promise(r => setTimeout(r, 2000));
-      await loadThreats();
-    } catch (err) {
-      console.error('Refresh failed:', err);
-    } finally {
-      setRefreshing(false);
-    }
+    setLoading(true);
+    await loadThreats();
+    setRefreshing(false);
   }, [loadThreats]);
 
   useEffect(() => {

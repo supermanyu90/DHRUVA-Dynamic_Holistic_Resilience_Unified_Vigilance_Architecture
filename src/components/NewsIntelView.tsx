@@ -62,93 +62,119 @@ const GDELT_THEMES: { key: GdeltTheme; icon: string; label: string; color: strin
   { key: 'maritime',  icon: '🚢', label: 'MARITIME',  color: '#00BFFF' },
 ];
 
-const DOMAIN_SOURCE_MAP: Record<string, string> = {
-  'bbc.co.uk': 'bbc', 'bbc.com': 'bbc',
-  'aljazeera.com': 'aljazeera', 'aljazeera.net': 'aljazeera',
-  'nytimes.com': 'nytimes',
-  'reuters.com': 'reuters',
-  'apnews.com': 'ap',
-  'theguardian.com': 'guardian',
-  'reliefweb.int': 'reliefweb',
-  'thehindu.com': 'thehindu',
-  'ndtv.com': 'ndtv',
-  'indianexpress.com': 'ie',
-  'hindustantimes.com': 'ht',
-  'business-standard.com': 'bs',
-};
+const RSS_PROXY = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rss-proxy`;
 
-function domainToSource(domain: string): string {
-  if (!domain) return 'GDELT';
-  const d = domain.toLowerCase().replace(/^www\./, '');
-  if (DOMAIN_SOURCE_MAP[d]) return DOMAIN_SOURCE_MAP[d];
-  for (const [pattern, src] of Object.entries(DOMAIN_SOURCE_MAP)) {
-    if (d.includes(pattern)) return src;
+const GLOBAL_FEEDS = [
+  { url: 'https://feeds.bbci.co.uk/news/world/rss.xml', source: 'bbc' },
+  { url: 'https://www.aljazeera.com/xml/rss/all.xml', source: 'aljazeera' },
+  { url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml', source: 'nytimes' },
+  { url: 'https://www.theguardian.com/world/rss', source: 'guardian' },
+  { url: 'https://reliefweb.int/updates/rss.xml', source: 'reliefweb' },
+];
+
+const INDIA_FEEDS = [
+  { url: 'https://www.thehindu.com/news/national/feeder/default.rss', source: 'thehindu' },
+  { url: 'https://feeds.ndtv.com/india-news/rss', source: 'ndtv' },
+  { url: 'https://indianexpress.com/section/india/feed/', source: 'ie' },
+  { url: 'https://www.hindustantimes.com/feeds/rss/india-news/rssfeed.xml', source: 'ht' },
+  { url: 'https://feeds.bbci.co.uk/news/world/asia/india/rss.xml', source: 'bbcindia' },
+];
+
+async function fetchViaRssProxy(feeds: { url: string; source: string }[]): Promise<NewsArticle[]> {
+  try {
+    const params = new URLSearchParams({ urls: JSON.stringify(feeds) });
+    const res = await fetch(`${RSS_PROXY}?${params}`, { signal: AbortSignal.timeout(20_000) });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const items: any[] = json?.items ?? [];
+    return items.map((item: any, i: number) => ({
+      id: `rss-${i}-${Date.now()}`,
+      source: item.source ?? 'GDELT',
+      title: item.title ?? '',
+      url: item.url ?? '',
+      content: item.description ?? item.title ?? '',
+      published_at: item.published ?? new Date().toISOString(),
+      categories: [],
+      sentiment: undefined,
+      tone: undefined,
+      country: undefined,
+      metadata: {},
+    }));
+  } catch {
+    return [];
   }
-  return 'GDELT';
 }
 
-function parseGdeltDate(seendate: string | undefined): string {
-  if (!seendate) return new Date().toISOString();
-  return new Date(seendate.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')).toISOString();
+async function fetchGdeltThemed(timeWindow: string): Promise<NewsArticle[]> {
+  const timespan = timeWindow === '1h' ? '60min' : timeWindow === '6h' ? '360min' : timeWindow === '24h' ? '1440min' : timeWindow === '7d' ? '10080min' : '20160min';
+  try {
+    const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent('sourcelang:english conflict OR crisis OR disaster OR protest OR military OR attack')}&mode=ArtList&format=json&maxrecords=75&timespan=${timespan}&sort=DateDesc`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const items: any[] = json?.articles ?? [];
+    return items.map((a: any, i: number) => ({
+      id: `gdelt-${i}-${Date.now()}`,
+      source: 'GDELT',
+      title: a.title ?? '',
+      url: a.url ?? '',
+      content: a.title ?? '',
+      published_at: a.seendate ? new Date(a.seendate.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')).toISOString() : new Date().toISOString(),
+      categories: [],
+      sentiment: undefined,
+      tone: a.tone ? parseFloat(String(a.tone).split(',')[0]) : undefined,
+      country: a.sourcecountry ?? undefined,
+      metadata: { domain: a.domain ?? '' },
+    }));
+  } catch {
+    return [];
+  }
 }
 
-async function fetchGdelt(query: string, timespan: string, maxrecords: number): Promise<any[]> {
-  const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(query)}&mode=ArtList&format=json&maxrecords=${maxrecords}&timespan=${timespan}&sort=DateDesc`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
-  if (!res.ok) return [];
-  const json = await res.json();
-  return json?.articles ?? [];
+async function fetchGdeltByDomain(domains: string[], sourceKey: string, timeWindow: string): Promise<NewsArticle[]> {
+  const timespan = timeWindow === '1h' ? '60min' : timeWindow === '6h' ? '360min' : timeWindow === '24h' ? '1440min' : timeWindow === '7d' ? '10080min' : '20160min';
+  const domainQuery = domains.map(d => `domain:${d}`).join(' OR ');
+  try {
+    const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(`sourcelang:english ${domainQuery}`)}&mode=ArtList&format=json&maxrecords=15&timespan=${timespan}&sort=DateDesc`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return (json?.articles ?? []).map((a: any, i: number) => ({
+      id: `${sourceKey}-${i}-${Date.now()}`,
+      source: sourceKey,
+      title: a.title ?? '',
+      url: a.url ?? '',
+      content: a.title ?? '',
+      published_at: a.seendate ? new Date(a.seendate.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')).toISOString() : new Date().toISOString(),
+      categories: [],
+      sentiment: undefined,
+      tone: a.tone ? parseFloat(String(a.tone).split(',')[0]) : undefined,
+      country: a.sourcecountry ?? undefined,
+      metadata: { domain: a.domain ?? '' },
+    }));
+  } catch {
+    return [];
+  }
 }
 
 async function fetchAllSources(group: NewsGroup, timeWindow: string): Promise<NewsArticle[]> {
-  const timespan = timeWindow === '1h' ? '60min' : timeWindow === '6h' ? '360min' : timeWindow === '24h' ? '1440min' : timeWindow === '7d' ? '10080min' : '20160min';
-
-  const queries: string[] = [];
   if (group === 'global') {
-    queries.push(
-      'sourcelang:english domain:bbc.co.uk OR domain:bbc.com',
-      'sourcelang:english domain:aljazeera.com',
-      'sourcelang:english domain:nytimes.com',
-      'sourcelang:english domain:reuters.com',
-      'sourcelang:english domain:apnews.com',
-      'sourcelang:english domain:theguardian.com',
-      'sourcelang:english domain:reliefweb.int',
-    );
+    const [rssResults, reutersResults, apResults] = await Promise.allSettled([
+      fetchViaRssProxy(GLOBAL_FEEDS),
+      fetchGdeltByDomain(['reuters.com'], 'reuters', timeWindow),
+      fetchGdeltByDomain(['apnews.com'], 'ap', timeWindow),
+    ]);
+    const articles: NewsArticle[] = [];
+    if (rssResults.status === 'fulfilled') articles.push(...rssResults.value);
+    if (reutersResults.status === 'fulfilled') articles.push(...reutersResults.value);
+    if (apResults.status === 'fulfilled') articles.push(...apResults.value);
+    articles.sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime());
+    return articles;
   } else if (group === 'india') {
-    queries.push(
-      'sourcelang:english domain:thehindu.com OR domain:ndtv.com OR domain:indianexpress.com OR domain:hindustantimes.com OR domain:business-standard.com OR domain:bbc.co.uk India',
-    );
+    return fetchViaRssProxy(INDIA_FEEDS);
   } else {
-    queries.push('sourcelang:english conflict OR crisis OR disaster OR protest OR military OR attack');
+    return fetchGdeltThemed(timeWindow);
   }
-
-  const fetches = queries.map(q => fetchGdelt(q, timespan, group === 'gdelt' ? 75 : 15));
-  const results = await Promise.allSettled(fetches);
-
-  const allArticles: NewsArticle[] = [];
-  let idx = 0;
-  for (const r of results) {
-    if (r.status !== 'fulfilled') continue;
-    for (const a of r.value) {
-      const source = domainToSource(a.domain ?? '');
-      allArticles.push({
-        id: `news-${idx++}-${Date.now()}`,
-        source,
-        title: a.title ?? '',
-        url: a.url ?? '',
-        content: a.title ?? '',
-        published_at: parseGdeltDate(a.seendate),
-        categories: [],
-        sentiment: undefined,
-        tone: a.tone ? parseFloat(String(a.tone).split(',')[0]) : undefined,
-        country: a.sourcecountry ?? undefined,
-        metadata: { domain: a.domain ?? '', language: a.language ?? '', socialimage: a.socialimage ?? '' },
-      });
-    }
-  }
-
-  allArticles.sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime());
-  return allArticles;
 }
 
 export function NewsIntelView() {

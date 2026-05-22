@@ -46,8 +46,49 @@ export function InfoOpsView() {
 
   const loadOps = useCallback(async () => {
     try {
-      setOperations([]);
+      const timespan = timeWindow === '1h' ? '60min' : timeWindow === '6h' ? '360min' : timeWindow === '24h' ? '1440min' : timeWindow === '7d' ? '10080min' : '20160min';
+      const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent('disinformation OR propaganda OR "information warfare" OR "fake news" OR "influence operation" OR deepfake OR bot network OR troll farm')}&mode=ArtList&format=json&maxrecords=50&timespan=${timespan}&sort=DateDesc`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) throw new Error(`GDELT ${res.status}`);
+      const json = await res.json();
+      const articles: any[] = json?.articles ?? [];
+
+      const PLATFORM_KW: Record<string, string[]> = {
+        x: ['twitter', 'x.com', 'tweet'], fb: ['facebook', 'meta', 'instagram'],
+        tg: ['telegram'], yt: ['youtube'], wa: ['whatsapp'],
+        rt: ['rt.com', 'russia today', 'sputnik'], ig: ['instagram'],
+      };
+      const COUNTRIES = ['Russia', 'China', 'Iran', 'North Korea', 'Unknown'];
+
+      const ops: InfoOp[] = articles.map((a: any, i: number) => {
+        const title = a.title ?? '';
+        const lower = title.toLowerCase();
+        let platform = 'x';
+        for (const [p, kws] of Object.entries(PLATFORM_KW)) {
+          if (kws.some(kw => lower.includes(kw))) { platform = p; break; }
+        }
+        let country = 'Unknown';
+        for (const c of COUNTRIES) {
+          if (lower.includes(c.toLowerCase())) { country = c; break; }
+        }
+
+        return {
+          id: `infoop-${i}-${Date.now()}`,
+          campaign_id: `camp-${i}`,
+          title: title.slice(0, 150),
+          description: `Source: ${a.domain ?? 'unknown'} — ${title}`,
+          platform,
+          origin_country: country,
+          is_active: true,
+          first_detected: a.seendate ? new Date(a.seendate.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')).toISOString() : new Date().toISOString(),
+        };
+      });
+
+      setOperations(ops);
       setLastUpdated(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    } catch (err) {
+      console.error('Load info ops failed:', err);
+      setOperations([]);
     } finally {
       setLoading(false);
     }
@@ -55,22 +96,9 @@ export function InfoOpsView() {
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    try {
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ingest-info-ops`;
-      await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      await new Promise(r => setTimeout(r, 2000));
-      await loadOps();
-    } catch (err) {
-      console.error('Refresh failed:', err);
-    } finally {
-      setRefreshing(false);
-    }
+    setLoading(true);
+    await loadOps();
+    setRefreshing(false);
   }, [loadOps]);
 
   useEffect(() => {

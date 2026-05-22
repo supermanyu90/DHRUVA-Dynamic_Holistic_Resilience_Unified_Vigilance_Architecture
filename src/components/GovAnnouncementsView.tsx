@@ -166,6 +166,47 @@ export function GovAnnouncementsView() {
   const loadAnnouncements = useCallback(async () => {
     setLoading(true);
     try {
+      const RSS_PROXY = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rss-proxy`;
+      const GOV_FEEDS = [
+        { url: 'https://www.whitehouse.gov/feed/', source: 'whitehouse', country: 'United States', country_code: 'US', region: 'Americas', category: 'Executive' },
+        { url: 'https://www.state.gov/rss-feed/press-releases/feed/', source: 'state_dept', country: 'United States', country_code: 'US', region: 'Americas', category: 'Diplomatic' },
+        { url: 'https://www.gov.uk/government/organisations/foreign-commonwealth-development-office.atom', source: 'fcdo', country: 'United Kingdom', country_code: 'GB', region: 'Europe', category: 'Diplomatic' },
+        { url: 'https://pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=3', source: 'pib', country: 'India', country_code: 'IN', region: 'South Asia', category: 'Government' },
+        { url: 'https://mea.gov.in/RSS/rss_pressrelease_eng.xml', source: 'mea', country: 'India', country_code: 'IN', region: 'South Asia', category: 'Diplomatic' },
+        { url: 'https://news.un.org/feed/subscribe/en/news/all/rss.xml', source: 'un', country: 'International', country_code: 'UN', region: 'International', category: 'International' },
+        { url: 'https://www.nato.int/cps/en/natolive/news.xml', source: 'nato', country: 'NATO', country_code: 'NATO', region: 'Europe', category: 'Defense' },
+        { url: 'https://www.iaea.org/feeds/press-releases', source: 'iaea', country: 'International', country_code: 'UN', region: 'International', category: 'Nuclear' },
+      ];
+
+      const feedsForProxy = GOV_FEEDS.map(f => ({ url: f.url, source: f.source }));
+      const params = new URLSearchParams({ urls: JSON.stringify(feedsForProxy) });
+      const res = await fetch(`${RSS_PROXY}?${params}`, { signal: AbortSignal.timeout(25_000) });
+
+      if (!res.ok) throw new Error(`Proxy ${res.status}`);
+      const json = await res.json();
+      const items: any[] = json?.items ?? [];
+
+      const mapped: GovAnnouncement[] = items.map((item: any, i: number) => {
+        const feedMeta = GOV_FEEDS.find(f => f.source === item.source) || GOV_FEEDS[0];
+        return {
+          id: `gov-${i}-${Date.now()}`,
+          feed_key: item.source ?? 'unknown',
+          country: feedMeta.country,
+          country_code: feedMeta.country_code,
+          source: feedMeta.source,
+          region: feedMeta.region,
+          category: feedMeta.category,
+          title: item.title ?? '',
+          url: item.url ?? '',
+          content: item.description ?? '',
+          published_at: item.published ?? new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        };
+      });
+
+      setAnnouncements(mapped);
+    } catch (err) {
+      console.error('Load announcements failed:', err);
       setAnnouncements([]);
     } finally {
       setLoading(false);
@@ -174,25 +215,10 @@ export function GovAnnouncementsView() {
 
   useEffect(() => { loadAnnouncements(); }, [loadAnnouncements]);
 
-
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    try {
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ingest-gov-announcements`;
-      await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      await new Promise(r => setTimeout(r, 3000));
-      await loadAnnouncements();
-    } catch (err) {
-      console.error('Refresh failed:', err);
-    } finally {
-      setRefreshing(false);
-    }
+    await loadAnnouncements();
+    setRefreshing(false);
   }, [loadAnnouncements]);
 
   const allCountries = useMemo(() => {
