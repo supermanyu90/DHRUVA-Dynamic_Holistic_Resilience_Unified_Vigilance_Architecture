@@ -10,8 +10,7 @@ type ViewMode = 'split' | 'map' | 'table';
 
 const TYPE_FILTERS = ['ALL', 'Tanker', 'Cargo', 'Military', 'Passenger', 'Fishing', 'Tug'];
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
 
 export function VesselView() {
   const [activeTab, setActiveTab] = useState<TabType>('live');
@@ -46,62 +45,20 @@ export function VesselView() {
   }, []);
 
   useEffect(() => {
-    // Auto-sync on mount to ensure DB reflects live AIS if key is configured
-    const autoSync = async () => {
-      try {
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/ingest-vessels`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
-        });
-        const json = await res.json().catch(() => ({}));
-        if (json.source && (String(json.source).startsWith('aisstream') || String(json.source).startsWith('aishub') || String(json.source).startsWith('vesselapi'))) setDataSource('live');
-      } catch { /* silent */ }
-      loadVessels();
-    };
-    autoSync();
-    const sub = IntelligenceAPI.subscribeToVessels((updated) => {
-      setVessels(prev => prev.map(v => v.mmsi === updated.mmsi ? updated : v));
-    });
-    return () => { sub.unsubscribe(); };
+    loadVessels();
   }, [loadVessels]);
 
   const handleSync = async () => {
     setSyncing(true);
-    try {
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/ingest-vessels`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
-      });
-      const json = await res.json().catch(() => ({}));
-      if (json.source && (String(json.source).startsWith('aisstream') || String(json.source).startsWith('aishub') || String(json.source).startsWith('vesselapi'))) setDataSource('live');
-      setTimeout(loadVessels, 1500);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setTimeout(() => setSyncing(false), 1500);
-    }
+    await loadVessels();
+    setSyncing(false);
   };
 
   const handleSearch = async () => {
-    if (!searchQuery && !mmsiQuery) {
-      const data = await IntelligenceAPI.getVessels(100);
-      setSearchResults(data);
-      return;
-    }
     setSearching(true);
     try {
-      const params = new URLSearchParams();
-      if (mmsiQuery) params.set('mmsi', mmsiQuery);
-      else if (searchQuery) params.set('q', searchQuery);
-      if (typeFilter !== 'ALL') params.set('type', typeFilter);
-      if (flagFilter) params.set('flag', flagFilter.toUpperCase());
-      params.set('limit', '100');
-
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/vessel-search?${params}`, {
-        headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-      });
-      const data = await res.json();
-      setSearchResults(data.vessels || []);
+      const data = await IntelligenceAPI.getVessels(100);
+      setSearchResults(data);
     } catch (e) {
       console.error(e);
     } finally {

@@ -510,6 +510,7 @@ export function WorldMapSVG({
     const MAX_CHARS_PER_LINE = 16;
 
     function wrapText(name: string): string[] {
+      if (!name) return [''];
       const words = name.split(' ');
       const lines: string[] = [];
       let current = '';
@@ -1370,6 +1371,7 @@ export function WorldMapSVG({
 
         {layersEnabled.disasters &&
           disasters.slice(0, 30).map((disaster) => {
+            if (!disaster.id) return null;
             const hash = disaster.id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
             const stableLat = ((hash * 9301 + 49297) % 139) - 69;
             const stableLon = ((hash * 49297 + 233) % 299) - 149;

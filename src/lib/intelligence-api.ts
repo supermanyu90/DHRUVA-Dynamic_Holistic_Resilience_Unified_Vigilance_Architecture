@@ -1,7 +1,3 @@
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const ANON_KEY     = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-const FUNCTIONS_URL = `${SUPABASE_URL}/functions/v1`;
-
 export interface Earthquake {
   id: string;
   event_id: string;
@@ -302,44 +298,6 @@ function usgsFeatureToEarthquake(f: USGSFeature): Earthquake {
   };
 }
 
-// ── GDACS disaster feed parsing ───────────────────────────────────────────────
-
-interface GDACSEntry {
-  guid: string;
-  title: string;
-  'gdacs:eventtype': string;
-  'gdacs:latitude': string;
-  'gdacs:longitude': string;
-  pubDate: string;
-}
-
-function gdacsEntryToDisaster(e: GDACSEntry): Disaster {
-  return {
-    id: e.guid,
-    event_id: e.guid,
-    title: e.title,
-    category: e['gdacs:eventtype'] ?? 'unknown',
-    latitude: parseFloat(e['gdacs:latitude'] ?? '0') || null,
-    longitude: parseFloat(e['gdacs:longitude'] ?? '0') || null,
-    event_date: e.pubDate ? new Date(e.pubDate).toISOString() : new Date().toISOString(),
-    closed: false,
-    properties: e as any,
-  };
-}
-
-// ── Edge function helper ──────────────────────────────────────────────────────
-
-async function callEdgeFunction<T>(slug: string, params?: Record<string, string>): Promise<T[]> {
-  const url = new URL(`${FUNCTIONS_URL}/${slug}`);
-  if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetch(url.toString(), {
-    headers: { Authorization: `Bearer ${ANON_KEY}` },
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!res.ok) throw new Error(`Edge function ${slug} returned ${res.status}`);
-  const json = await res.json();
-  return Array.isArray(json) ? json : (json.data ?? []);
-}
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -352,46 +310,14 @@ export class IntelligenceAPI {
     return (json.features as USGSFeature[]).map(usgsFeatureToEarthquake);
   }
 
-  static async getDisasters(limit = 100): Promise<Disaster[]> {
-    const url = `https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?alertlevel=Green&fromDate=${new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0,10)}&toDate=${new Date().toISOString().slice(0,10)}&orderby=alertscore&pagesize=${Math.min(limit, 100)}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(12_000) });
-    if (!res.ok) throw new Error(`GDACS ${res.status}`);
-    const json = await res.json();
-    const items: GDACSEntry[] = json?.features ?? json?.Results ?? [];
-    return items.map(gdacsEntryToDisaster);
+  static async getDisasters(_limit = 100): Promise<Disaster[]> {
+    return [];
   }
 
-  static async getNews(limit = 100): Promise<NewsEvent[]> {
-    try {
-      return await callEdgeFunction<NewsEvent>('ingest-news-intel', { limit: String(limit) });
-    } catch {
-      return [];
-    }
-  }
-
-  static async getVessels(limit = 100): Promise<Vessel[]> {
-    try {
-      return await callEdgeFunction<Vessel>('ingest-vessels', { limit: String(limit) });
-    } catch {
-      return [];
-    }
-  }
-
-  static async getVolcanoes(limit = 100): Promise<VolcanoEvent[]> {
-    try {
-      return await callEdgeFunction<VolcanoEvent>('ingest-volcanoes', { limit: String(limit) });
-    } catch {
-      return [];
-    }
-  }
-
-  static async getGeopoliticalEvents(limit = 100): Promise<GeopoliticalEvent[]> {
-    try {
-      return await callEdgeFunction<GeopoliticalEvent>('ingest-geopolitical', { limit: String(limit) });
-    } catch {
-      return [];
-    }
-  }
+  static async getNews(_limit = 100): Promise<NewsEvent[]> { return []; }
+  static async getVessels(_limit = 100): Promise<Vessel[]> { return []; }
+  static async getVolcanoes(_limit = 100): Promise<VolcanoEvent[]> { return []; }
+  static async getGeopoliticalEvents(_limit = 100): Promise<GeopoliticalEvent[]> { return []; }
 
   static async getCyberThreats(_limit = 100): Promise<CyberThreat[]> { return []; }
   static async getBankEvents(_limit = 100): Promise<BankEvent[]> { return []; }
@@ -406,12 +332,7 @@ export class IntelligenceAPI {
   static async getAlertLifecycleCounts(): Promise<LifecycleCounts> { return { active: 0, updated: 0, expired: 0 }; }
   static async getLastSyncTime(): Promise<string | null> { return null; }
 
-  static async triggerDataSync(): Promise<void> {
-    await fetch(`${FUNCTIONS_URL}/scheduler`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${ANON_KEY}` },
-    });
-  }
+  static async triggerDataSync(): Promise<void> {}
 
   // Realtime subscriptions are no-ops without DB — return a dummy unsubscribable object
   private static noopChannel() {
