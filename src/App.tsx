@@ -95,7 +95,6 @@ function App() {
   const [currentView, setCurrentView] = useState<ViewType>('map');
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
   const [pendingDrawer, setPendingDrawer] = useState<{ id: string; type: string } | null>(null);
-  const [mode, setMode] = useState<'live' | 'archive'>('live');
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [layersEnabled, setLayersEnabled] = useState({
     earthquakes: true,
@@ -636,8 +635,6 @@ function App() {
           pendingDrawer={pendingDrawer}
           onPendingDrawerConsumed={() => setPendingDrawer(null)}
           onEventSelect={(id, type) => { handleEventSelect(id, type); setMobileSidebarOpen(false); }}
-          mode={mode}
-          onModeChange={setMode}
           layersEnabled={layersEnabled}
           onLayerToggle={handleLayerToggle}
           mobileOpen={mobileSidebarOpen}
@@ -701,8 +698,8 @@ function App() {
           REALTIME: ACTIVE
         </div>
         <div>
-          <span className="sdot" style={{ background: '#FFB800' }}></span>
-          MODE: {mode.toUpperCase()}
+          <span className="sdot" style={{ background: '#00D4A0', animation: 'statusPulse 2s ease-in-out infinite' }}></span>
+          MODE: LIVE
         </div>
         <div>
           <span className="sdot" style={{ background: syncing ? '#FFB800' : '#4D9FFF' }}></span>
