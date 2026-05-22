@@ -79,6 +79,37 @@ export function NewsIntelView() {
   const loadArticles = async () => {
     setLoading(true);
     try {
+      const queryTerms = newsGroup === 'india'
+        ? 'India OR Modi OR Delhi OR Mumbai'
+        : newsGroup === 'gdelt'
+        ? 'conflict OR crisis OR military OR protest OR disaster'
+        : 'world news politics economy conflict';
+
+      const timespan = timeWindow === '1h' ? '60min' : timeWindow === '6h' ? '360min' : timeWindow === '24h' ? '1440min' : timeWindow === '7d' ? '10080min' : '20160min';
+
+      const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(queryTerms)}&mode=ArtList&format=json&maxrecords=75&timespan=${timespan}&sort=DateDesc`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) throw new Error(`GDELT ${res.status}`);
+      const json = await res.json();
+      const items: any[] = json?.articles ?? [];
+
+      const mapped: NewsArticle[] = items.map((a: any, i: number) => ({
+        id: `gdelt-${i}-${Date.now()}`,
+        source: 'GDELT',
+        title: a.title ?? '',
+        url: a.url ?? '',
+        content: a.title ?? '',
+        published_at: a.seendate ? new Date(a.seendate.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')).toISOString() : new Date().toISOString(),
+        categories: [],
+        sentiment: undefined,
+        tone: a.tone ? parseFloat(String(a.tone).split(',')[0]) : undefined,
+        country: a.sourcecountry ?? undefined,
+        metadata: { domain: a.domain ?? '', language: a.language ?? '', socialimage: a.socialimage ?? '' },
+      }));
+
+      setArticles(mapped);
+    } catch (err) {
+      console.error('Failed to load news from GDELT:', err);
       setArticles([]);
     } finally {
       setLoading(false);

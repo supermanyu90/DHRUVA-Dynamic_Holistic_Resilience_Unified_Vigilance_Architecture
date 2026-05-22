@@ -314,10 +314,70 @@ export class IntelligenceAPI {
     return [];
   }
 
-  static async getNews(_limit = 100): Promise<NewsEvent[]> { return []; }
+  static async getNews(limit = 100): Promise<NewsEvent[]> {
+    try {
+      const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent('world news')}&mode=ArtList&format=json&maxrecords=${Math.min(limit, 50)}&timespan=1440min&sort=DateDesc`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+      if (!res.ok) return [];
+      const json = await res.json();
+      const items: any[] = json?.articles ?? [];
+      return items.map((a: any, i: number) => ({
+        id: `news-${i}-${Date.now()}`,
+        source: 'GDELT',
+        title: a.title ?? '',
+        url: a.url ?? '',
+        content: a.title ?? '',
+        published_at: a.seendate ? new Date(a.seendate.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')).toISOString() : new Date().toISOString(),
+        country: a.sourcecountry ?? null,
+        latitude: null,
+        longitude: null,
+        categories: [],
+        sentiment: null,
+      }));
+    } catch {
+      return [];
+    }
+  }
   static async getVessels(_limit = 100): Promise<Vessel[]> { return []; }
   static async getVolcanoes(_limit = 100): Promise<VolcanoEvent[]> { return []; }
-  static async getGeopoliticalEvents(_limit = 100): Promise<GeopoliticalEvent[]> { return []; }
+  static async getGeopoliticalEvents(limit = 100): Promise<GeopoliticalEvent[]> {
+    try {
+      const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent('conflict OR protest OR coup OR sanctions OR military OR crisis')}&mode=ArtList&format=json&maxrecords=${Math.min(limit, 50)}&timespan=4320min&sort=DateDesc`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+      if (!res.ok) return [];
+      const json = await res.json();
+      const items: any[] = json?.articles ?? [];
+
+      const categories: GeopoliticalEvent['category'][] = ['conflict', 'sanctions', 'protest', 'crisis', 'geopolitical', 'coup', 'curfew'];
+      return items.map((a: any, i: number) => {
+        const title = (a.title ?? '') as string;
+        const lower = title.toLowerCase();
+        const category = categories.find(c => lower.includes(c)) ?? 'geopolitical';
+        const severity: GeopoliticalEvent['severity'] = lower.includes('kill') || lower.includes('attack') || lower.includes('bomb') ? 'critical'
+          : lower.includes('war') || lower.includes('military') || lower.includes('missile') ? 'high'
+          : lower.includes('protest') || lower.includes('crisis') ? 'medium' : 'low';
+
+        return {
+          id: `geo-${i}-${Date.now()}`,
+          event_id: `geo-${i}`,
+          title,
+          category,
+          country: a.sourcecountry ?? null,
+          latitude: null,
+          longitude: null,
+          description: title,
+          severity,
+          is_active: true,
+          started_at: a.seendate ? new Date(a.seendate.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')).toISOString() : new Date().toISOString(),
+          source: a.domain ?? 'GDELT',
+          properties: { url: a.url, domain: a.domain },
+          updated_at: new Date().toISOString(),
+        };
+      });
+    } catch {
+      return [];
+    }
+  }
 
   static async getCyberThreats(_limit = 100): Promise<CyberThreat[]> { return []; }
   static async getBankEvents(_limit = 100): Promise<BankEvent[]> { return []; }
