@@ -62,6 +62,95 @@ const GDELT_THEMES: { key: GdeltTheme; icon: string; label: string; color: strin
   { key: 'maritime',  icon: '🚢', label: 'MARITIME',  color: '#00BFFF' },
 ];
 
+const DOMAIN_SOURCE_MAP: Record<string, string> = {
+  'bbc.co.uk': 'bbc', 'bbc.com': 'bbc',
+  'aljazeera.com': 'aljazeera', 'aljazeera.net': 'aljazeera',
+  'nytimes.com': 'nytimes',
+  'reuters.com': 'reuters',
+  'apnews.com': 'ap',
+  'theguardian.com': 'guardian',
+  'reliefweb.int': 'reliefweb',
+  'thehindu.com': 'thehindu',
+  'ndtv.com': 'ndtv',
+  'indianexpress.com': 'ie',
+  'hindustantimes.com': 'ht',
+  'business-standard.com': 'bs',
+};
+
+function domainToSource(domain: string): string {
+  if (!domain) return 'GDELT';
+  const d = domain.toLowerCase().replace(/^www\./, '');
+  if (DOMAIN_SOURCE_MAP[d]) return DOMAIN_SOURCE_MAP[d];
+  for (const [pattern, src] of Object.entries(DOMAIN_SOURCE_MAP)) {
+    if (d.includes(pattern)) return src;
+  }
+  return 'GDELT';
+}
+
+function parseGdeltDate(seendate: string | undefined): string {
+  if (!seendate) return new Date().toISOString();
+  return new Date(seendate.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')).toISOString();
+}
+
+async function fetchGdelt(query: string, timespan: string, maxrecords: number): Promise<any[]> {
+  const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(query)}&mode=ArtList&format=json&maxrecords=${maxrecords}&timespan=${timespan}&sort=DateDesc`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json?.articles ?? [];
+}
+
+async function fetchAllSources(group: NewsGroup, timeWindow: string): Promise<NewsArticle[]> {
+  const timespan = timeWindow === '1h' ? '60min' : timeWindow === '6h' ? '360min' : timeWindow === '24h' ? '1440min' : timeWindow === '7d' ? '10080min' : '20160min';
+
+  const queries: string[] = [];
+  if (group === 'global') {
+    queries.push(
+      'sourcelang:english domain:bbc.co.uk OR domain:bbc.com',
+      'sourcelang:english domain:aljazeera.com',
+      'sourcelang:english domain:nytimes.com',
+      'sourcelang:english domain:reuters.com',
+      'sourcelang:english domain:apnews.com',
+      'sourcelang:english domain:theguardian.com',
+      'sourcelang:english domain:reliefweb.int',
+    );
+  } else if (group === 'india') {
+    queries.push(
+      'sourcelang:english domain:thehindu.com OR domain:ndtv.com OR domain:indianexpress.com OR domain:hindustantimes.com OR domain:business-standard.com OR domain:bbc.co.uk India',
+    );
+  } else {
+    queries.push('sourcelang:english conflict OR crisis OR disaster OR protest OR military OR attack');
+  }
+
+  const fetches = queries.map(q => fetchGdelt(q, timespan, group === 'gdelt' ? 75 : 15));
+  const results = await Promise.allSettled(fetches);
+
+  const allArticles: NewsArticle[] = [];
+  let idx = 0;
+  for (const r of results) {
+    if (r.status !== 'fulfilled') continue;
+    for (const a of r.value) {
+      const source = domainToSource(a.domain ?? '');
+      allArticles.push({
+        id: `news-${idx++}-${Date.now()}`,
+        source,
+        title: a.title ?? '',
+        url: a.url ?? '',
+        content: a.title ?? '',
+        published_at: parseGdeltDate(a.seendate),
+        categories: [],
+        sentiment: undefined,
+        tone: a.tone ? parseFloat(String(a.tone).split(',')[0]) : undefined,
+        country: a.sourcecountry ?? undefined,
+        metadata: { domain: a.domain ?? '', language: a.language ?? '', socialimage: a.socialimage ?? '' },
+      });
+    }
+  }
+
+  allArticles.sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime());
+  return allArticles;
+}
+
 export function NewsIntelView() {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,37 +168,10 @@ export function NewsIntelView() {
   const loadArticles = async () => {
     setLoading(true);
     try {
-      const queryTerms = newsGroup === 'india'
-        ? 'India OR Modi OR Delhi OR Mumbai'
-        : newsGroup === 'gdelt'
-        ? 'conflict OR crisis OR military OR protest OR disaster'
-        : 'world news politics economy conflict';
-
-      const timespan = timeWindow === '1h' ? '60min' : timeWindow === '6h' ? '360min' : timeWindow === '24h' ? '1440min' : timeWindow === '7d' ? '10080min' : '20160min';
-
-      const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(queryTerms)}&mode=ArtList&format=json&maxrecords=75&timespan=${timespan}&sort=DateDesc`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
-      if (!res.ok) throw new Error(`GDELT ${res.status}`);
-      const json = await res.json();
-      const items: any[] = json?.articles ?? [];
-
-      const mapped: NewsArticle[] = items.map((a: any, i: number) => ({
-        id: `gdelt-${i}-${Date.now()}`,
-        source: 'GDELT',
-        title: a.title ?? '',
-        url: a.url ?? '',
-        content: a.title ?? '',
-        published_at: a.seendate ? new Date(a.seendate.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')).toISOString() : new Date().toISOString(),
-        categories: [],
-        sentiment: undefined,
-        tone: a.tone ? parseFloat(String(a.tone).split(',')[0]) : undefined,
-        country: a.sourcecountry ?? undefined,
-        metadata: { domain: a.domain ?? '', language: a.language ?? '', socialimage: a.socialimage ?? '' },
-      }));
-
-      setArticles(mapped);
+      const results = await fetchAllSources(newsGroup, timeWindow);
+      setArticles(results);
     } catch (err) {
-      console.error('Failed to load news from GDELT:', err);
+      console.error('Failed to load news:', err);
       setArticles([]);
     } finally {
       setLoading(false);
