@@ -90,9 +90,9 @@ export function Sidebar({
     onPendingDrawerConsumed?.();
   }, [pendingDrawer]);
 
-  const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const last72Hours = new Date(Date.now() - 72 * 60 * 60 * 1000);
 
-  const filterByMode = (eventTime: Date) => eventTime >= last24Hours;
+  const filterByMode = (eventTime: Date) => eventTime >= last72Hours;
 
   const curfewEvents = geopolitical.filter((g) => g.category === 'curfew');
 

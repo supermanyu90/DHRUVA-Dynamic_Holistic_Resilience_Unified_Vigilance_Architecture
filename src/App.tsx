@@ -106,10 +106,10 @@ function App() {
     nuclear: false,
     chokepoints: false,
     daynight: false,
-    vessels: false,
-    volcanoes: false,
-    geopolitical: false,
-    curfews: false,
+    vessels: true,
+    volcanoes: true,
+    geopolitical: true,
+    curfews: true,
   });
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try {
