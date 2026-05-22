@@ -226,30 +226,34 @@ function App() {
     try {
       // Each source is fetched independently with resilience so one failing
       // source never blocks the others. Settled results are applied regardless.
-      const [eqRes, disRes, newsRes, vesRes, volRes, geoRes] = await Promise.all([
-        withResilience('earthquakes', () => IntelligenceAPI.getEarthquakes(4.0, 50)),
-        withResilience('disasters',   () => IntelligenceAPI.getDisasters(50)),
-        withResilience('news',        () => IntelligenceAPI.getNews(50)),
-        withResilience('vessels',     () => IntelligenceAPI.getVessels(50)),
-        withResilience('volcanoes',   () => IntelligenceAPI.getVolcanoes(50)),
-        withResilience('geopolitical',() => IntelligenceAPI.getGeopoliticalEvents(50)),
+      const settled = await Promise.allSettled([
+        withResilience('earthquakes', () => IntelligenceAPI.getEarthquakes(4.0, 50), { maxRetries: 1, baseDelayMs: 300 }),
+        withResilience('disasters',   () => IntelligenceAPI.getDisasters(50),         { maxRetries: 1, baseDelayMs: 300 }),
+        withResilience('news',        () => IntelligenceAPI.getNews(50),              { maxRetries: 1, baseDelayMs: 300 }),
+        withResilience('vessels',     () => IntelligenceAPI.getVessels(50),           { maxRetries: 1, baseDelayMs: 300 }),
+        withResilience('volcanoes',   () => IntelligenceAPI.getVolcanoes(50),         { maxRetries: 1, baseDelayMs: 300 }),
+        withResilience('geopolitical',() => IntelligenceAPI.getGeopoliticalEvents(50),{ maxRetries: 1, baseDelayMs: 300 }),
       ]);
 
-      setEarthquakes(eqRes.data);
-      setDisasters(disRes.data);
-      setNews(newsRes.data);
-      setVessels(vesRes.data);
-      setVolcanoes(volRes.data);
-      setGeopolitical(geoRes.data);
+      const [eqR, disR, newsR, vesR, volR, geoR] = settled;
 
-      // Determine overall freshness: stale if ANY source served cached data
-      const allResults = [eqRes, disRes, newsRes, vesRes, volRes, geoRes];
-      const staleResults = allResults.filter(r => r.stale && r.staleSince);
-      const isStale = staleResults.length > 0;
-      const oldestStale = isStale
+      if (eqR.status   === 'fulfilled') setEarthquakes(eqR.value.data);
+      if (disR.status  === 'fulfilled') setDisasters(disR.value.data);
+      if (newsR.status === 'fulfilled') setNews(newsR.value.data);
+      if (vesR.status  === 'fulfilled') setVessels(vesR.value.data);
+      if (volR.status  === 'fulfilled') setVolcanoes(volR.value.data);
+      if (geoR.status  === 'fulfilled') setGeopolitical(geoR.value.data);
+
+      // Determine overall freshness: stale if ANY source served cached data or failed
+      const fulfilled = settled.filter(r => r.status === 'fulfilled') as PromiseFulfilledResult<{ data: any; stale: boolean; staleSince: string | null }>[];
+      const failed    = settled.filter(r => r.status === 'rejected').length;
+      const staleResults = fulfilled.filter(r => r.value.stale && r.value.staleSince);
+      const isStale = staleResults.length > 0 || failed > 0;
+
+      const oldestStale = staleResults.length > 0
         ? staleResults.reduce((oldest, r) =>
-            !oldest || new Date(r.staleSince!).getTime() < new Date(oldest).getTime()
-              ? r.staleSince!
+            !oldest || new Date(r.value.staleSince!).getTime() < new Date(oldest).getTime()
+              ? r.value.staleSince!
               : oldest
           , null as string | null)
         : null;
@@ -257,7 +261,7 @@ function App() {
       setDataFreshness({
         isStale,
         staleSince: oldestStale,
-        staleAge: formatStaleAge(oldestStale),
+        staleAge: failed > 0 && staleResults.length === 0 ? 'unavailable' : formatStaleAge(oldestStale),
       });
 
       if (!isStale) {
@@ -265,8 +269,6 @@ function App() {
         if (syncTime) setLastSyncTime(syncTime);
       }
     } catch (error) {
-      // Complete cold failure (no cache at all for any source) — keep
-      // whatever is in state (empty arrays on first load) and mark stale
       console.error('Error loading data:', error);
       setDataFreshness({ isStale: true, staleSince: null, staleAge: 'unavailable' });
     } finally {
