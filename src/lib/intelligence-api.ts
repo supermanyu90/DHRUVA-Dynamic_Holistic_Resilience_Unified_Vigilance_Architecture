@@ -423,17 +423,23 @@ export class IntelligenceAPI {
   }
   static async getGeopoliticalEvents(limit = 100): Promise<GeopoliticalEvent[]> {
     try {
-      const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent('conflict OR protest OR coup OR sanctions OR military OR crisis')}&mode=ArtList&format=json&maxrecords=${Math.min(limit, 50)}&timespan=4320min&sort=DateDesc`;
+      const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent('conflict OR protest OR coup OR sanctions OR military OR crisis OR curfew OR "martial law" OR lockdown OR "state of emergency"')}&mode=ArtList&format=json&maxrecords=${Math.min(limit, 50)}&timespan=4320min&sort=DateDesc`;
       const res = await fetch(url, { signal: AbortSignal.timeout(12_000) });
       if (!res.ok) return [];
       const json = await res.json();
       const items: any[] = json?.articles ?? [];
 
-      const categories: GeopoliticalEvent['category'][] = ['conflict', 'sanctions', 'protest', 'crisis', 'geopolitical', 'coup', 'curfew'];
       return items.map((a: any, i: number) => {
         const title = (a.title ?? '') as string;
         const lower = title.toLowerCase();
-        const category = categories.find(c => lower.includes(c)) ?? 'geopolitical';
+        const category: GeopoliticalEvent['category'] =
+          lower.includes('curfew') || lower.includes('martial law') || lower.includes('lockdown') || lower.includes('state of emergency') ? 'curfew'
+          : lower.includes('conflict') || lower.includes('war') || lower.includes('military') || lower.includes('attack') ? 'conflict'
+          : lower.includes('sanctions') ? 'sanctions'
+          : lower.includes('protest') || lower.includes('demonstration') || lower.includes('riot') ? 'protest'
+          : lower.includes('coup') || lower.includes('overthrow') ? 'coup'
+          : lower.includes('crisis') ? 'crisis'
+          : 'geopolitical';
         const severity: GeopoliticalEvent['severity'] = lower.includes('kill') || lower.includes('attack') || lower.includes('bomb') ? 'critical'
           : lower.includes('war') || lower.includes('military') || lower.includes('missile') ? 'high'
           : lower.includes('protest') || lower.includes('crisis') ? 'medium' : 'low';

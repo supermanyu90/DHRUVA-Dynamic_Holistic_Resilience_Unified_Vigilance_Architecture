@@ -71,10 +71,11 @@ function toTickerEvent(
   }
   if (type === 'geopolitical') {
     const g = item as GeopoliticalEvent;
+    const tickerType = g.category === 'curfew' ? 'curfew' as const : 'geopolitical' as const;
     return {
       id: g.id,
       time: timeStr,
-      type,
+      type: tickerType,
       title: `${g.title}${g.country ? ` — ${g.country}` : ''}`,
       severity: g.severity,
     };
@@ -243,13 +244,14 @@ function App() {
       if (volR.status  === 'fulfilled') setVolcanoes(volR.value.data);
       if (geoR.status  === 'fulfilled') setGeopolitical(geoR.value.data);
 
-      // Seed ticker with initial data
+      // Seed ticker with initial data from all sources
       const tickerSeed: TickerEvent[] = [];
       if (eqR.status === 'fulfilled') eqR.value.data.slice(0, 5).forEach((eq: Earthquake) => tickerSeed.push(toTickerEvent('earthquake', eq)));
-      if (disR.status === 'fulfilled') disR.value.data.slice(0, 3).forEach((d: Disaster) => tickerSeed.push(toTickerEvent('disaster', d)));
-      if (newsR.status === 'fulfilled') newsR.value.data.slice(0, 5).forEach((n: NewsEvent) => tickerSeed.push(toTickerEvent('news', n)));
-      if (geoR.status === 'fulfilled') geoR.value.data.slice(0, 4).forEach((g: GeopoliticalEvent) => tickerSeed.push(toTickerEvent('geopolitical', g)));
-      if (volR.status === 'fulfilled') volR.value.data.slice(0, 2).forEach((v: VolcanoEvent) => tickerSeed.push(toTickerEvent('volcano', v)));
+      if (disR.status === 'fulfilled') disR.value.data.slice(0, 4).forEach((d: Disaster) => tickerSeed.push(toTickerEvent('disaster', d)));
+      if (newsR.status === 'fulfilled') newsR.value.data.slice(0, 8).forEach((n: NewsEvent) => tickerSeed.push(toTickerEvent('news', n)));
+      if (geoR.status === 'fulfilled') geoR.value.data.slice(0, 10).forEach((g: GeopoliticalEvent) => tickerSeed.push(toTickerEvent('geopolitical', g)));
+      if (volR.status === 'fulfilled') volR.value.data.slice(0, 3).forEach((v: VolcanoEvent) => tickerSeed.push(toTickerEvent('volcano', v)));
+      if (vesR.status === 'fulfilled') vesR.value.data.slice(0, 3).forEach((v: Vessel) => tickerSeed.push(toTickerEvent('vessel', v)));
       if (tickerSeed.length > 0) setTickerEvents(prev => prev.length === 0 ? tickerSeed : prev);
 
       // Only show stale banner when withResilience actually fell back to localStorage cache

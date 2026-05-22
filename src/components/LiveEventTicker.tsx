@@ -4,7 +4,7 @@ import { Radio } from 'lucide-react';
 export interface TickerEvent {
   id: string;
   time: string;
-  type: 'earthquake' | 'disaster' | 'news' | 'vessel' | 'volcano' | 'geopolitical' | 'cyber';
+  type: 'earthquake' | 'disaster' | 'news' | 'vessel' | 'volcano' | 'geopolitical' | 'cyber' | 'curfew';
   title: string;
   severity?: 'critical' | 'high' | 'medium' | 'low';
 }
@@ -21,6 +21,7 @@ const TYPE_COLOR: Record<string, string> = {
   volcano: '#FF4500',
   geopolitical: '#FF2255',
   cyber: '#FF3D6B',
+  curfew: '#FFB800',
 };
 
 const TYPE_LABEL: Record<string, string> = {
@@ -31,6 +32,7 @@ const TYPE_LABEL: Record<string, string> = {
   volcano: 'VOLCANO',
   geopolitical: 'GEOPOLIT',
   cyber: 'CYBER',
+  curfew: 'CURFEW',
 };
 
 const SEV_COLOR: Record<string, string> = {
