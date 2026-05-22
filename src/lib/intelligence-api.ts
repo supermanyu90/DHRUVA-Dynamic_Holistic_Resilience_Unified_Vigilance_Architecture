@@ -423,21 +423,67 @@ export class IntelligenceAPI {
   }
   static async getGeopoliticalEvents(limit = 100): Promise<GeopoliticalEvent[]> {
     try {
-      const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent('conflict OR protest OR coup OR sanctions OR military OR crisis OR curfew OR "martial law" OR lockdown OR "state of emergency"')}&mode=ArtList&format=json&maxrecords=${Math.min(limit, 50)}&timespan=4320min&sort=DateDesc`;
+      // Use GDELT GEO API for geopolitical events (distinct endpoint from news ArtList)
+      const url = `https://api.gdeltproject.org/api/v2/geo/geo?query=conflict%20OR%20military%20OR%20protest%20OR%20sanctions%20OR%20crisis%20OR%20curfew&mode=PointData&format=GeoJSON&timespan=4320min&maxpoints=${Math.min(limit, 50)}&sortby=DateDesc`;
       const res = await fetch(url, { signal: AbortSignal.timeout(12_000) });
-      if (!res.ok) return [];
-      const json = await res.json();
-      const items: any[] = json?.articles ?? [];
+
+      if (res.ok) {
+        const json = await res.json();
+        const features: any[] = json?.features ?? [];
+        if (features.length > 0) {
+          return features.map((f: any, i: number) => {
+            const props = f.properties ?? {};
+            const title = (props.name ?? props.html ?? `Geopolitical Event #${i + 1}`) as string;
+            const lower = title.toLowerCase();
+            const coords = f.geometry?.coordinates ?? [0, 0];
+            const category: GeopoliticalEvent['category'] =
+              lower.includes('curfew') || lower.includes('lockdown') ? 'curfew'
+              : lower.includes('conflict') || lower.includes('war') || lower.includes('military') || lower.includes('attack') ? 'conflict'
+              : lower.includes('sanctions') ? 'sanctions'
+              : lower.includes('protest') || lower.includes('riot') ? 'protest'
+              : lower.includes('coup') ? 'coup'
+              : lower.includes('crisis') ? 'crisis'
+              : 'geopolitical';
+            const severity: GeopoliticalEvent['severity'] = lower.includes('kill') || lower.includes('attack') || lower.includes('bomb') ? 'critical'
+              : lower.includes('war') || lower.includes('military') || lower.includes('missile') ? 'high'
+              : lower.includes('protest') || lower.includes('crisis') ? 'medium' : 'low';
+
+            return {
+              id: `geo-${i}-${Date.now()}`,
+              event_id: `geo-${i}`,
+              title: title.replace(/<[^>]*>/g, '').slice(0, 150),
+              category,
+              country: props.country ?? null,
+              latitude: coords[1] ?? null,
+              longitude: coords[0] ?? null,
+              description: title.replace(/<[^>]*>/g, ''),
+              severity,
+              is_active: true,
+              started_at: new Date().toISOString(),
+              source: props.domain ?? 'GDELT',
+              properties: { url: props.url, domain: props.domain, shareimage: props.shareimage },
+              updated_at: new Date().toISOString(),
+            };
+          });
+        }
+      }
+
+      // Fallback: use ArtList if GEO endpoint fails or returns nothing
+      const fallbackUrl = `https://api.gdeltproject.org/api/v2/doc/doc?query=conflict+OR+military+OR+protest+OR+sanctions+OR+crisis+OR+curfew&mode=ArtList&format=json&maxrecords=${Math.min(limit, 40)}&timespan=4320min&sort=DateDesc`;
+      const fallbackRes = await fetch(fallbackUrl, { signal: AbortSignal.timeout(12_000) });
+      if (!fallbackRes.ok) return [];
+      const fallbackJson = await fallbackRes.json();
+      const items: any[] = fallbackJson?.articles ?? [];
 
       return items.map((a: any, i: number) => {
         const title = (a.title ?? '') as string;
         const lower = title.toLowerCase();
         const category: GeopoliticalEvent['category'] =
-          lower.includes('curfew') || lower.includes('martial law') || lower.includes('lockdown') || lower.includes('state of emergency') ? 'curfew'
+          lower.includes('curfew') || lower.includes('lockdown') ? 'curfew'
           : lower.includes('conflict') || lower.includes('war') || lower.includes('military') || lower.includes('attack') ? 'conflict'
           : lower.includes('sanctions') ? 'sanctions'
-          : lower.includes('protest') || lower.includes('demonstration') || lower.includes('riot') ? 'protest'
-          : lower.includes('coup') || lower.includes('overthrow') ? 'coup'
+          : lower.includes('protest') || lower.includes('riot') ? 'protest'
+          : lower.includes('coup') ? 'coup'
           : lower.includes('crisis') ? 'crisis'
           : 'geopolitical';
         const severity: GeopoliticalEvent['severity'] = lower.includes('kill') || lower.includes('attack') || lower.includes('bomb') ? 'critical'

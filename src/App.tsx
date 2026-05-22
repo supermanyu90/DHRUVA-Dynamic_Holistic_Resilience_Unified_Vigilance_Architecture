@@ -232,7 +232,7 @@ function App() {
         withResilience('news',        () => IntelligenceAPI.getNews(50),              { maxRetries: 1, baseDelayMs: 300 }),
         withResilience('vessels',     () => IntelligenceAPI.getVessels(50),           { maxRetries: 1, baseDelayMs: 300 }),
         withResilience('volcanoes',   () => IntelligenceAPI.getVolcanoes(50),         { maxRetries: 1, baseDelayMs: 300 }),
-        withResilience('geopolitical',() => IntelligenceAPI.getGeopoliticalEvents(50),{ maxRetries: 1, baseDelayMs: 300 }),
+        withResilience('geopolitical',() => new Promise<GeopoliticalEvent[]>(r => setTimeout(r, 1500)).then(() => IntelligenceAPI.getGeopoliticalEvents(50)),{ maxRetries: 1, baseDelayMs: 300 }),
       ]);
 
       const [eqR, disR, newsR, vesR, volR, geoR] = settled;
