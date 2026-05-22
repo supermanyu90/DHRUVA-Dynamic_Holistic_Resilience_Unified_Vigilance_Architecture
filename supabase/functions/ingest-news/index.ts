@@ -70,7 +70,6 @@ Deno.serve(async (req: Request) => {
             source: feed.source,
             title: item.title,
             url: item.link,
-            content: item.description,
             published_at: new Date(item.pubDate).toISOString(),
             country: null,
             latitude: null,
@@ -79,7 +78,7 @@ Deno.serve(async (req: Request) => {
             goldstein_scale: null,
             categories: [],
             sentiment: null,
-            metadata: {},
+            metadata: { content: item.description },
           });
         }
       } catch (error) {
