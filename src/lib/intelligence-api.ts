@@ -597,22 +597,27 @@ export class IntelligenceAPI {
   static async getIngestionStats(_days = 7): Promise<IngestionStat[]> {
     const sources = ['USGS', 'NASA EONET', 'GDELT News', 'GDELT Geo', 'RSS Proxy', 'Abuse.ch'];
     const today = new Date().toISOString().slice(0, 10);
-    return sources.map(source => ({
-      source,
-      day: today,
-      total_fetches: Math.floor(40 + Math.random() * 100),
-      successful_fetches: Math.floor(38 + Math.random() * 95),
-      failed_fetches: Math.floor(Math.random() * 3),
-      success_rate: 0.92 + Math.random() * 0.08,
-      total_alerts_written: Math.floor(10 + Math.random() * 80),
-      avg_duration_ms: Math.floor(1200 + Math.random() * 2000),
-      last_fetch_at: new Date().toISOString(),
-      last_success_at: new Date().toISOString(),
-      last_error: null,
-      consecutive_failures: 0,
-      lifetime_fetches: Math.floor(5000 + Math.random() * 20000),
-      lifetime_changes: Math.floor(1000 + Math.random() * 8000),
-    }));
+    return sources.map(source => {
+      const total_fetches = Math.floor(40 + Math.random() * 100);
+      const failed_fetches = Math.floor(Math.random() * 3);
+      const successful_fetches = total_fetches - failed_fetches;
+      return {
+        source,
+        day: today,
+        total_fetches,
+        successful_fetches,
+        failed_fetches,
+        success_rate: total_fetches > 0 ? successful_fetches / total_fetches : null,
+        total_alerts_written: Math.floor(10 + Math.random() * 80),
+        avg_duration_ms: Math.floor(1200 + Math.random() * 2000),
+        last_fetch_at: new Date().toISOString(),
+        last_success_at: new Date().toISOString(),
+        last_error: null,
+        consecutive_failures: 0,
+        lifetime_fetches: Math.floor(5000 + Math.random() * 20000),
+        lifetime_changes: Math.floor(1000 + Math.random() * 8000),
+      };
+    });
   }
 
   static async getSystemMetrics(names: string[], _hours = 24): Promise<SystemMetric[]> {
