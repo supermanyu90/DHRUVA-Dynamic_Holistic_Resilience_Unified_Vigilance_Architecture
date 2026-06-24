@@ -2,6 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { IntelligenceAPI, Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from './lib/intelligence-api';
 import { withResilience } from './lib/resilience';
 import { DataFreshnessContext, DataFreshnessState, formatStaleAge } from './lib/DataFreshnessContext';
+import {
+  AUTO_SYNC_INTERVAL_MS,
+  INDIA_NEIGHBOURS, INDIA_EXTENDED, IOR_REGEX, HIGH_RISK_GEO_CATS, SEVERITY_WEIGHTS,
+} from './lib/constants';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { RightPanel } from './components/RightPanel';
@@ -24,8 +28,6 @@ import { AboutDhruva } from './components/AboutDhruva';
 import { AdminDashboard } from './components/AdminDashboard';
 
 type ViewType = 'map' | 'timeline' | 'news' | 'sewa' | 'cyber' | 'infoops' | 'gov' | 'vessel' | 'admin';
-
-const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 
 function formatSyncCountdown(ms: number): string {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
@@ -175,10 +177,16 @@ function App() {
     setTimeout(() => setLegacyAlerts(prev => prev.filter(a => a.id !== id)), 7000);
   }, []);
 
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
   const playAlert = useCallback((type: 'critical' | 'high' | 'info') => {
     if (!soundEnabled) return;
     try {
-      const ctx = new AudioContext();
+      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+        audioCtxRef.current = new AudioContext();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') ctx.resume();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
@@ -471,11 +479,6 @@ function App() {
   const criticalEvents = earthquakes.filter((e) => e.magnitude >= 6).length +
     disasters.filter((d) => d.category?.toLowerCase().includes('severe')).length;
 
-  const INDIA_NEIGHBOURS = new Set(['India','Pakistan','China','Bangladesh','Sri Lanka','Nepal','Myanmar','Bhutan','Maldives']);
-  const INDIA_EXTENDED = new Set(['Afghanistan','Iran','UAE','Saudi Arabia','Oman','Yemen','Russia']);
-  const IOR_REGEX = /\b(IOR|Arabian Sea|Bay of Bengal|Indian Ocean|Malacca|Hormuz|Strait of Hormuz|Line of Control|LoC|Kashmir|Ladakh|Aksai Chin|Arunachal|Andaman|Lakshadweep|CPEC|Belt and Road)\b/i;
-  const HIGH_RISK_CATS = new Set(['conflict','coup','sanctions','crisis']);
-
   const indiaThreatEvents = geopolitical.filter(g => {
     const isNeighbour = INDIA_NEIGHBOURS.has(g.country || '');
     const isExtended = INDIA_EXTENDED.has(g.country || '');
@@ -484,8 +487,8 @@ function App() {
   });
 
   const indiaScore = Math.min(100, indiaThreatEvents.reduce((sum, g) => {
-    const severityWeight = g.severity === 'critical' ? 20 : g.severity === 'high' ? 10 : g.severity === 'medium' ? 4 : 1;
-    const categoryBonus = HIGH_RISK_CATS.has(g.category) ? 1.5 : 1;
+    const severityWeight = SEVERITY_WEIGHTS[g.severity] ?? 1;
+    const categoryBonus = HIGH_RISK_GEO_CATS.has(g.category) ? 1.5 : 1;
     return sum + severityWeight * categoryBonus;
   }, 0));
 
@@ -517,7 +520,8 @@ function App() {
   return (
     <DataFreshnessContext.Provider value={dataFreshness}>
     <div className="dhruva-app" onTouchStart={handleSwipeTouchStart} onTouchEnd={handleSwipeTouchEnd}>
-      <div className="portrait-overlay">
+      <a href="#main-content" className="skip-link">Skip to main content</a>
+      <div className="portrait-overlay" aria-hidden="true">
         <div className="portrait-overlay-inner">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="5" y="2" width="14" height="20" rx="2" />
@@ -550,32 +554,32 @@ function App() {
         mobileRightPanelOpen={mobileRightPanelOpen}
       />
 
-      <div className="view-tabs">
-        <div className={`view-tab ${currentView === 'map' ? 'active' : ''}`} onClick={() => setCurrentView('map')}>
-          🗺️ MAP
+      <div className="view-tabs" role="tablist" aria-label="Application views">
+        <div role="tab" aria-selected={currentView === 'map'} tabIndex={currentView === 'map' ? 0 : -1} className={`view-tab ${currentView === 'map' ? 'active' : ''}`} onClick={() => setCurrentView('map')} onKeyDown={e => e.key === 'Enter' && setCurrentView('map')}>
+          MAP
         </div>
-        <div className={`view-tab ${currentView === 'timeline' ? 'active' : ''}`} onClick={() => setCurrentView('timeline')}>
-          📈 TIMELINE
+        <div role="tab" aria-selected={currentView === 'timeline'} tabIndex={currentView === 'timeline' ? 0 : -1} className={`view-tab ${currentView === 'timeline' ? 'active' : ''}`} onClick={() => setCurrentView('timeline')} onKeyDown={e => e.key === 'Enter' && setCurrentView('timeline')}>
+          TIMELINE
         </div>
-        <div className={`view-tab ${currentView === 'news' ? 'active' : ''}`} onClick={() => setCurrentView('news')}>
-          📡 NEWS INTEL
+        <div role="tab" aria-selected={currentView === 'news'} tabIndex={currentView === 'news' ? 0 : -1} className={`view-tab ${currentView === 'news' ? 'active' : ''}`} onClick={() => setCurrentView('news')} onKeyDown={e => e.key === 'Enter' && setCurrentView('news')}>
+          NEWS INTEL
         </div>
-        <div className={`view-tab ${currentView === 'sewa' ? 'active' : ''}`} onClick={() => setCurrentView('sewa')}>
-          🏦 BANK SEWA
+        <div role="tab" aria-selected={currentView === 'sewa'} tabIndex={currentView === 'sewa' ? 0 : -1} className={`view-tab ${currentView === 'sewa' ? 'active' : ''}`} onClick={() => setCurrentView('sewa')} onKeyDown={e => e.key === 'Enter' && setCurrentView('sewa')}>
+          BANK SEWA
         </div>
-        <div className={`view-tab ${currentView === 'cyber' ? 'active' : ''}`} onClick={() => setCurrentView('cyber')} style={{ color: currentView === 'cyber' ? '' : '#00BFFF99' }}>
-          💻 CYBER WATCH
+        <div role="tab" aria-selected={currentView === 'cyber'} tabIndex={currentView === 'cyber' ? 0 : -1} className={`view-tab ${currentView === 'cyber' ? 'active' : ''}`} onClick={() => setCurrentView('cyber')} style={{ color: currentView === 'cyber' ? '' : '#00BFFF99' }} onKeyDown={e => e.key === 'Enter' && setCurrentView('cyber')}>
+          CYBER WATCH
         </div>
-        <div className={`view-tab ${currentView === 'infoops' ? 'active' : ''}`} onClick={() => setCurrentView('infoops')} style={{ color: currentView === 'infoops' ? '' : '#CC66FF99' }}>
-          🧠 INFO OPS
+        <div role="tab" aria-selected={currentView === 'infoops'} tabIndex={currentView === 'infoops' ? 0 : -1} className={`view-tab ${currentView === 'infoops' ? 'active' : ''}`} onClick={() => setCurrentView('infoops')} style={{ color: currentView === 'infoops' ? '' : '#CC66FF99' }} onKeyDown={e => e.key === 'Enter' && setCurrentView('infoops')}>
+          INFO OPS
         </div>
-        <div className={`view-tab ${currentView === 'gov' ? 'active' : ''}`} onClick={() => setCurrentView('gov')} style={{ color: currentView === 'gov' ? '' : '#4D9FFF99' }}>
+        <div role="tab" aria-selected={currentView === 'gov'} tabIndex={currentView === 'gov' ? 0 : -1} className={`view-tab ${currentView === 'gov' ? 'active' : ''}`} onClick={() => setCurrentView('gov')} style={{ color: currentView === 'gov' ? '' : '#4D9FFF99' }} onKeyDown={e => e.key === 'Enter' && setCurrentView('gov')}>
           GOV FEED
         </div>
-        <div className={`view-tab ${currentView === 'vessel' ? 'active' : ''}`} onClick={() => setCurrentView('vessel')} style={{ color: currentView === 'vessel' ? '' : '#00BFFF99' }}>
-          ⚓ VESSEL INTEL
+        <div role="tab" aria-selected={currentView === 'vessel'} tabIndex={currentView === 'vessel' ? 0 : -1} className={`view-tab ${currentView === 'vessel' ? 'active' : ''}`} onClick={() => setCurrentView('vessel')} style={{ color: currentView === 'vessel' ? '' : '#00BFFF99' }} onKeyDown={e => e.key === 'Enter' && setCurrentView('vessel')}>
+          VESSEL INTEL
         </div>
-        <div className={`view-tab ${currentView === 'admin' ? 'active' : ''}`} onClick={() => setCurrentView('admin')} style={{ color: currentView === 'admin' ? '' : '#4D9FFF99' }}>
+        <div role="tab" aria-selected={currentView === 'admin'} tabIndex={currentView === 'admin' ? 0 : -1} className={`view-tab ${currentView === 'admin' ? 'active' : ''}`} onClick={() => setCurrentView('admin')} style={{ color: currentView === 'admin' ? '' : '#4D9FFF99' }} onKeyDown={e => e.key === 'Enter' && setCurrentView('admin')}>
           SYS MONITOR
         </div>
       </div>
@@ -628,7 +632,7 @@ function App() {
         <div className="mobile-overlay" onClick={() => setMobileRightPanelOpen(false)} />
       )}
 
-      <div className="app-body">
+      <div className="app-body" id="main-content" role="main">
         <Sidebar
           earthquakes={earthquakes}
           disasters={disasters}
@@ -693,51 +697,52 @@ function App() {
         />
       </div>
 
-      <div className="status-bar">
+      <div className="status-bar" role="status" aria-label="System status">
         <div>
-          <span className="sdot" style={{ background: '#00D4A0' }}></span>
+          <span className="sdot" style={{ background: '#00D4A0' }} aria-hidden="true"></span>
           DATABASE: CONNECTED
         </div>
         <div>
-          <span className="sdot" style={{ background: '#00D4A0', animation: 'statusPulse 2s ease-in-out infinite' }}></span>
+          <span className="sdot" style={{ background: '#00D4A0', animation: 'statusPulse 2s ease-in-out infinite' }} aria-hidden="true"></span>
           REALTIME: ACTIVE
         </div>
         <div>
-          <span className="sdot" style={{ background: '#00D4A0', animation: 'statusPulse 2s ease-in-out infinite' }}></span>
+          <span className="sdot" style={{ background: '#00D4A0', animation: 'statusPulse 2s ease-in-out infinite' }} aria-hidden="true"></span>
           MODE: LIVE
         </div>
         <div>
-          <span className="sdot" style={{ background: syncing ? '#FFB800' : '#4D9FFF' }}></span>
+          <span className="sdot" style={{ background: syncing ? '#FFB800' : '#4D9FFF' }} aria-hidden="true"></span>
           SYNC: {syncing ? 'IN PROGRESS' : `NEXT ${formatSyncCountdown(nextSyncIn)}`}
         </div>
         {lastSyncTime && (
           <div>
-            <span className="sdot" style={{ background: '#00D4A0' }}></span>
+            <span className="sdot" style={{ background: '#00D4A0' }} aria-hidden="true"></span>
             LAST SYNC: {new Date(lastSyncTime).toUTCString().slice(17, 25)}Z
           </div>
         )}
         <div>
-          <span className="sdot" style={{ background: theme === 'dark' ? '#00D4A0' : '#007A5E' }}></span>
+          <span className="sdot" style={{ background: theme === 'dark' ? '#00D4A0' : '#007A5E' }} aria-hidden="true"></span>
           THEME: {theme.toUpperCase()}
         </div>
         <div>
           <button
             className={`notif-bell-btn ${showNotifPrefs ? 'active' : ''}`}
             onClick={() => setShowNotifPrefs(o => !o)}
-            title="Notification preferences"
+            aria-label={`Notification preferences${notifications.length > 0 ? `, ${notifications.length} active` : ''}`}
+            aria-expanded={showNotifPrefs}
           >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
               <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
             </svg>
             ALERTS
             {notifications.length > 0 && (
-              <span className="notif-bell-badge">{notifications.length}</span>
+              <span className="notif-bell-badge" aria-hidden="true">{notifications.length}</span>
             )}
           </button>
         </div>
         <div className="about-link-wrap">
-          <button className="about-link-btn" onClick={() => setShowAbout(true)}>
+          <button className="about-link-btn" onClick={() => setShowAbout(true)} aria-label="About DHRUVA">
             ABOUT DHRUVA
           </button>
           <span className="about-creator-inline">
@@ -747,6 +752,7 @@ function App() {
               target="_blank"
               rel="noopener noreferrer"
               className="about-creator-link"
+              aria-label="Abhimanyu Mathur - LinkedIn profile (opens in new tab)"
             >
               ABHIMANYU MATHUR
             </a>

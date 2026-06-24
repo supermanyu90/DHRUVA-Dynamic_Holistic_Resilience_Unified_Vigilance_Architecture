@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
 import { EventDetailDrawer } from './sidebar/EventDetailDrawer';
@@ -90,13 +90,13 @@ export function Sidebar({
     onPendingDrawerConsumed?.();
   }, [pendingDrawer]);
 
-  const last72Hours = new Date(Date.now() - 72 * 60 * 60 * 1000);
+  const last72Hours = useMemo(() => new Date(Date.now() - 72 * 60 * 60 * 1000), []);
 
   const filterByMode = (eventTime: Date) => eventTime >= last72Hours;
 
-  const curfewEvents = geopolitical.filter((g) => g.category === 'curfew');
+  const curfewEvents = useMemo(() => geopolitical.filter((g) => g.category === 'curfew'), [geopolitical]);
 
-  const allEvents = [
+  const allEvents = useMemo(() => [
     ...earthquakes.map((e) => ({ ...e, type: 'earthquake', icon: '⚡', color: 'var(--quake)', sortTime: e.event_time })),
     ...disasters.map((d) => ({ ...d, type: 'disaster', icon: '⚠', color: 'var(--fire)', sortTime: d.event_date })),
     ...volcanoes.map((v) => ({ ...v, id: v.id, type: 'volcano', icon: '▲', color: '#FF4500', sortTime: v.updated_at })),
@@ -116,7 +116,8 @@ export function Sidebar({
       if (event.type === 'news') return layersEnabled.news;
       return true;
     })
-    .sort((a, b) => new Date(b.sortTime).getTime() - new Date(a.sortTime).getTime());
+    .sort((a, b) => new Date(b.sortTime).getTime() - new Date(a.sortTime).getTime()),
+  [earthquakes, disasters, volcanoes, geopolitical, curfewEvents, vessels, news, layersEnabled, last72Hours]);
 
   function openDrawer(event: typeof allEvents[0]) {
     if (event.type === 'news') {
@@ -147,101 +148,125 @@ export function Sidebar({
         <div className="ph-badge">{allEvents.length} ACTIVE</div>
       </div>
 
-      <div className="layer-bar">
+      <div className="layer-bar" role="group" aria-label="Event layer filters">
         <button
           className={`lbtn ${layersEnabled.earthquakes ? 'active' : ''}`}
           onClick={() => onLayerToggle('earthquakes')}
+          aria-pressed={layersEnabled.earthquakes}
+          aria-label="Toggle earthquakes layer"
           style={{ borderColor: 'var(--quake)', color: 'var(--quake)' }}
         >
-          <span className="ldot" style={{ background: 'var(--quake)' }}></span>
+          <span className="ldot" style={{ background: 'var(--quake)' }} aria-hidden="true"></span>
           QUAKES
         </button>
         <button
           className={`lbtn ${layersEnabled.disasters ? 'active' : ''}`}
           onClick={() => onLayerToggle('disasters')}
+          aria-pressed={layersEnabled.disasters}
+          aria-label="Toggle disasters layer"
           style={{ borderColor: 'var(--fire)', color: 'var(--fire)' }}
         >
-          <span className="ldot" style={{ background: 'var(--fire)' }}></span>
+          <span className="ldot" style={{ background: 'var(--fire)' }} aria-hidden="true"></span>
           DISASTERS
         </button>
         <button
           className={`lbtn ${layersEnabled.news ? 'active' : ''}`}
           onClick={() => onLayerToggle('news')}
+          aria-pressed={layersEnabled.news}
+          aria-label="Toggle intel news layer"
           style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}
         >
-          <span className="ldot" style={{ background: 'var(--accent)' }}></span>
+          <span className="ldot" style={{ background: 'var(--accent)' }} aria-hidden="true"></span>
           INTEL
         </button>
         <button
           className={`lbtn ${layersEnabled.volcanoes ? 'active' : ''}`}
           onClick={() => onLayerToggle('volcanoes')}
+          aria-pressed={layersEnabled.volcanoes}
+          aria-label="Toggle volcanoes layer"
           style={{ borderColor: '#FF4500', color: '#FF4500' }}
         >
-          <span className="ldot" style={{ background: '#FF4500' }}></span>
+          <span className="ldot" style={{ background: '#FF4500' }} aria-hidden="true"></span>
           VOLCANOES
         </button>
         <button
           className={`lbtn ${layersEnabled.geopolitical ? 'active' : ''}`}
           onClick={() => onLayerToggle('geopolitical')}
+          aria-pressed={layersEnabled.geopolitical}
+          aria-label="Toggle geopolitical events layer"
           style={{ borderColor: '#FF2255', color: '#FF2255' }}
         >
-          <span className="ldot" style={{ background: '#FF2255' }}></span>
+          <span className="ldot" style={{ background: '#FF2255' }} aria-hidden="true"></span>
           GEO-POL
         </button>
         <button
           className={`lbtn ${layersEnabled.curfews ? 'active' : ''}`}
           onClick={() => onLayerToggle('curfews')}
+          aria-pressed={layersEnabled.curfews}
+          aria-label="Toggle curfews layer"
           style={{ borderColor: '#CC3300', color: '#CC3300' }}
         >
-          <span className="ldot" style={{ background: '#CC3300' }}></span>
+          <span className="ldot" style={{ background: '#CC3300' }} aria-hidden="true"></span>
           CURFEWS
         </button>
         <button
           className={`lbtn ${layersEnabled.vessels ? 'active' : ''}`}
           onClick={() => onLayerToggle('vessels')}
+          aria-pressed={layersEnabled.vessels}
+          aria-label="Toggle vessels layer"
           style={{ borderColor: '#00BFFF', color: '#00BFFF' }}
         >
-          <span className="ldot" style={{ background: '#00BFFF' }}></span>
+          <span className="ldot" style={{ background: '#00BFFF' }} aria-hidden="true"></span>
           VESSELS
         </button>
         <button
           className={`lbtn lbtn-cab ${layersEnabled.cables ? 'active' : ''}`}
           onClick={() => onLayerToggle('cables')}
+          aria-pressed={layersEnabled.cables}
+          aria-label="Toggle submarine cables layer"
           style={{ borderColor: '#FF69B4', color: '#FF69B4' }}
         >
-          <span className="ldot" style={{ background: '#FF69B4' }}></span>
+          <span className="ldot" style={{ background: '#FF69B4' }} aria-hidden="true"></span>
           CABLES
         </button>
         <button
           className={`lbtn lbtn-mil ${layersEnabled.military ? 'active' : ''}`}
           onClick={() => onLayerToggle('military')}
+          aria-pressed={layersEnabled.military}
+          aria-label="Toggle military bases layer"
           style={{ borderColor: '#4A9EFF', color: '#4A9EFF' }}
         >
-          <span className="ldot" style={{ background: '#4A9EFF' }}></span>
+          <span className="ldot" style={{ background: '#4A9EFF' }} aria-hidden="true"></span>
           MILITARY
         </button>
         <button
           className={`lbtn lbtn-nuke ${layersEnabled.nuclear ? 'active' : ''}`}
           onClick={() => onLayerToggle('nuclear')}
+          aria-pressed={layersEnabled.nuclear}
+          aria-label="Toggle nuclear sites layer"
           style={{ borderColor: '#39FF88', color: '#39FF88' }}
         >
-          <span className="ldot" style={{ background: '#39FF88' }}></span>
+          <span className="ldot" style={{ background: '#39FF88' }} aria-hidden="true"></span>
           NUCLEAR
         </button>
         <button
           className={`lbtn lbtn-dn ${layersEnabled.chokepoints ? 'active' : ''}`}
           onClick={() => onLayerToggle('chokepoints')}
+          aria-pressed={layersEnabled.chokepoints}
+          aria-label="Toggle maritime chokepoints layer"
           style={{ borderColor: '#FF6B00', color: '#FF6B00' }}
         >
-          <span className="ldot" style={{ background: '#FF6B00' }}></span>
+          <span className="ldot" style={{ background: '#FF6B00' }} aria-hidden="true"></span>
           CHOKES
         </button>
         <button
           className={`lbtn ${layersEnabled.daynight ? 'active' : ''}`}
           onClick={() => onLayerToggle('daynight')}
+          aria-pressed={layersEnabled.daynight}
+          aria-label="Toggle day/night overlay"
           style={{ borderColor: '#A0C8FF', color: '#A0C8FF' }}
         >
-          <span className="ldot" style={{ background: '#A0C8FF' }}></span>
+          <span className="ldot" style={{ background: '#A0C8FF' }} aria-hidden="true"></span>
           DAY/NIGHT
         </button>
       </div>
@@ -253,7 +278,7 @@ export function Sidebar({
         </button>
       </div>
 
-      <div className="ev-list">
+      <div className="ev-list" role="list" aria-label="Active events">
         {allEvents.map((event) => {
           const eventTime = new Date(event.sortTime);
           const isEarthquake = event.type === 'earthquake';
@@ -307,12 +332,22 @@ export function Sidebar({
           return (
             <div
               key={`${event.type}-${event.id}`}
+              role="listitem"
+              tabIndex={0}
+              aria-label={`${isNews ? 'Intel' : event.type} event: ${label}`}
               className={`ev ${selectedEvent === event.id ? 'selected' : ''}`}
               onClick={() => {
                 if (hasDrawer) {
                   openDrawer(event);
                 } else {
                   onEventSelect(event.id, event.type);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  if (hasDrawer) openDrawer(event);
+                  else onEventSelect(event.id, event.type);
                 }
               }}
               style={{ cursor: 'pointer' }}

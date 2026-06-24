@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Activity, AlertTriangle, FileText, Zap, Waves, Flame, Wind, Droplets, Globe, Ship, Radio } from 'lucide-react';
 import type { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
 import { AlertPriorityList } from './AlertPriorityList';
@@ -22,9 +23,16 @@ function MagnitudeBand({ label, count, color }: { label: string; count: number; 
   );
 }
 
-function MiniBar({ pct, color }: { pct: number; color: string }) {
+function MiniBar({ pct, color, label }: { pct: number; color: string; label?: string }) {
   return (
-    <div style={{ height: '3px', background: 'rgba(255,255,255,0.07)', borderRadius: '2px', overflow: 'hidden', marginTop: '4px' }}>
+    <div
+      role="progressbar"
+      aria-valuenow={Math.round(pct)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={label}
+      style={{ height: '3px', background: 'rgba(255,255,255,0.07)', borderRadius: '2px', overflow: 'hidden', marginTop: '4px' }}
+    >
       <div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, background: color, borderRadius: '2px', transition: 'width 0.6s ease' }} />
     </div>
   );
@@ -64,40 +72,49 @@ function MetricCard({
 }
 
 export function RightPanel({ earthquakes, disasters, news, vessels, volcanoes, geopolitical, mobileOpen = false }: RightPanelProps) {
-  const m45 = earthquakes.filter(e => e.magnitude >= 4.5 && e.magnitude < 5.5).length;
-  const m55 = earthquakes.filter(e => e.magnitude >= 5.5 && e.magnitude < 6.5).length;
-  const m65 = earthquakes.filter(e => e.magnitude >= 6.5).length;
-  const maxMag = earthquakes.length > 0 ? Math.max(...earthquakes.map(e => e.magnitude)) : 0;
+  const m45 = useMemo(() => earthquakes.filter(e => e.magnitude >= 4.5 && e.magnitude < 5.5).length, [earthquakes]);
+  const m55 = useMemo(() => earthquakes.filter(e => e.magnitude >= 5.5 && e.magnitude < 6.5).length, [earthquakes]);
+  const m65 = useMemo(() => earthquakes.filter(e => e.magnitude >= 6.5).length, [earthquakes]);
+  const maxMag = useMemo(() => earthquakes.length > 0 ? Math.max(...earthquakes.map(e => e.magnitude)) : 0, [earthquakes]);
 
-  const disasterCats: Record<string, number> = {};
-  disasters.forEach(d => {
-    const cat = (d.category || 'other').toLowerCase();
-    disasterCats[cat] = (disasterCats[cat] || 0) + 1;
-  });
-  const topDisasters = Object.entries(disasterCats).sort((a, b) => b[1] - a[1]).slice(0, 3);
-  const disasterTotal = disasters.length || 1;
+  const { disasterCats, topDisasters, disasterTotal } = useMemo(() => {
+    const cats: Record<string, number> = {};
+    disasters.forEach(d => {
+      const cat = (d.category || 'other').toLowerCase();
+      cats[cat] = (cats[cat] || 0) + 1;
+    });
+    return {
+      disasterCats: cats,
+      topDisasters: Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 3),
+      disasterTotal: disasters.length || 1,
+    };
+  }, [disasters]);
 
-  const newsCountries = new Set(news.map(n => n.country).filter(Boolean)).size;
-  const newsSentiments = { positive: 0, negative: 0, neutral: 0 };
-  news.forEach(n => {
-    if (n.sentiment === 'positive') newsSentiments.positive++;
-    else if (n.sentiment === 'negative') newsSentiments.negative++;
-    else newsSentiments.neutral++;
-  });
+  const { newsCountries, newsSentiments } = useMemo(() => {
+    const countries = new Set(news.map(n => n.country).filter(Boolean)).size;
+    const sentiments = { positive: 0, negative: 0, neutral: 0 };
+    news.forEach(n => {
+      if (n.sentiment === 'positive') sentiments.positive++;
+      else if (n.sentiment === 'negative') sentiments.negative++;
+      else sentiments.neutral++;
+    });
+    return { newsCountries: countries, newsSentiments: sentiments };
+  }, [news]);
 
-  const criticalGeo = geopolitical.filter(g => g.severity === 'critical' || g.severity === 'high').length;
-  const eruptingVolcanoes = volcanoes.filter(v => v.status === 'erupting').length;
-  const unrestVolcanoes = volcanoes.filter(v => v.status === 'unrest').length;
-  const criticalCount =
-    earthquakes.filter(e => e.magnitude >= 6.5).length +
-    disasters.filter(d => d.category?.toLowerCase().includes('severe')).length +
-    criticalGeo +
-    eruptingVolcanoes;
-
-  const total = earthquakes.length + disasters.length + news.length + 1;
-  const eqPct = (earthquakes.length / total) * 100;
-  const disPct = (disasters.length / total) * 100;
-  const newsPct = (news.length / total) * 100;
+  const { criticalGeo, eruptingVolcanoes, unrestVolcanoes, criticalCount, total, eqPct, disPct, newsPct } = useMemo(() => {
+    const cGeo = geopolitical.filter(g => g.severity === 'critical' || g.severity === 'high').length;
+    const erupting = volcanoes.filter(v => v.status === 'erupting').length;
+    const unrest = volcanoes.filter(v => v.status === 'unrest').length;
+    const critical = earthquakes.filter(e => e.magnitude >= 6.5).length +
+      disasters.filter(d => d.category?.toLowerCase().includes('severe')).length +
+      cGeo + erupting;
+    const tot = earthquakes.length + disasters.length + news.length + 1;
+    return {
+      criticalGeo: cGeo, eruptingVolcanoes: erupting, unrestVolcanoes: unrest, criticalCount: critical,
+      total: tot, eqPct: (earthquakes.length / tot) * 100,
+      disPct: (disasters.length / tot) * 100, newsPct: (news.length / tot) * 100,
+    };
+  }, [earthquakes, disasters, news, volcanoes, geopolitical]);
 
   const disasterCatIcon: Record<string, React.ReactNode> = {
     wildfire: <Flame size={8} />, fire: <Flame size={8} />,

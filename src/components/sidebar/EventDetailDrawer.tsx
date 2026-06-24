@@ -1,6 +1,11 @@
 import { ExternalLink, X, Radio, Globe, Tag, Clock, TrendingUp, TrendingDown, Minus, AlertTriangle, Activity, MapPin, Layers, Shield, Zap, Navigation, Anchor } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from '../../lib/intelligence-api';
 import { Vessel } from '../../lib/intelligence-api';
+
+function safeHostname(url: string): string {
+  try { return new URL(url).hostname; } catch { return url.slice(0, 30); }
+}
 
 type DrawerEvent =
   | { type: 'news'; data: NewsEvent }
@@ -408,7 +413,7 @@ function GeopoliticalDrawer({ data, isCurfew }: { data: GeopoliticalEvent; isCur
           return <SourceButton url={fallbackInfo.baseUrl} label={`VISIT ${fallbackInfo.name.toUpperCase()}`} />;
         }
         if (src.startsWith('http://') || src.startsWith('https://')) {
-          return <SourceButton url={src} label={`VIEW SOURCE — ${new URL(src).hostname}`} />;
+          return <SourceButton url={src} label={`VIEW SOURCE — ${safeHostname(src)}`} />;
         }
         return null;
       })()}
@@ -417,6 +422,15 @@ function GeopoliticalDrawer({ data, isCurfew }: { data: GeopoliticalEvent; isCur
 }
 
 export function EventDetailDrawer({ event, onClose }: EventDetailDrawerProps) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const titleMap: Record<string, string> = {
     news: 'INTEL REPORT',
     earthquake: 'SEISMIC EVENT',
@@ -428,26 +442,33 @@ export function EventDetailDrawer({ event, onClose }: EventDetailDrawerProps) {
   };
 
   return (
-    <div style={{
-      position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(2,5,8,0.97)', border: '1px solid rgba(0,212,160,0.18)',
-      zIndex: 50, display: 'flex', flexDirection: 'column', overflowY: 'auto',
-    }}>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={titleMap[event.type] || 'Event Details'}
+      style={{
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        background: 'rgba(2,5,8,0.97)', border: '1px solid rgba(0,212,160,0.18)',
+        zIndex: 50, display: 'flex', flexDirection: 'column', overflowY: 'auto',
+      }}
+    >
       <div style={{
         display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
         padding: '10px 12px 8px', borderBottom: '1px solid var(--border)', flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-          <Radio size={10} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+          <Radio size={10} style={{ color: 'var(--accent)', flexShrink: 0 }} aria-hidden="true" />
           <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '10px', letterSpacing: '2.5px', color: 'var(--accent)' }}>
             {titleMap[event.type] || 'EVENT DETAILS'}
           </span>
         </div>
         <button
+          ref={closeRef}
           onClick={onClose}
+          aria-label="Close event details"
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dim)', padding: '2px', lineHeight: 1 }}
         >
-          <X size={13} />
+          <X size={13} aria-hidden="true" />
         </button>
       </div>
 

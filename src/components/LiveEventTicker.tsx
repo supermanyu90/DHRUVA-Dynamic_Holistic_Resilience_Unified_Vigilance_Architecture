@@ -79,6 +79,8 @@ export function LiveEventTicker({ events }: LiveEventTickerProps) {
 
   return (
     <div
+      role="marquee"
+      aria-label="Live event feed"
       style={{
         width: '100%',
         height: '28px',
@@ -95,6 +97,14 @@ export function LiveEventTicker({ events }: LiveEventTickerProps) {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
+      {/* Screen-reader-only live region announces new events */}
+      <div
+        aria-live="polite"
+        aria-atomic="false"
+        style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap' }}
+      >
+        {events[0] ? `New event: ${events[0].title}` : ''}
+      </div>
       <div
         style={{
           flexShrink: 0,

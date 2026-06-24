@@ -372,7 +372,19 @@ export function Globe3D({
   useEffect(() => {
     if (!markersRef.current || !globeGroupRef.current) return;
 
-    while (markersRef.current.children.length > 0) markersRef.current.remove(markersRef.current.children[0]);
+    const disposeChildren = (parent: THREE.Object3D) => {
+      while (parent.children.length > 0) {
+        const child = parent.children[0];
+        if ((child as THREE.Mesh).geometry) (child as THREE.Mesh).geometry.dispose();
+        if ((child as THREE.Mesh).material) {
+          const m = (child as THREE.Mesh).material;
+          Array.isArray(m) ? m.forEach(x => x.dispose()) : (m as THREE.Material).dispose();
+        }
+        parent.remove(child);
+      }
+    };
+
+    disposeChildren(markersRef.current);
     pulseMeshesRef.current = [];
 
     const addPulse = (pos: THREE.Vector3, color: number, baseScale: number, phase: number, userData: any) => {
@@ -647,6 +659,9 @@ export function Globe3D({
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div
         ref={containerRef}
+        role="application"
+        aria-label="Interactive 3D globe showing global intelligence events. Use mouse to rotate and zoom."
+        tabIndex={0}
         style={{
           width: '100%',
           height: '100%',

@@ -1,3 +1,13 @@
+import { API_TIMEOUT_MS } from './constants';
+
+function stripHtml(raw: string): string {
+  try {
+    return new DOMParser().parseFromString(raw, 'text/html').body.textContent ?? '';
+  } catch {
+    return raw.replace(/<[^>]*>/g, '');
+  }
+}
+
 export interface Earthquake {
   id: string;
   event_id: string;
@@ -304,7 +314,7 @@ function usgsFeatureToEarthquake(f: USGSFeature): Earthquake {
 export class IntelligenceAPI {
   static async getEarthquakes(minMagnitude = 0, limit = 100): Promise<Earthquake[]> {
     const url = `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude=${minMagnitude}&orderby=time&limit=${Math.min(limit, 200)}&starttime=${new Date(Date.now() - 7 * 86_400_000).toISOString()}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+    const res = await fetch(url, { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
     if (!res.ok) throw new Error(`USGS ${res.status}`);
     const json = await res.json();
     return (json.features as USGSFeature[]).map(usgsFeatureToEarthquake);
@@ -312,7 +322,7 @@ export class IntelligenceAPI {
 
   static async getDisasters(limit = 100): Promise<Disaster[]> {
     try {
-      const res = await fetch(`https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=${Math.min(limit, 50)}`, { signal: AbortSignal.timeout(12_000) });
+      const res = await fetch(`https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=${Math.min(limit, 50)}`, { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
       if (!res.ok) return [];
       const json = await res.json();
       const events: any[] = json?.events ?? [];
@@ -339,7 +349,7 @@ export class IntelligenceAPI {
   static async getNews(limit = 100): Promise<NewsEvent[]> {
     try {
       const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent('world news')}&mode=ArtList&format=json&maxrecords=${Math.min(limit, 50)}&timespan=1440min&sort=DateDesc`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
       if (!res.ok) return [];
       const json = await res.json();
       const items: any[] = json?.articles ?? [];
@@ -394,7 +404,7 @@ export class IntelligenceAPI {
   }
   static async getVolcanoes(_limit = 100): Promise<VolcanoEvent[]> {
     try {
-      const res = await fetch('https://eonet.gsfc.nasa.gov/api/v3/events?category=volcanoes&status=open&limit=20', { signal: AbortSignal.timeout(12_000) });
+      const res = await fetch('https://eonet.gsfc.nasa.gov/api/v3/events?category=volcanoes&status=open&limit=20', { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
       if (!res.ok) return [];
       const json = await res.json();
       const events: any[] = json?.events ?? [];
@@ -425,7 +435,7 @@ export class IntelligenceAPI {
     try {
       // Use GDELT GEO API for geopolitical events (distinct endpoint from news ArtList)
       const url = `https://api.gdeltproject.org/api/v2/geo/geo?query=conflict%20OR%20military%20OR%20protest%20OR%20sanctions%20OR%20crisis%20OR%20curfew&mode=PointData&format=GeoJSON&timespan=4320min&maxpoints=${Math.min(limit, 50)}&sortby=DateDesc`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
 
       if (res.ok) {
         const json = await res.json();
@@ -451,12 +461,12 @@ export class IntelligenceAPI {
             return {
               id: `geo-${i}-${Date.now()}`,
               event_id: `geo-${i}`,
-              title: title.replace(/<[^>]*>/g, '').slice(0, 150),
+              title: stripHtml(title).slice(0, 150),
               category,
               country: props.country ?? null,
               latitude: coords[1] ?? null,
               longitude: coords[0] ?? null,
-              description: title.replace(/<[^>]*>/g, ''),
+              description: stripHtml(title),
               severity,
               is_active: true,
               started_at: new Date().toISOString(),
@@ -470,7 +480,7 @@ export class IntelligenceAPI {
 
       // Fallback: use ArtList if GEO endpoint fails or returns nothing
       const fallbackUrl = `https://api.gdeltproject.org/api/v2/doc/doc?query=conflict+OR+military+OR+protest+OR+sanctions+OR+crisis+OR+curfew&mode=ArtList&format=json&maxrecords=${Math.min(limit, 40)}&timespan=4320min&sort=DateDesc`;
-      const fallbackRes = await fetch(fallbackUrl, { signal: AbortSignal.timeout(12_000) });
+      const fallbackRes = await fetch(fallbackUrl, { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
       if (!fallbackRes.ok) return [];
       const fallbackJson = await fallbackRes.json();
       const items: any[] = fallbackJson?.articles ?? [];
