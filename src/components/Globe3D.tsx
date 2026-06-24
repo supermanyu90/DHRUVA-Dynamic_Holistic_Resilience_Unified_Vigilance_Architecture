@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
-import { UNDERSEA_CABLES } from '../lib/cable-data';
+import { UNDERSEA_CABLES, CHOKEPOINTS, MILITARY_BASES, NUCLEAR_SITES } from '../lib/cable-data';
 import { INDIA_OUTER_BOUNDARY, LINE_OF_CONTROL, LINE_OF_ACTUAL_CONTROL } from '../lib/india-boundary';
 
 interface Globe3DProps {
@@ -31,63 +31,6 @@ interface Globe3DProps {
 }
 
 const GLOBE_RADIUS = 100;
-
-const CHOKEPOINTS = [
-  { name: 'Strait of Hormuz', lat: 26.5, lon: 56.5, desc: '20% of world oil supply' },
-  { name: 'Suez Canal', lat: 30.5, lon: 32.5, desc: '~15% of global trade' },
-  { name: 'Malacca Strait', lat: 1.3, lon: 103.8, desc: '25% of global trade' },
-  { name: 'Bab el-Mandeb', lat: 12.6, lon: 43.3, desc: 'Red Sea access — Houthi attacks' },
-  { name: 'Panama Canal', lat: 9.1, lon: -79.9, desc: 'Connects Atlantic-Pacific' },
-  { name: 'Turkish Straits', lat: 41.1, lon: 29.1, desc: 'Black Sea gateway' },
-  { name: 'Strait of Gibraltar', lat: 36.0, lon: -5.4, desc: 'Mediterranean gateway' },
-  { name: 'Danish Straits', lat: 56.0, lon: 12.0, desc: 'Baltic Sea access' },
-  { name: 'Cape of Good Hope', lat: -34.4, lon: 18.5, desc: 'Africa bypass route' },
-  { name: 'Strait of Taiwan', lat: 24.5, lon: 120.5, desc: 'China-Pacific flashpoint' },
-  { name: 'Lombok Strait', lat: -8.8, lon: 115.7, desc: 'Pacific-Indian alt route' },
-];
-
-const MILITARY_BASES = [
-  { name: 'Pentagon / Andrews AFB', lat: 38.87, lon: -77.06, type: 'USAF/Army CMD HQ' },
-  { name: 'Ramstein AB', lat: 49.44, lon: 7.60, type: 'USAF Europe HQ' },
-  { name: 'Camp Humphreys', lat: 36.96, lon: 126.97, type: 'US Army Korea' },
-  { name: 'Kadena AB', lat: 26.36, lon: 127.77, type: 'USAF Pacific Hub' },
-  { name: 'Diego Garcia', lat: -7.31, lon: 72.41, type: 'US-UK Joint Base' },
-  { name: 'Al Udeid AB', lat: 25.12, lon: 51.31, type: 'USCENTCOM Forward' },
-  { name: 'Ali Al Salem AB', lat: 29.34, lon: 47.52, type: 'USAF Kuwait' },
-  { name: 'Yokosuka Naval Base', lat: 35.29, lon: 139.67, type: 'US 7th Fleet HQ' },
-  { name: 'Andersen AFB — Guam', lat: 13.58, lon: 144.93, type: 'USAF Pacific Strike' },
-  { name: 'Camp Lemonnier', lat: 11.55, lon: 43.16, type: 'US AFRICOM FWD' },
-  { name: 'Severomorsk Naval Base', lat: 69.07, lon: 33.42, type: 'Russia Northern Fleet' },
-  { name: 'Hmeimim AB, Syria', lat: 35.40, lon: 35.95, type: 'Russia Syria Ops' },
-  { name: 'Tartus Naval Facility', lat: 34.89, lon: 35.87, type: 'Russia Naval Med' },
-  { name: 'Engels-2 AB', lat: 51.14, lon: 46.17, type: 'Russia Strategic Bombers' },
-  { name: 'Sanya Naval Base', lat: 18.22, lon: 109.51, type: 'PLAN South Sea' },
-  { name: 'PLA Djibouti Base', lat: 11.56, lon: 43.14, type: 'China Overseas Base' },
-  { name: 'INS Kadamba, Karwar', lat: 14.82, lon: 74.14, type: 'India Navy West CMD' },
-  { name: 'RAF Akrotiri, Cyprus', lat: 34.59, lon: 32.99, type: 'UK RAF East Med' },
-  { name: 'SHAPE — Mons', lat: 50.45, lon: 3.84, type: 'NATO Supreme HQ' },
-  { name: 'Ain Al-Asad AB, Iraq', lat: 33.79, lon: 42.44, type: 'Coalition Iraq FWD' },
-  { name: 'Incirlik AB, Turkey', lat: 37.00, lon: 35.43, type: 'NATO Turkey Hub' },
-  { name: 'Kings Bay SSBN Base', lat: 30.80, lon: -81.55, type: 'US Trident SSBN East' },
-  { name: 'RAAF Tindal', lat: -14.52, lon: 132.38, type: 'Australia RAAF' },
-  { name: 'Pine Gap', lat: -23.80, lon: 133.74, type: 'US-AU SIGINT' },
-];
-
-const NUCLEAR_SITES = [
-  { name: 'Zaporizhzhia NPP', lat: 47.51, lon: 34.59, type: 'NPP — Warzone Risk', status: 'OCCUPIED' },
-  { name: 'Bushehr NPP', lat: 28.83, lon: 50.91, type: 'NPP — Iran', status: 'ACTIVE' },
-  { name: 'Yongbyon Complex', lat: 39.79, lon: 125.75, type: 'DPRK Weapons', status: 'ACTIVE' },
-  { name: 'Dimona Nuclear Centre', lat: 30.97, lon: 35.15, type: 'Israel (est)', status: 'UNDECLARED' },
-  { name: 'Natanz Enrichment', lat: 33.72, lon: 51.73, type: 'Iran Enrichment', status: 'STRUCK' },
-  { name: 'Fordow (Qom)', lat: 34.88, lon: 49.14, type: 'Iran Underground', status: 'STRUCK' },
-  { name: 'Faslane SSBN Base', lat: 56.07, lon: -4.77, type: 'UK Trident SSBN', status: 'ACTIVE' },
-  { name: 'Bangor SSBN Base', lat: 47.73, lon: -122.70, type: 'US Trident SSBN Pacific', status: 'ACTIVE' },
-  { name: 'Yulin SSBN Base', lat: 18.22, lon: 109.75, type: 'China SSBN Base', status: 'ACTIVE' },
-  { name: 'Gadzhiyevo SSBN', lat: 69.25, lon: 33.52, type: 'Russia SSBN Northern', status: 'ACTIVE' },
-  { name: 'Khushab Plutonium', lat: 32.06, lon: 72.20, type: 'Pakistan Weapons', status: 'ACTIVE' },
-  { name: 'Kudankulam NPP', lat: 8.17, lon: 77.71, type: 'India NPP', status: 'ACTIVE' },
-  { name: 'Parchin Military Complex', lat: 35.52, lon: 51.77, type: 'Iran Weapons (suspected)', status: 'SUSPECTED' },
-];
 
 function latLonToVec3(lat: number, lon: number, r: number): THREE.Vector3 {
   const phi = (90 - lat) * (Math.PI / 180);
