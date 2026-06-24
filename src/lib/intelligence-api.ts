@@ -355,14 +355,14 @@ export class IntelligenceAPI {
       const items: any[] = json?.articles ?? [];
       return items.map((a: any, i: number) => ({
         id: `news-${i}-${Date.now()}`,
-        source: 'GDELT',
+        source: a.domain ?? 'GDELT',
         title: a.title ?? '',
         url: a.url ?? '',
         content: a.title ?? '',
         published_at: a.seendate ? new Date(a.seendate.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')).toISOString() : new Date().toISOString(),
         country: a.sourcecountry ?? null,
-        latitude: null,
-        longitude: null,
+        latitude: a.sourcelat != null ? parseFloat(a.sourcelat) : null,
+        longitude: a.sourcelong != null ? parseFloat(a.sourcelong) : null,
         categories: [],
         sentiment: null,
       }));

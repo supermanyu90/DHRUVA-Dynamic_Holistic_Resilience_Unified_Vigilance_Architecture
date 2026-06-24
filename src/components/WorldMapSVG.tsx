@@ -1370,13 +1370,19 @@ export function WorldMapSVG({
           })}
 
         {layersEnabled.disasters &&
-          disasters.slice(0, 30).map((disaster) => {
+          disasters.slice(0, 40).map((disaster) => {
             if (!disaster.id) return null;
-            const hash = disaster.id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-            const stableLat = ((hash * 9301 + 49297) % 139) - 69;
-            const stableLon = ((hash * 49297 + 233) % 299) - 149;
-            const x = lonToX(stableLon);
-            const y = latToY(stableLat);
+            let plotLat: number;
+            let plotLon: number;
+            if (disaster.latitude != null && disaster.longitude != null) {
+              plotLat = disaster.latitude;
+              plotLon = disaster.longitude;
+            } else {
+              // No real coordinates — skip instead of generating fake positions
+              return null;
+            }
+            const x = lonToX(plotLon);
+            const y = latToY(plotLat);
             const isNew = newEventIds.has(disaster.id);
             return (
               <g key={disaster.id} style={{ cursor: 'pointer' }} onClick={() => handleMarkerClick(disaster.id, 'disaster')}>
