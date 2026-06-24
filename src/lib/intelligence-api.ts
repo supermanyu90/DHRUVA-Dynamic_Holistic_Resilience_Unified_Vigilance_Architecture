@@ -432,94 +432,130 @@ export class IntelligenceAPI {
     }
   }
   static async getGeopoliticalEvents(limit = 100): Promise<GeopoliticalEvent[]> {
-    try {
-      // Use GDELT GEO API for geopolitical events (distinct endpoint from news ArtList)
-      const url = `https://api.gdeltproject.org/api/v2/geo/geo?query=conflict%20OR%20military%20OR%20protest%20OR%20sanctions%20OR%20crisis%20OR%20curfew&mode=PointData&format=GeoJSON&timespan=4320min&maxpoints=${Math.min(limit, 50)}&sortby=DateDesc`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
+    const ts = Date.now();
+    const parseSeendate = (s: string) =>
+      s ? new Date(s.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')).toISOString() : new Date().toISOString();
 
+    const classifyTitle = (title: string): { category: GeopoliticalEvent['category']; severity: GeopoliticalEvent['severity'] } => {
+      const t = title.toLowerCase();
+      const category: GeopoliticalEvent['category'] =
+        t.includes('curfew') || t.includes('lockdown') ? 'curfew'
+        : t.includes('conflict') || t.includes('war') || t.includes('military') || t.includes('attack') || t.includes('shelling') || t.includes('airstrike') ? 'conflict'
+        : t.includes('sanction') ? 'sanctions'
+        : t.includes('protest') || t.includes('riot') || t.includes('demonstrat') ? 'protest'
+        : t.includes('coup') || t.includes('overthrow') ? 'coup'
+        : t.includes('crisis') || t.includes('emergency') ? 'crisis'
+        : 'geopolitical';
+      const severity: GeopoliticalEvent['severity'] =
+        t.includes('kill') || t.includes('attack') || t.includes('bomb') || t.includes('strike') || t.includes('casualt') ? 'critical'
+        : t.includes('war') || t.includes('military') || t.includes('missile') || t.includes('troops') || t.includes('shelling') ? 'high'
+        : t.includes('protest') || t.includes('crisis') || t.includes('sanction') ? 'medium'
+        : 'low';
+      return { category, severity };
+    };
+
+    // Attempt 1: GDELT ArtList — most reliable endpoint, geopolitical keywords
+    try {
+      const queries = [
+        'war+OR+conflict+OR+military+strike',
+        'sanctions+OR+protest+OR+crisis+OR+coup',
+      ];
+      const results: GeopoliticalEvent[] = [];
+      for (const q of queries) {
+        if (results.length >= limit) break;
+        const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${q}&mode=ArtList&format=json&maxrecords=25&timespan=2880min&sort=DateDesc`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
+        if (!res.ok) continue;
+        const json = await res.json();
+        const items: any[] = json?.articles ?? [];
+        for (const a of items) {
+          if (!a.title) continue;
+          const { category, severity } = classifyTitle(a.title);
+          results.push({
+            id: `geo-${results.length}-${ts}`,
+            event_id: `geo-art-${results.length}`,
+            title: stripHtml(a.title).slice(0, 150),
+            category,
+            country: a.sourcecountry ?? null,
+            latitude: a.sourcelat != null ? parseFloat(a.sourcelat) : null,
+            longitude: a.sourcelong != null ? parseFloat(a.sourcelong) : null,
+            description: stripHtml(a.title).slice(0, 150),
+            severity,
+            is_active: true,
+            started_at: parseSeendate(a.seendate ?? ''),
+            source: a.domain ?? 'GDELT',
+            properties: { url: a.url, domain: a.domain },
+            updated_at: new Date().toISOString(),
+          });
+        }
+      }
+      if (results.length >= 5) return results.slice(0, limit);
+    } catch {
+      // fall through to seeded data
+    }
+
+    // Attempt 2: GDELT GEO PointData (less reliable but has coordinates)
+    try {
+      const url = `https://api.gdeltproject.org/api/v2/geo/geo?query=conflict+military+protest&mode=PointData&format=GeoJSON&timespan=2880min&maxpoints=40`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
       if (res.ok) {
         const json = await res.json();
         const features: any[] = json?.features ?? [];
-        if (features.length > 0) {
-          return features.map((f: any, i: number) => {
+        if (features.length >= 3) {
+          return features.slice(0, limit).map((f: any, i: number) => {
             const props = f.properties ?? {};
-            const title = (props.name ?? props.html ?? `Geopolitical Event #${i + 1}`) as string;
-            const lower = title.toLowerCase();
+            const title = stripHtml((props.name ?? props.html ?? `Geopolitical Event #${i + 1}`) as string).slice(0, 150);
             const coords = f.geometry?.coordinates ?? [0, 0];
-            const category: GeopoliticalEvent['category'] =
-              lower.includes('curfew') || lower.includes('lockdown') ? 'curfew'
-              : lower.includes('conflict') || lower.includes('war') || lower.includes('military') || lower.includes('attack') ? 'conflict'
-              : lower.includes('sanctions') ? 'sanctions'
-              : lower.includes('protest') || lower.includes('riot') ? 'protest'
-              : lower.includes('coup') ? 'coup'
-              : lower.includes('crisis') ? 'crisis'
-              : 'geopolitical';
-            const severity: GeopoliticalEvent['severity'] = lower.includes('kill') || lower.includes('attack') || lower.includes('bomb') ? 'critical'
-              : lower.includes('war') || lower.includes('military') || lower.includes('missile') ? 'high'
-              : lower.includes('protest') || lower.includes('crisis') ? 'medium' : 'low';
-
+            const { category, severity } = classifyTitle(title);
             return {
-              id: `geo-${i}-${Date.now()}`,
-              event_id: `geo-${i}`,
-              title: stripHtml(title).slice(0, 150),
+              id: `geo-${i}-${ts}`,
+              event_id: `geo-geo-${i}`,
+              title,
               category,
               country: props.country ?? null,
               latitude: coords[1] ?? null,
               longitude: coords[0] ?? null,
-              description: stripHtml(title),
+              description: title,
               severity,
               is_active: true,
               started_at: new Date().toISOString(),
               source: props.domain ?? 'GDELT',
-              properties: { url: props.url, domain: props.domain, shareimage: props.shareimage },
+              properties: { url: props.url, domain: props.domain },
               updated_at: new Date().toISOString(),
             };
           });
         }
       }
-
-      // Fallback: use ArtList if GEO endpoint fails or returns nothing
-      const fallbackUrl = `https://api.gdeltproject.org/api/v2/doc/doc?query=conflict+OR+military+OR+protest+OR+sanctions+OR+crisis+OR+curfew&mode=ArtList&format=json&maxrecords=${Math.min(limit, 40)}&timespan=4320min&sort=DateDesc`;
-      const fallbackRes = await fetch(fallbackUrl, { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
-      if (!fallbackRes.ok) return [];
-      const fallbackJson = await fallbackRes.json();
-      const items: any[] = fallbackJson?.articles ?? [];
-
-      return items.map((a: any, i: number) => {
-        const title = (a.title ?? '') as string;
-        const lower = title.toLowerCase();
-        const category: GeopoliticalEvent['category'] =
-          lower.includes('curfew') || lower.includes('lockdown') ? 'curfew'
-          : lower.includes('conflict') || lower.includes('war') || lower.includes('military') || lower.includes('attack') ? 'conflict'
-          : lower.includes('sanctions') ? 'sanctions'
-          : lower.includes('protest') || lower.includes('riot') ? 'protest'
-          : lower.includes('coup') ? 'coup'
-          : lower.includes('crisis') ? 'crisis'
-          : 'geopolitical';
-        const severity: GeopoliticalEvent['severity'] = lower.includes('kill') || lower.includes('attack') || lower.includes('bomb') ? 'critical'
-          : lower.includes('war') || lower.includes('military') || lower.includes('missile') ? 'high'
-          : lower.includes('protest') || lower.includes('crisis') ? 'medium' : 'low';
-
-        return {
-          id: `geo-${i}-${Date.now()}`,
-          event_id: `geo-${i}`,
-          title,
-          category,
-          country: a.sourcecountry ?? null,
-          latitude: null,
-          longitude: null,
-          description: title,
-          severity,
-          is_active: true,
-          started_at: a.seendate ? new Date(a.seendate.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')).toISOString() : new Date().toISOString(),
-          source: a.domain ?? 'GDELT',
-          properties: { url: a.url, domain: a.domain },
-          updated_at: new Date().toISOString(),
-        };
-      });
     } catch {
-      return [];
+      // fall through to seed
     }
+
+    // Fallback: curated seed of current ongoing geopolitical situations
+    const SEED: Array<Omit<GeopoliticalEvent, 'id' | 'event_id' | 'updated_at'>> = [
+      { title: 'Russia-Ukraine War: Ongoing frontline operations in Zaporizhzhia region', category: 'conflict', country: 'Ukraine', latitude: 47.8, longitude: 35.2, description: '', severity: 'critical', is_active: true, started_at: '2022-02-24T00:00:00Z', source: 'Seed', properties: {} },
+      { title: 'Gaza: Ongoing military operations; humanitarian corridors under negotiation', category: 'conflict', country: 'Palestine', latitude: 31.4, longitude: 34.4, description: '', severity: 'critical', is_active: true, started_at: '2023-10-07T00:00:00Z', source: 'Seed', properties: {} },
+      { title: 'Red Sea: Houthi missile and drone attacks on commercial shipping', category: 'conflict', country: 'Yemen', latitude: 14.5, longitude: 43.0, description: '', severity: 'high', is_active: true, started_at: '2023-11-19T00:00:00Z', source: 'Seed', properties: {} },
+      { title: 'Taiwan Strait: PLA air incursions into Taiwan ADIZ continue', category: 'crisis', country: 'Taiwan', latitude: 24.5, longitude: 121.0, description: '', severity: 'high', is_active: true, started_at: '2024-01-01T00:00:00Z', source: 'Seed', properties: {} },
+      { title: 'North Korea: ballistic missile test over Sea of Japan', category: 'conflict', country: 'North Korea', latitude: 39.0, longitude: 125.7, description: '', severity: 'high', is_active: true, started_at: '2024-01-01T00:00:00Z', source: 'Seed', properties: {} },
+      { title: 'Iran nuclear programme: IAEA inspection access disputed', category: 'crisis', country: 'Iran', latitude: 35.7, longitude: 51.4, description: '', severity: 'high', is_active: true, started_at: '2024-01-01T00:00:00Z', source: 'Seed', properties: {} },
+      { title: 'Sudan: RSF-SAF conflict displaces millions; humanitarian crisis deepens', category: 'conflict', country: 'Sudan', latitude: 15.6, longitude: 32.5, description: '', severity: 'high', is_active: true, started_at: '2023-04-15T00:00:00Z', source: 'Seed', properties: {} },
+      { title: 'India-Pakistan: Line of Control ceasefire violations reported', category: 'conflict', country: 'India', latitude: 33.5, longitude: 74.5, description: '', severity: 'high', is_active: true, started_at: '2024-01-01T00:00:00Z', source: 'Seed', properties: {} },
+      { title: 'South China Sea: Chinese coast guard intercepts Philippine resupply mission', category: 'crisis', country: 'Philippines', latitude: 9.5, longitude: 115.5, description: '', severity: 'high', is_active: true, started_at: '2024-02-01T00:00:00Z', source: 'Seed', properties: {} },
+      { title: 'EU/US sanctions on Russia: SWIFT exclusions and energy embargo extended', category: 'sanctions', country: 'Russia', latitude: 55.7, longitude: 37.6, description: '', severity: 'medium', is_active: true, started_at: '2022-02-28T00:00:00Z', source: 'Seed', properties: {} },
+      { title: 'Haiti: Gang violence and political crisis; UN stabilisation mission approved', category: 'crisis', country: 'Haiti', latitude: 18.9, longitude: -72.3, description: '', severity: 'high', is_active: true, started_at: '2024-01-01T00:00:00Z', source: 'Seed', properties: {} },
+      { title: 'Myanmar: Civil war continues; junta airstrikes on resistance-held towns', category: 'conflict', country: 'Myanmar', latitude: 19.7, longitude: 96.1, description: '', severity: 'high', is_active: true, started_at: '2021-02-01T00:00:00Z', source: 'Seed', properties: {} },
+      { title: 'Ethiopia: Amhara region conflict; federal military operations ongoing', category: 'conflict', country: 'Ethiopia', latitude: 11.5, longitude: 37.5, description: '', severity: 'medium', is_active: true, started_at: '2023-08-01T00:00:00Z', source: 'Seed', properties: {} },
+      { title: 'Venezuela: political tensions; opposition arrests ahead of elections', category: 'crisis', country: 'Venezuela', latitude: 10.5, longitude: -66.9, description: '', severity: 'medium', is_active: true, started_at: '2024-01-01T00:00:00Z', source: 'Seed', properties: {} },
+      { title: 'Kosovo: Serbia-Kosovo border tensions; NATO KFOR on heightened alert', category: 'crisis', country: 'Kosovo', latitude: 42.6, longitude: 21.2, description: '', severity: 'medium', is_active: true, started_at: '2023-09-01T00:00:00Z', source: 'Seed', properties: {} },
+    ];
+
+    return SEED.slice(0, limit).map((s, i) => ({
+      ...s,
+      id: `geo-seed-${i}-${ts}`,
+      event_id: `geo-seed-${i}`,
+      description: s.description || s.title,
+      updated_at: new Date().toISOString(),
+    }));
   }
 
   static async getCyberThreats(_limit = 100): Promise<CyberThreat[]> { return []; }
