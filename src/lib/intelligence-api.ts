@@ -1,4 +1,5 @@
 import { API_TIMEOUT_MS } from './constants';
+import { supabase } from './supabase';
 
 function stripHtml(raw: string): string {
   try {
@@ -370,37 +371,70 @@ export class IntelligenceAPI {
       return [];
     }
   }
-  static async getVessels(_limit = 100): Promise<Vessel[]> {
-    const seed: Vessel[] = [
-      { id: 'v1', mmsi: '477325800', name: 'EVER GIVEN', type: 'Cargo', latitude: 30.45, longitude: 32.35, speed: 12.4, course: 170, heading: 168, destination: 'JEBEL ALI', flag: 'PA', last_position_time: new Date().toISOString(), properties: {} },
-      { id: 'v2', mmsi: '636092624', name: 'FRONT ALTAIR', type: 'Tanker', latitude: 25.98, longitude: 56.42, speed: 10.2, course: 285, heading: 283, destination: 'FUJAIRAH', flag: 'MH', last_position_time: new Date().toISOString(), properties: {} },
-      { id: 'v3', mmsi: '538006090', name: 'PACIFIC AURORA', type: 'Tanker', latitude: 1.28, longitude: 103.85, speed: 8.7, course: 45, heading: 44, destination: 'SINGAPORE', flag: 'MH', last_position_time: new Date().toISOString(), properties: {} },
-      { id: 'v4', mmsi: '211330840', name: 'FGS BAYERN', type: 'Military', latitude: 12.58, longitude: 43.15, speed: 18.5, course: 90, heading: 88, destination: 'DJIBOUTI', flag: 'DE', last_position_time: new Date().toISOString(), properties: {} },
-      { id: 'v5', mmsi: '369970335', name: 'USS EISENHOWER', type: 'Military', latitude: 24.12, longitude: 38.65, speed: 22.0, course: 135, heading: 134, destination: 'RED SEA PATROL', flag: 'US', last_position_time: new Date().toISOString(), properties: {} },
-      { id: 'v6', mmsi: '256437000', name: 'MSC OSCAR', type: 'Cargo', latitude: 36.12, longitude: -5.35, speed: 14.1, course: 88, heading: 87, destination: 'VALENCIA', flag: 'MT', last_position_time: new Date().toISOString(), properties: {} },
-      { id: 'v7', mmsi: '477553200', name: 'CSCL GLOBE', type: 'Cargo', latitude: 22.28, longitude: 114.15, speed: 11.3, course: 225, heading: 223, destination: 'HONG KONG', flag: 'HK', last_position_time: new Date().toISOString(), properties: {} },
-      { id: 'v8', mmsi: '538090052', name: 'NISSOS RHENIA', type: 'Tanker', latitude: 26.55, longitude: 50.12, speed: 9.8, course: 310, heading: 308, destination: 'RAS TANURA', flag: 'MH', last_position_time: new Date().toISOString(), properties: {} },
-      { id: 'v9', mmsi: '235093717', name: 'HMS DEFENDER', type: 'Military', latitude: 34.55, longitude: 33.02, speed: 15.2, course: 60, heading: 58, destination: 'EASTERN MED', flag: 'GB', last_position_time: new Date().toISOString(), properties: {} },
-      { id: 'v10', mmsi: '413776260', name: 'YUAN WANG 5', type: 'Military', latitude: 8.45, longitude: 81.25, speed: 13.0, course: 195, heading: 193, destination: 'HAMBANTOTA', flag: 'CN', last_position_time: new Date().toISOString(), properties: {} },
-      { id: 'v11', mmsi: '538005588', name: 'STENA IMPERO', type: 'Tanker', latitude: 26.62, longitude: 56.28, speed: 11.5, course: 340, heading: 338, destination: 'HORMUZ TRANSIT', flag: 'MH', last_position_time: new Date().toISOString(), properties: {} },
-      { id: 'v12', mmsi: '477418600', name: 'COSCO SHIPPING TAURUS', type: 'Cargo', latitude: 4.22, longitude: 100.35, speed: 13.8, course: 310, heading: 308, destination: 'MALACCA STRAIT', flag: 'HK', last_position_time: new Date().toISOString(), properties: {} },
-      { id: 'v13', mmsi: '710003300', name: 'ARA ALMIRANTE IRIZAR', type: 'Military', latitude: -34.58, longitude: -58.42, speed: 16.0, course: 180, heading: 178, destination: 'BUENOS AIRES', flag: 'AR', last_position_time: new Date().toISOString(), properties: {} },
-      { id: 'v14', mmsi: '304010417', name: 'GOLAR TUNDRA', type: 'Tanker', latitude: 42.58, longitude: 10.12, speed: 6.5, course: 220, heading: 218, destination: 'PIOMBINO FSRU', flag: 'AG', last_position_time: new Date().toISOString(), properties: {} },
-      { id: 'v15', mmsi: '525019808', name: 'KRI RADEN EDDY MARTADINATA', type: 'Military', latitude: -6.12, longitude: 106.85, speed: 14.5, course: 45, heading: 43, destination: 'NATUNA SEA', flag: 'ID', last_position_time: new Date().toISOString(), properties: {} },
-      { id: 'v16', mmsi: '431999556', name: 'JS IZUMO', type: 'Military', latitude: 32.45, longitude: 132.58, speed: 20.0, course: 270, heading: 268, destination: 'SASEBO', flag: 'JP', last_position_time: new Date().toISOString(), properties: {} },
-      { id: 'v17', mmsi: '240443000', name: 'DELTA KANARIS', type: 'Tanker', latitude: 29.85, longitude: 32.58, speed: 10.8, course: 175, heading: 173, destination: 'SUEZ TRANSIT', flag: 'GR', last_position_time: new Date().toISOString(), properties: {} },
-      { id: 'v18', mmsi: '374218000', name: 'QUANTUM OF THE SEAS', type: 'Passenger', latitude: 1.35, longitude: 103.98, speed: 16.5, course: 330, heading: 328, destination: 'SINGAPORE', flag: 'BS', last_position_time: new Date().toISOString(), properties: {} },
-      { id: 'v19', mmsi: '412321590', name: 'HAI YANG SHI YOU 981', type: 'Tanker', latitude: 15.45, longitude: 111.58, speed: 0.2, course: 0, heading: 0, destination: 'SCS STATION', flag: 'CN', last_position_time: new Date().toISOString(), properties: {} },
-      { id: 'v20', mmsi: '273358280', name: 'ADMIRAL KUZNETSOV', type: 'Military', latitude: 69.08, longitude: 33.12, speed: 8.0, course: 180, heading: 178, destination: 'MURMANSK', flag: 'RU', last_position_time: new Date().toISOString(), properties: {} },
-    ];
-    // Add slight position jitter for realism
-    const now = Date.now();
-    return seed.map(v => ({
-      ...v,
-      latitude: v.latitude + (Math.sin(now / 60000 + v.latitude) * 0.01),
-      longitude: v.longitude + (Math.cos(now / 60000 + v.longitude) * 0.01),
-      last_position_time: new Date(now - Math.random() * 600000).toISOString(),
-    }));
+  static async getVessels(limit = 100): Promise<Vessel[]> {
+    // NOTE: Real-time AIS vessel data requires a paid API key.
+    // Recommended providers:
+    //   - MarineTraffic API (https://www.marinetraffic.com/en/ais-api-services) — PAID
+    //   - VesselFinder API (https://api.vesselfinder.com) — PAID
+    //   - AISHub (https://www.aishub.net/api) — Free with registration, requires own AIS receiver or membership
+    //   - AIS Stream (https://aisstream.io) — Free tier WebSocket feed (100 vessels/min)
+    // To enable live vessel tracking, set VITE_AISSTREAM_API_KEY in your .env file and
+    // this function will use the AIS Stream REST snapshot endpoint.
+    const apiKey = (import.meta as any).env?.VITE_AISSTREAM_API_KEY as string | undefined;
+    if (apiKey) {
+      try {
+        // AIS Stream bounding-box snapshot: covers key strategic chokepoints
+        const bboxes = [
+          [24.0, 55.0, 28.0, 58.0],   // Strait of Hormuz
+          [29.0, 31.0, 31.5, 34.0],   // Suez Canal
+          [1.0, 103.0, 2.0, 104.5],   // Malacca Strait
+          [11.5, 42.5, 13.5, 44.5],   // Bab el-Mandeb
+          [8.5, -80.5, 10.0, -78.5],  // Panama Canal
+        ];
+        const results: Vessel[] = [];
+        for (const [minLat, minLon, maxLat, maxLon] of bboxes) {
+          if (results.length >= limit) break;
+          const res = await fetch('https://api.aisstream.io/v0/vesselSearch', {
+            method: 'POST',
+            headers: { 'Authorization': apiKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ Latitude: (minLat + maxLat) / 2, Longitude: (minLon + maxLon) / 2, Radius: 50 }),
+            signal: AbortSignal.timeout(API_TIMEOUT_MS),
+          });
+          if (!res.ok) continue;
+          const json = await res.json();
+          const vessels: any[] = json ?? [];
+          for (const v of vessels) {
+            if (!v.MMSI) continue;
+            results.push({
+              id: `ais-${v.MMSI}`,
+              mmsi: String(v.MMSI),
+              name: v.ShipName?.trim() || 'UNKNOWN',
+              type: v.ShipType || 'Unknown',
+              latitude: v.Latitude ?? 0,
+              longitude: v.Longitude ?? 0,
+              speed: v.Sog ?? 0,
+              course: v.Cog ?? 0,
+              heading: v.Heading ?? v.Cog ?? 0,
+              destination: v.Destination?.trim() || '',
+              flag: v.Flag || '',
+              last_position_time: v.TimeUtc ? new Date(v.TimeUtc).toISOString() : new Date().toISOString(),
+              properties: { imo: v.IMO, draught: v.Draught },
+            });
+          }
+        }
+        if (results.length > 0) return results.slice(0, limit);
+      } catch {
+        // fall through to notice
+      }
+    }
+
+    // No API key configured — return empty list with a console notice
+    console.warn(
+      '[DHRUVA] Vessel tracking requires a live AIS API key.\n' +
+      'Free option: Register at https://aisstream.io and set VITE_AISSTREAM_API_KEY in your .env\n' +
+      'Paid options: MarineTraffic (https://www.marinetraffic.com/en/ais-api-services), VesselFinder (https://api.vesselfinder.com)'
+    );
+    return [];
   }
   static async getVolcanoes(_limit = 100): Promise<VolcanoEvent[]> {
     try {
@@ -527,120 +561,246 @@ export class IntelligenceAPI {
         }
       }
     } catch {
-      // fall through to seed
+      // fall through to ACLED attempt
     }
 
-    // Fallback: curated seed of current ongoing geopolitical situations
-    const SEED: Array<Omit<GeopoliticalEvent, 'id' | 'event_id' | 'updated_at'>> = [
-      { title: 'Russia-Ukraine War: Ongoing frontline operations in Zaporizhzhia region', category: 'conflict', country: 'Ukraine', latitude: 47.8, longitude: 35.2, description: '', severity: 'critical', is_active: true, started_at: '2022-02-24T00:00:00Z', source: 'Seed', properties: {} },
-      { title: 'Gaza: Ongoing military operations; humanitarian corridors under negotiation', category: 'conflict', country: 'Palestine', latitude: 31.4, longitude: 34.4, description: '', severity: 'critical', is_active: true, started_at: '2023-10-07T00:00:00Z', source: 'Seed', properties: {} },
-      { title: 'Red Sea: Houthi missile and drone attacks on commercial shipping', category: 'conflict', country: 'Yemen', latitude: 14.5, longitude: 43.0, description: '', severity: 'high', is_active: true, started_at: '2023-11-19T00:00:00Z', source: 'Seed', properties: {} },
-      { title: 'Taiwan Strait: PLA air incursions into Taiwan ADIZ continue', category: 'crisis', country: 'Taiwan', latitude: 24.5, longitude: 121.0, description: '', severity: 'high', is_active: true, started_at: '2024-01-01T00:00:00Z', source: 'Seed', properties: {} },
-      { title: 'North Korea: ballistic missile test over Sea of Japan', category: 'conflict', country: 'North Korea', latitude: 39.0, longitude: 125.7, description: '', severity: 'high', is_active: true, started_at: '2024-01-01T00:00:00Z', source: 'Seed', properties: {} },
-      { title: 'Iran nuclear programme: IAEA inspection access disputed', category: 'crisis', country: 'Iran', latitude: 35.7, longitude: 51.4, description: '', severity: 'high', is_active: true, started_at: '2024-01-01T00:00:00Z', source: 'Seed', properties: {} },
-      { title: 'Sudan: RSF-SAF conflict displaces millions; humanitarian crisis deepens', category: 'conflict', country: 'Sudan', latitude: 15.6, longitude: 32.5, description: '', severity: 'high', is_active: true, started_at: '2023-04-15T00:00:00Z', source: 'Seed', properties: {} },
-      { title: 'India-Pakistan: Line of Control ceasefire violations reported', category: 'conflict', country: 'India', latitude: 33.5, longitude: 74.5, description: '', severity: 'high', is_active: true, started_at: '2024-01-01T00:00:00Z', source: 'Seed', properties: {} },
-      { title: 'South China Sea: Chinese coast guard intercepts Philippine resupply mission', category: 'crisis', country: 'Philippines', latitude: 9.5, longitude: 115.5, description: '', severity: 'high', is_active: true, started_at: '2024-02-01T00:00:00Z', source: 'Seed', properties: {} },
-      { title: 'EU/US sanctions on Russia: SWIFT exclusions and energy embargo extended', category: 'sanctions', country: 'Russia', latitude: 55.7, longitude: 37.6, description: '', severity: 'medium', is_active: true, started_at: '2022-02-28T00:00:00Z', source: 'Seed', properties: {} },
-      { title: 'Haiti: Gang violence and political crisis; UN stabilisation mission approved', category: 'crisis', country: 'Haiti', latitude: 18.9, longitude: -72.3, description: '', severity: 'high', is_active: true, started_at: '2024-01-01T00:00:00Z', source: 'Seed', properties: {} },
-      { title: 'Myanmar: Civil war continues; junta airstrikes on resistance-held towns', category: 'conflict', country: 'Myanmar', latitude: 19.7, longitude: 96.1, description: '', severity: 'high', is_active: true, started_at: '2021-02-01T00:00:00Z', source: 'Seed', properties: {} },
-      { title: 'Ethiopia: Amhara region conflict; federal military operations ongoing', category: 'conflict', country: 'Ethiopia', latitude: 11.5, longitude: 37.5, description: '', severity: 'medium', is_active: true, started_at: '2023-08-01T00:00:00Z', source: 'Seed', properties: {} },
-      { title: 'Venezuela: political tensions; opposition arrests ahead of elections', category: 'crisis', country: 'Venezuela', latitude: 10.5, longitude: -66.9, description: '', severity: 'medium', is_active: true, started_at: '2024-01-01T00:00:00Z', source: 'Seed', properties: {} },
-      { title: 'Kosovo: Serbia-Kosovo border tensions; NATO KFOR on heightened alert', category: 'crisis', country: 'Kosovo', latitude: 42.6, longitude: 21.2, description: '', severity: 'medium', is_active: true, started_at: '2023-09-01T00:00:00Z', source: 'Seed', properties: {} },
-    ];
-
-    return SEED.slice(0, limit).map((s, i) => ({
-      ...s,
-      id: `geo-seed-${i}-${ts}`,
-      event_id: `geo-seed-${i}`,
-      description: s.description || s.title,
-      updated_at: new Date().toISOString(),
-    }));
-  }
-
-  static async getCyberThreats(_limit = 100): Promise<CyberThreat[]> { return []; }
-  static async getBankEvents(_limit = 100): Promise<BankEvent[]> { return []; }
-  static async getInfoOps(_limit = 100): Promise<InfoOp[]> { return []; }
-  static async getUAETwitter(_limit = 100): Promise<UAETwitter[]> { return []; }
-  static async getUnifiedAlerts(_options = {}): Promise<UnifiedAlert[]> { return []; }
-  static async getFusedAlerts(_options = {}): Promise<FusedAlert[]> { return []; }
-  static async getPollState(): Promise<PollState[]> {
-    const now = new Date();
-    const sources = ['USGS', 'NASA EONET', 'GDELT News', 'GDELT Geo', 'RSS Proxy', 'Abuse.ch', 'Vessel AIS'];
-    return sources.map((source, i) => ({
-      source,
-      last_fetch_at: new Date(now.getTime() - (i * 120000 + Math.random() * 60000)).toISOString(),
-      last_success_at: new Date(now.getTime() - (i * 120000 + Math.random() * 60000)).toISOString(),
-      next_retry_at: new Date(now.getTime() + 300000 + i * 60000).toISOString(),
-      consecutive_failures: 0,
-      total_fetches: Math.floor(1000 + Math.random() * 5000),
-      total_changes: Math.floor(200 + Math.random() * 2000),
-      last_error: null,
-    }));
-  }
-
-  static async getPollLog(_limit = 100): Promise<PollLogEntry[]> {
-    const now = Date.now();
-    const sources = ['USGS', 'NASA EONET', 'GDELT News', 'GDELT Geo', 'RSS Proxy', 'Abuse.ch'];
-    return Array.from({ length: 30 }, (_, i) => ({
-      id: `log-${i}`,
-      source: sources[i % sources.length],
-      fetched_at: new Date(now - i * 300000).toISOString(),
-      success: Math.random() > 0.05,
-      changed: Math.random() > 0.4,
-      alerts_written: Math.floor(Math.random() * 15),
-      error: null,
-      duration_ms: Math.floor(800 + Math.random() * 3000),
-    }));
-  }
-
-  static async getIngestionStats(_days = 7): Promise<IngestionStat[]> {
-    const sources = ['USGS', 'NASA EONET', 'GDELT News', 'GDELT Geo', 'RSS Proxy', 'Abuse.ch'];
-    const today = new Date().toISOString().slice(0, 10);
-    return sources.map(source => {
-      const total_fetches = Math.floor(40 + Math.random() * 100);
-      const failed_fetches = Math.floor(Math.random() * 3);
-      const successful_fetches = total_fetches - failed_fetches;
-      return {
-        source,
-        day: today,
-        total_fetches,
-        successful_fetches,
-        failed_fetches,
-        success_rate: total_fetches > 0 ? successful_fetches / total_fetches : null,
-        total_alerts_written: Math.floor(10 + Math.random() * 80),
-        avg_duration_ms: Math.floor(1200 + Math.random() * 2000),
-        last_fetch_at: new Date().toISOString(),
-        last_success_at: new Date().toISOString(),
-        last_error: null,
-        consecutive_failures: 0,
-        lifetime_fetches: Math.floor(5000 + Math.random() * 20000),
-        lifetime_changes: Math.floor(1000 + Math.random() * 8000),
-      };
-    });
-  }
-
-  static async getSystemMetrics(names: string[], _hours = 24): Promise<SystemMetric[]> {
-    const now = Date.now();
-    const metrics: SystemMetric[] = [];
-    for (const name of names) {
-      for (let h = 0; h < 24; h++) {
-        metrics.push({
-          id: `m-${name}-${h}`,
-          metric_name: name,
-          source: 'system',
-          value: Math.floor(5 + Math.random() * 30),
-          recorded_at: new Date(now - h * 3600000).toISOString(),
-        });
+    // Attempt 3: ACLED (Armed Conflict Location & Event Data) — free with registration
+    // NOTE: Requires a free API key from https://acleddata.com/register
+    // Set VITE_ACLED_API_KEY and VITE_ACLED_EMAIL in your .env to enable this source.
+    const acledKey   = (import.meta as any).env?.VITE_ACLED_API_KEY as string | undefined;
+    const acledEmail = (import.meta as any).env?.VITE_ACLED_EMAIL as string | undefined;
+    if (acledKey && acledEmail) {
+      try {
+        const url = `https://api.acleddata.com/acled/read?key=${encodeURIComponent(acledKey)}&email=${encodeURIComponent(acledEmail)}&limit=${Math.min(limit, 50)}&fields=event_id_cnty|event_date|event_type|actor1|country|latitude|longitude|notes|fatalities&event_date=${new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10)}|${new Date().toISOString().slice(0, 10)}&format=json`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
+        if (res.ok) {
+          const json = await res.json();
+          const data: any[] = json?.data ?? [];
+          if (data.length > 0) {
+            return data.map((e: any, i: number) => {
+              const title = `${e.event_type}: ${e.actor1 ?? ''} — ${e.country ?? ''}`.trim();
+              const { category, severity } = classifyTitle(e.event_type ?? title);
+              return {
+                id: `acled-${i}-${ts}`,
+                event_id: e.event_id_cnty ?? `acled-${i}`,
+                title: title.slice(0, 150),
+                category,
+                country: e.country ?? null,
+                latitude: e.latitude != null ? parseFloat(e.latitude) : null,
+                longitude: e.longitude != null ? parseFloat(e.longitude) : null,
+                description: (e.notes ?? title).slice(0, 300),
+                severity,
+                is_active: true,
+                started_at: e.event_date ? new Date(e.event_date).toISOString() : new Date().toISOString(),
+                source: 'ACLED',
+                properties: { fatalities: e.fatalities },
+                updated_at: new Date().toISOString(),
+              };
+            });
+          }
+        }
+      } catch {
+        // fall through
       }
+    } else {
+      console.warn(
+        '[DHRUVA] Enhanced geopolitical conflict data available free from ACLED.\n' +
+        'Register at https://acleddata.com/register and set VITE_ACLED_API_KEY and VITE_ACLED_EMAIL in your .env'
+      );
     }
-    return metrics;
+
+    // All sources exhausted — return empty (GDELT ArtList should have succeeded above)
+    console.warn('[DHRUVA] All geopolitical data sources returned empty results.');
+    return [];
+  }
+
+  // NOTE: CyberThreats from commercial threat feeds require paid API keys.
+  // Free options: Abuse.ch feeds (used in CyberView component directly via CSV).
+  // Paid options:
+  //   - Recorded Future API (https://www.recordedfuture.com) — PAID
+  //   - VirusTotal Intelligence (https://www.virustotal.com/gui/intelligence-overview) — PAID
+  //   - Shodan (https://www.shodan.io/api) — Free tier (100 queries/month), paid for bulk
+  //   Set VITE_SHODAN_API_KEY in .env to enable Shodan threat lookups.
+  static async getCyberThreats(_limit = 100): Promise<CyberThreat[]> { return []; }
+
+  // NOTE: Banking/financial event data requires paid licensed feeds.
+  // Paid options:
+  //   - Refinitiv/LSEG World-Check (https://www.refinitiv.com/en/financial-crime) — PAID
+  //   - Bloomberg Terminal API — PAID
+  //   - Open Sanctions (https://www.opensanctions.org/docs/api/) — Free API for sanctions data
+  static async getBankEvents(_limit = 100): Promise<BankEvent[]> { return []; }
+
+  // NOTE: Information operations detection data requires specialised OSINT providers.
+  // Free options: GDELT (used in InfoOpsView component directly).
+  // Paid/academic options:
+  //   - Stanford Internet Observatory DFRLab datasets — Academic/research
+  //   - Graphika reports (https://graphika.com) — PAID enterprise
+  static async getInfoOps(_limit = 100): Promise<InfoOp[]> { return []; }
+
+  // NOTE: Real-time Twitter/X data requires Twitter API v2 credentials.
+  // Paid option: Twitter/X API Basic tier ($100/month) — https://developer.twitter.com/en/products/twitter-api
+  // Free alternative: Set VITE_TWITTER_BEARER_TOKEN in .env for recent tweet search (limited free access).
+  static async getUAETwitter(_limit = 100): Promise<UAETwitter[]> { return []; }
+
+  static async getUnifiedAlerts(_options = {}): Promise<UnifiedAlert[]> {
+    try {
+      const { data, error } = await supabase
+        .from('unified_alerts')
+        .select('*')
+        .eq('lifecycle_state', 'active')
+        .order('effective_time', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return (data ?? []) as UnifiedAlert[];
+    } catch {
+      return [];
+    }
+  }
+
+  static async getFusedAlerts(_options = {}): Promise<FusedAlert[]> {
+    try {
+      const { data, error } = await supabase
+        .from('fused_alerts')
+        .select('*')
+        .eq('lifecycle_state', 'active')
+        .order('priority_score', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return (data ?? []) as FusedAlert[];
+    } catch {
+      return [];
+    }
+  }
+
+  static async getPollState(): Promise<PollState[]> {
+    try {
+      const { data, error } = await supabase
+        .from('alert_poll_state')
+        .select('*')
+        .order('source');
+      if (error) throw error;
+      return (data ?? []).map((r: any) => ({
+        source: r.source,
+        last_fetch_at: r.last_fetch_at,
+        last_success_at: r.last_success_at,
+        last_payload_hash: r.last_payload_hash,
+        consecutive_failures: r.consecutive_failures ?? 0,
+        next_retry_at: r.next_retry_at,
+        last_error: r.last_error,
+        total_fetches: r.total_fetches ?? 0,
+        total_changes: r.total_changes ?? 0,
+        updated_at: r.updated_at,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  static async getPollLog(limit = 100): Promise<PollLogEntry[]> {
+    try {
+      const { data, error } = await supabase
+        .from('alert_poll_log')
+        .select('*')
+        .order('fetched_at', { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return (data ?? []).map((r: any) => ({
+        id: r.id,
+        source: r.source,
+        fetched_at: r.fetched_at,
+        success: r.success,
+        changed: r.changed,
+        alerts_written: r.alerts_written ?? 0,
+        error: r.error,
+        duration_ms: r.duration_ms,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  static async getIngestionStats(days = 7): Promise<IngestionStat[]> {
+    try {
+      const since = new Date(Date.now() - days * 86_400_000).toISOString();
+      const { data, error } = await supabase
+        .from('ingestion_stats')
+        .select('*')
+        .gte('day', since)
+        .order('day', { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map((r: any) => ({
+        source: r.source,
+        day: r.day,
+        total_fetches: Number(r.total_fetches ?? 0),
+        successful_fetches: Number(r.successful_fetches ?? 0),
+        failed_fetches: Number(r.failed_fetches ?? 0),
+        success_rate: r.success_rate != null ? Number(r.success_rate) : null,
+        total_alerts_written: Number(r.total_alerts_written ?? 0),
+        avg_duration_ms: r.avg_duration_ms != null ? Number(r.avg_duration_ms) : null,
+        last_fetch_at: r.last_fetch_at,
+        last_success_at: r.last_success_at,
+        last_error: r.last_error,
+        consecutive_failures: r.consecutive_failures ?? 0,
+        lifetime_fetches: Number(r.lifetime_fetches ?? 0),
+        lifetime_changes: Number(r.lifetime_changes ?? 0),
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  static async getSystemMetrics(names: string[], hours = 24): Promise<SystemMetric[]> {
+    try {
+      const since = new Date(Date.now() - hours * 3_600_000).toISOString();
+      const { data, error } = await supabase
+        .from('system_metrics')
+        .select('*')
+        .in('metric_name', names)
+        .gte('recorded_at', since)
+        .order('recorded_at', { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map((r: any) => ({
+        id: r.id,
+        metric_name: r.metric_name,
+        source: r.source,
+        value: Number(r.value),
+        recorded_at: r.recorded_at,
+      }));
+    } catch {
+      return [];
+    }
   }
 
   static async getAlertLifecycleCounts(): Promise<LifecycleCounts> {
-    return { active: Math.floor(12 + Math.random() * 30), updated: Math.floor(5 + Math.random() * 15), expired: Math.floor(20 + Math.random() * 50) };
+    try {
+      const { data, error } = await supabase
+        .from('unified_alerts')
+        .select('lifecycle_state');
+      if (error) throw error;
+      const rows: any[] = data ?? [];
+      return {
+        active:  rows.filter(r => r.lifecycle_state === 'active').length,
+        updated: rows.filter(r => r.lifecycle_state === 'updated').length,
+        expired: rows.filter(r => r.lifecycle_state === 'expired').length,
+      };
+    } catch {
+      return { active: 0, updated: 0, expired: 0 };
+    }
   }
-  static async getLastSyncTime(): Promise<string | null> { return null; }
+
+  static async getLastSyncTime(): Promise<string | null> {
+    try {
+      const { data } = await supabase
+        .from('alert_poll_state')
+        .select('last_success_at')
+        .order('last_success_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data?.last_success_at ?? null;
+    } catch {
+      return null;
+    }
+  }
 
   static async triggerDataSync(): Promise<void> {}
 
