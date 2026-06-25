@@ -523,7 +523,7 @@ export class IntelligenceAPI {
           });
         }
       }
-      if (results.length >= 5) return results.slice(0, limit);
+      if (results.length >= 1) return results.slice(0, limit);
     } catch {
       // fall through to seeded data
     }
@@ -535,7 +535,7 @@ export class IntelligenceAPI {
       if (res.ok) {
         const json = await res.json();
         const features: any[] = json?.features ?? [];
-        if (features.length >= 3) {
+        if (features.length >= 1) {
           return features.slice(0, limit).map((f: any, i: number) => {
             const props = f.properties ?? {};
             const title = stripHtml((props.name ?? props.html ?? `Geopolitical Event #${i + 1}`) as string).slice(0, 150);
@@ -609,7 +609,87 @@ export class IntelligenceAPI {
       );
     }
 
-    // All sources exhausted — return empty (GDELT ArtList should have succeeded above)
+    // Attempt 4: ReliefWeb API (UNOCHA) — completely free, no key required
+    // Covers active humanitarian crises, conflicts, disasters with country + coordinates
+    try {
+      const rwUrl = 'https://api.reliefweb.int/v1/disasters?appname=dhruva-intel&profile=list&preset=latest&slim=1&limit=50' +
+        '&fields[include][]=name&fields[include][]=primary_country&fields[include][]=date&fields[include][]=primary_type&fields[include][]=status';
+      const rwRes = await fetch(rwUrl, { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
+      if (rwRes.ok) {
+        const rwJson = await rwRes.json();
+        const items: any[] = rwJson?.data ?? [];
+        if (items.length > 0) {
+          // Fetch country coordinates from a second ReliefWeb call for countries
+          const events: GeopoliticalEvent[] = items.map((item: any, i: number) => {
+            const f = item.fields ?? {};
+            const typeName: string = (f.primary_type?.name ?? '').toLowerCase();
+            const name: string = f.name ?? 'Unknown Crisis';
+            const country: string | null = f.primary_country?.name ?? null;
+            const status: string = (f.status ?? '').toLowerCase();
+            const category: GeopoliticalEvent['category'] =
+              typeName.includes('conflict') || typeName.includes('civil') || typeName.includes('war') ? 'conflict'
+              : typeName.includes('epidemic') || typeName.includes('health') ? 'crisis'
+              : typeName.includes('political') ? 'crisis'
+              : 'geopolitical';
+            const severity: GeopoliticalEvent['severity'] =
+              status === 'alert' ? 'critical'
+              : status === 'ongoing' ? 'high'
+              : typeName.includes('conflict') ? 'high'
+              : 'medium';
+            return {
+              id: `rw-${item.id ?? i}-${ts}`,
+              event_id: `rw-${item.id ?? i}`,
+              title: name.slice(0, 150),
+              category,
+              country,
+              latitude: f.primary_country?.location?.lat ?? null,
+              longitude: f.primary_country?.location?.lon ?? null,
+              description: name,
+              severity,
+              is_active: status !== 'past',
+              started_at: f.date?.created ? new Date(f.date.created).toISOString() : new Date().toISOString(),
+              source: 'ReliefWeb (UNOCHA)',
+              properties: { reliefweb_id: item.id, status, type: typeName, href: item.href },
+              updated_at: f.date?.changed ? new Date(f.date.changed).toISOString() : new Date().toISOString(),
+            };
+          });
+          // Supplement with a GDELT query that's broader — no minimum threshold
+          try {
+            const gdeltSup = `https://api.gdeltproject.org/api/v2/doc/doc?query=war+OR+conflict+OR+military&mode=ArtList&format=json&maxrecords=20&timespan=1440min&sort=DateDesc`;
+            const gRes = await fetch(gdeltSup, { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
+            if (gRes.ok) {
+              const gJson = await gRes.json();
+              const gItems: any[] = gJson?.articles ?? [];
+              for (const a of gItems) {
+                if (!a.title) continue;
+                const { category: gc, severity: gs } = classifyTitle(a.title);
+                events.push({
+                  id: `geo-sup-${events.length}-${ts}`,
+                  event_id: `geo-sup-${events.length}`,
+                  title: stripHtml(a.title).slice(0, 150),
+                  category: gc,
+                  country: a.sourcecountry ?? null,
+                  latitude: a.sourcelat != null ? parseFloat(a.sourcelat) : null,
+                  longitude: a.sourcelong != null ? parseFloat(a.sourcelong) : null,
+                  description: stripHtml(a.title).slice(0, 150),
+                  severity: gs,
+                  is_active: true,
+                  started_at: parseSeendate(a.seendate ?? ''),
+                  source: a.domain ?? 'GDELT',
+                  properties: { url: a.url },
+                  updated_at: new Date().toISOString(),
+                });
+              }
+            }
+          } catch { /* supplement failed, use ReliefWeb alone */ }
+          return events.slice(0, limit);
+        }
+      }
+    } catch {
+      // fall through
+    }
+
+    // All sources exhausted
     console.warn('[DHRUVA] All geopolitical data sources returned empty results.');
     return [];
   }
