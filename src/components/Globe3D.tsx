@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
-import { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
+import { Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
 import { UNDERSEA_CABLES, CHOKEPOINTS, MILITARY_BASES, NUCLEAR_SITES } from '../lib/cable-data';
 import { INDIA_OUTER_BOUNDARY, LINE_OF_CONTROL, LINE_OF_ACTUAL_CONTROL } from '../lib/india-boundary';
 
@@ -8,7 +8,6 @@ interface Globe3DProps {
   earthquakes: Earthquake[];
   disasters: Disaster[];
   news: NewsEvent[];
-  vessels: Vessel[];
   volcanoes: VolcanoEvent[];
   geopolitical: GeopoliticalEvent[];
   onEventSelect: (id: string, type: string) => void;
@@ -21,7 +20,6 @@ interface Globe3DProps {
     nuclear: boolean;
     chokepoints: boolean;
     daynight: boolean;
-    vessels: boolean;
     volcanoes: boolean;
     geopolitical: boolean;
     curfews: boolean;
@@ -85,7 +83,6 @@ export function Globe3D({
   earthquakes,
   disasters,
   news,
-  vessels,
   volcanoes,
   geopolitical,
   onEventSelect,
@@ -457,22 +454,6 @@ export function Globe3D({
       });
     }
 
-    if (layersEnabled.vessels) {
-      vessels.forEach((v) => {
-        if (!v.latitude || !v.longitude) return;
-        const pos = latLonToVec3(v.latitude, v.longitude, GLOBE_RADIUS + 1);
-        const col = v.type === 'Military' ? 0xff2255 : v.type === 'Tanker' ? 0xffb800 : 0x00bfff;
-        const geo = new THREE.ConeGeometry(0.9, 2.8, 3);
-        const mat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9 });
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.position.copy(pos);
-        mesh.lookAt(0, 0, 0);
-        mesh.rotateX(Math.PI);
-        mesh.userData = { type: 'vessel', id: v.id, name: `${v.name} [${v.type}] → ${v.destination || '?'}` };
-        markersRef.current?.add(mesh);
-      });
-    }
-
     if (layersEnabled.disasters) {
       disasters.slice(0, 40).forEach((d) => {
         if (!d.latitude || !d.longitude) return;
@@ -498,7 +479,7 @@ export function Globe3D({
         markersRef.current?.add(mesh);
       });
     }
-  }, [earthquakes, disasters, news, vessels, volcanoes, geopolitical, layersEnabled]);
+  }, [earthquakes, disasters, news, volcanoes, geopolitical, layersEnabled]);
 
   useEffect(() => {
     if (!nightOverlayRef.current || !layersEnabled.daynight) {

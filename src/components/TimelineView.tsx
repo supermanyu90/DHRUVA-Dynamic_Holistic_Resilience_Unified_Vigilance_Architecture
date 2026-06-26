@@ -3,7 +3,7 @@ import { TimelineChart } from './timeline/TimelineChart';
 import { TimelineEventList } from './timeline/TimelineEventList';
 import { TimelineStats } from './timeline/TimelineStats';
 import type { TimelineEvent } from './timeline/types';
-import type { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
+import type { Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
 
 const RANGES: { label: string; ms: number }[] = [
   { label: '6H', ms: 6 * 3600 * 1000 },
@@ -16,12 +16,11 @@ interface Props {
   earthquakes: Earthquake[];
   disasters: Disaster[];
   news: NewsEvent[];
-  vessels: Vessel[];
   volcanoes: VolcanoEvent[];
   geopolitical: GeopoliticalEvent[];
 }
 
-export function TimelineView({ earthquakes, disasters, news, vessels, volcanoes, geopolitical }: Props) {
+export function TimelineView({ earthquakes, disasters, news, volcanoes, geopolitical }: Props) {
   const [rangeIdx, setRangeIdx] = useState(1);
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const now = useMemo(() => Date.now(), []);
@@ -63,18 +62,8 @@ export function TimelineView({ earthquakes, disasters, news, vessels, volcanoes,
       });
     }
 
-    for (const v of vessels) {
-      result.push({
-        id: v.id,
-        type: 'vessel',
-        label: `${v.name} — ${v.destination || 'Unknown Dest'}`,
-        timestamp: v.last_position_time,
-        location: v.flag,
-      });
-    }
-
     return result;
-  }, [earthquakes, disasters, news, vessels]);
+  }, [earthquakes, disasters, news]);
 
   const persistentEvents: TimelineEvent[] = useMemo(() => {
     const result: TimelineEvent[] = [];

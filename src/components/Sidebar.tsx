@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ExternalLink } from 'lucide-react';
-import { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
+import { Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
 import { EventDetailDrawer } from './sidebar/EventDetailDrawer';
 
 type DrawerEvent =
@@ -8,14 +8,12 @@ type DrawerEvent =
   | { type: 'earthquake'; data: Earthquake }
   | { type: 'disaster'; data: Disaster }
   | { type: 'volcano'; data: VolcanoEvent }
-  | { type: 'vessel'; data: Vessel }
   | { type: 'geopolitical' | 'curfew'; data: GeopoliticalEvent };
 
 interface SidebarProps {
   earthquakes: Earthquake[];
   disasters: Disaster[];
   news: NewsEvent[];
-  vessels: Vessel[];
   volcanoes: VolcanoEvent[];
   geopolitical: GeopoliticalEvent[];
   selectedEvent: string | null;
@@ -31,7 +29,6 @@ interface SidebarProps {
     nuclear: boolean;
     chokepoints: boolean;
     daynight: boolean;
-    vessels: boolean;
     volcanoes: boolean;
     geopolitical: boolean;
     curfews: boolean;
@@ -40,13 +37,12 @@ interface SidebarProps {
   mobileOpen?: boolean;
 }
 
-const SUPPORTED_DRAWER_TYPES = new Set(['news', 'earthquake', 'disaster', 'geopolitical', 'curfew', 'volcano', 'vessel']);
+const SUPPORTED_DRAWER_TYPES = new Set(['news', 'earthquake', 'disaster', 'geopolitical', 'curfew', 'volcano']);
 
 export function Sidebar({
   earthquakes,
   disasters,
   news,
-  vessels,
   volcanoes,
   geopolitical,
   selectedEvent,
@@ -72,9 +68,6 @@ export function Sidebar({
       } else if (type === 'volcano') {
         const found = volcanoes.find(v => v.id === id);
         if (found) setDrawerEvent({ type: 'volcano', data: found });
-      } else if (type === 'vessel') {
-        const found = vessels.find(v => v.id === id);
-        if (found) setDrawerEvent({ type: 'vessel', data: found });
       } else if (type === 'geopolitical') {
         const found = geopolitical.find(g => g.id === id);
         if (found) setDrawerEvent({ type: 'geopolitical', data: found });
@@ -102,7 +95,6 @@ export function Sidebar({
     ...volcanoes.map((v) => ({ ...v, id: v.id, type: 'volcano', icon: '▲', color: '#FF4500', sortTime: v.updated_at })),
     ...geopolitical.filter((g) => g.category !== 'curfew').map((g) => ({ ...g, type: 'geopolitical', icon: '◉', color: g.severity === 'critical' ? '#FF2255' : g.severity === 'high' ? '#FF6B00' : '#FFB800', sortTime: g.updated_at })),
     ...curfewEvents.map((g) => ({ ...g, type: 'curfew', icon: '⊘', color: '#CC3300', sortTime: g.updated_at })),
-    ...vessels.map((v) => ({ ...v, type: 'vessel', icon: '◈', color: '#00BFFF', sortTime: v.last_position_time })),
     ...news.map((n) => ({ ...n, type: 'news', icon: '◎', color: 'var(--accent)', sortTime: n.published_at })),
   ]
     .filter((event) => filterByMode(new Date(event.sortTime)))
@@ -112,12 +104,11 @@ export function Sidebar({
       if (event.type === 'volcano') return layersEnabled.volcanoes;
       if (event.type === 'geopolitical') return layersEnabled.geopolitical;
       if (event.type === 'curfew') return layersEnabled.curfews;
-      if (event.type === 'vessel') return layersEnabled.vessels;
       if (event.type === 'news') return layersEnabled.news;
       return true;
     })
     .sort((a, b) => new Date(b.sortTime).getTime() - new Date(a.sortTime).getTime()),
-  [earthquakes, disasters, volcanoes, geopolitical, curfewEvents, vessels, news, layersEnabled, last72Hours]);
+  [earthquakes, disasters, volcanoes, geopolitical, curfewEvents, news, layersEnabled, last72Hours]);
 
   function openDrawer(event: typeof allEvents[0]) {
     if (event.type === 'news') {
@@ -128,8 +119,6 @@ export function Sidebar({
       setDrawerEvent({ type: 'disaster', data: event as unknown as Disaster });
     } else if (event.type === 'volcano') {
       setDrawerEvent({ type: 'volcano', data: event as unknown as VolcanoEvent });
-    } else if (event.type === 'vessel') {
-      setDrawerEvent({ type: 'vessel', data: event as unknown as Vessel });
     } else if (event.type === 'geopolitical') {
       setDrawerEvent({ type: 'geopolitical', data: event as unknown as GeopoliticalEvent });
     } else if (event.type === 'curfew') {
@@ -210,16 +199,6 @@ export function Sidebar({
           CURFEWS
         </button>
         <button
-          className={`lbtn ${layersEnabled.vessels ? 'active' : ''}`}
-          onClick={() => onLayerToggle('vessels')}
-          aria-pressed={layersEnabled.vessels}
-          aria-label="Toggle vessels layer"
-          style={{ borderColor: '#00BFFF', color: '#00BFFF' }}
-        >
-          <span className="ldot" style={{ background: '#00BFFF' }} aria-hidden="true"></span>
-          VESSELS
-        </button>
-        <button
           className={`lbtn lbtn-cab ${layersEnabled.cables ? 'active' : ''}`}
           onClick={() => onLayerToggle('cables')}
           aria-pressed={layersEnabled.cables}
@@ -282,7 +261,6 @@ export function Sidebar({
         {allEvents.map((event) => {
           const eventTime = new Date(event.sortTime);
           const isEarthquake = event.type === 'earthquake';
-          const isVessel = event.type === 'vessel';
           const isVolcano = event.type === 'volcano';
           const isGeopolitical = event.type === 'geopolitical' || event.type === 'curfew';
           const isNews = event.type === 'news';
@@ -295,10 +273,6 @@ export function Sidebar({
           if (isEarthquake) {
             label = `M${(event as any).magnitude.toFixed(1)} ${(event as any).location}`;
             sublabel = `USGS • Depth: ${(event as any).depth?.toFixed(0) ?? '?'} km`;
-          } else if (isVessel) {
-            const v = event as any;
-            label = v.name;
-            sublabel = `${v.type} • ${v.flag || ''} • ${v.speed?.toFixed(1) || '?'} kn → ${v.destination || '?'}`;
           } else if (isVolcano) {
             const v = event as any;
             label = v.name;

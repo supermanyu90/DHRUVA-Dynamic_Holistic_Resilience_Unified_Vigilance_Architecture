@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
-import { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
+import { Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
 import { UNDERSEA_CABLES, CHOKEPOINTS, MILITARY_BASES, NUCLEAR_SITES } from '../lib/cable-data';
 import { INDIA_OUTER_BOUNDARY, INDIA_NORTHERN_TERRITORY, INDIA_DISCLAIMER } from '../lib/india-boundary';
 
@@ -18,7 +18,6 @@ interface WorldMapSVGProps {
   earthquakes: Earthquake[];
   disasters: Disaster[];
   news: NewsEvent[];
-  vessels: Vessel[];
   volcanoes: VolcanoEvent[];
   geopolitical: GeopoliticalEvent[];
   onEventSelect: (id: string, type: string) => void;
@@ -31,7 +30,6 @@ interface WorldMapSVGProps {
     nuclear: boolean;
     chokepoints: boolean;
     daynight: boolean;
-    vessels: boolean;
     volcanoes: boolean;
     geopolitical: boolean;
     curfews: boolean;
@@ -75,7 +73,6 @@ export function WorldMapSVG({
   earthquakes,
   disasters,
   news,
-  vessels,
   volcanoes,
   geopolitical,
   onEventSelect,
@@ -1110,33 +1107,6 @@ export function WorldMapSVG({
             );
           })}
 
-        {layersEnabled.vessels &&
-          vessels.map((v) => {
-            if (!v.latitude || !v.longitude) return null;
-            const x = lonToX(v.longitude);
-            const y = latToY(v.latitude);
-            const color = v.type === 'Military' ? '#FF2255' : v.type === 'Tanker' ? '#FFB800' : '#00BFFF';
-            const courseRad = ((v.course || 0) * Math.PI) / 180;
-            const tipX = x + Math.sin(courseRad) * 4;
-            const tipY = y - Math.cos(courseRad) * 4;
-            const leftX = x + Math.sin(courseRad - 2.2) * 2.5;
-            const leftY = y - Math.cos(courseRad - 2.2) * 2.5;
-            const rightX = x + Math.sin(courseRad + 2.2) * 2.5;
-            const rightY = y - Math.cos(courseRad + 2.2) * 2.5;
-            return (
-              <g key={v.id} style={{ cursor: 'pointer' }}>
-                <polygon
-                  points={`${tipX},${tipY} ${leftX},${leftY} ${x},${y + 1} ${rightX},${rightY}`}
-                  fill={color}
-                  opacity="0.85"
-                  filter="url(#glow)"
-                  onMouseEnter={(e) => handleMarkerHover(e, `${v.name} [${v.type}] ${v.flag || ''} • ${v.speed?.toFixed(1) || '?'}kn → ${v.destination || '?'}`)}
-                  onMouseLeave={hideTooltip}
-                  onClick={() => handleMarkerClick(v.id, 'vessel')}
-                />
-              </g>
-            );
-          })}
       </svg>
     </div>
   );

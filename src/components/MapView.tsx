@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
+import { Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
 import { WorldMapSVG } from './WorldMapSVG';
 import { Globe3D } from './Globe3D';
 import { Globe, Map, Tag } from 'lucide-react';
@@ -8,7 +8,6 @@ interface MapViewProps {
   earthquakes: Earthquake[];
   disasters: Disaster[];
   news: NewsEvent[];
-  vessels: Vessel[];
   volcanoes: VolcanoEvent[];
   geopolitical: GeopoliticalEvent[];
   onEventSelect: (id: string, type: string) => void;
@@ -21,7 +20,6 @@ interface MapViewProps {
     nuclear: boolean;
     chokepoints: boolean;
     daynight: boolean;
-    vessels: boolean;
     volcanoes: boolean;
     geopolitical: boolean;
     curfews: boolean;
@@ -48,7 +46,6 @@ export function MapView({
   earthquakes,
   disasters,
   news,
-  vessels,
   volcanoes,
   geopolitical,
   onEventSelect,
@@ -106,7 +103,6 @@ export function MapView({
             earthquakes={earthquakes}
             disasters={disasters}
             news={news}
-            vessels={vessels}
             volcanoes={volcanoes}
             geopolitical={geopolitical}
             onEventSelect={onEventSelect}
@@ -123,7 +119,6 @@ export function MapView({
             earthquakes={earthquakes}
             disasters={disasters}
             news={news}
-            vessels={vessels}
             volcanoes={volcanoes}
             geopolitical={geopolitical}
             onEventSelect={onEventSelect}

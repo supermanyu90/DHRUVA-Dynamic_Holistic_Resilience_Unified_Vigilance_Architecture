@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { IntelligenceAPI, Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from './lib/intelligence-api';
+import { IntelligenceAPI, Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from './lib/intelligence-api';
 import { withResilience } from './lib/resilience';
 import { DataFreshnessContext, DataFreshnessState, formatStaleAge } from './lib/DataFreshnessContext';
 import {
@@ -14,7 +14,6 @@ import { SewaView } from './components/SewaView';
 import { CyberView } from './components/CyberView';
 import { InfoOpsView } from './components/InfoOpsView';
 import { GovAnnouncementsView } from './components/GovAnnouncementsView';
-import { VesselView } from './components/VesselView';
 import { NewsIntelView } from './components/NewsIntelView';
 import { TimelineView } from './components/TimelineView';
 import { AlertToast } from './components/AlertToast';
@@ -27,7 +26,7 @@ import { LiveEventTicker, TickerEvent } from './components/LiveEventTicker';
 import { AboutDhruva } from './components/AboutDhruva';
 import { AdminDashboard } from './components/AdminDashboard';
 
-type ViewType = 'map' | 'timeline' | 'news' | 'sewa' | 'cyber' | 'infoops' | 'gov' | 'vessel' | 'admin';
+type ViewType = 'map' | 'timeline' | 'news' | 'sewa' | 'cyber' | 'infoops' | 'gov' | 'admin';
 
 function formatSyncCountdown(ms: number): string {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
@@ -38,7 +37,7 @@ function formatSyncCountdown(ms: number): string {
 
 function toTickerEvent(
   type: TickerEvent['type'],
-  item: Earthquake | Disaster | NewsEvent | VolcanoEvent | GeopoliticalEvent | Vessel
+  item: Earthquake | Disaster | NewsEvent | VolcanoEvent | GeopoliticalEvent
 ): TickerEvent {
   const now = new Date();
   const timeStr = now.toUTCString().slice(17, 25) + 'Z';
@@ -82,15 +81,13 @@ function toTickerEvent(
       severity: g.severity,
     };
   }
-  const vessel = item as Vessel;
-  return { id: vessel.id, time: timeStr, type: 'vessel', title: `${vessel.name} [${vessel.type}]` };
+  return { id: '', time: timeStr, type: 'news', title: '' };
 }
 
 function App() {
   const [earthquakes, setEarthquakes] = useState<Earthquake[]>([]);
   const [disasters, setDisasters] = useState<Disaster[]>([]);
   const [news, setNews] = useState<NewsEvent[]>([]);
-  const [vessels, setVessels] = useState<Vessel[]>([]);
   const [volcanoes, setVolcanoes] = useState<VolcanoEvent[]>([]);
   const [geopolitical, setGeopolitical] = useState<GeopoliticalEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,7 +105,6 @@ function App() {
     nuclear: false,
     chokepoints: false,
     daynight: false,
-    vessels: true,
     volcanoes: true,
     geopolitical: true,
     curfews: true,
@@ -238,17 +234,15 @@ function App() {
         withResilience('earthquakes', () => IntelligenceAPI.getEarthquakes(4.0, 50), { maxRetries: 1, baseDelayMs: 300 }),
         withResilience('disasters',   () => IntelligenceAPI.getDisasters(50),         { maxRetries: 1, baseDelayMs: 300 }),
         withResilience('news',        () => IntelligenceAPI.getNews(50),              { maxRetries: 1, baseDelayMs: 300 }),
-        withResilience('vessels',     () => IntelligenceAPI.getVessels(50),           { maxRetries: 1, baseDelayMs: 300 }),
         withResilience('volcanoes',   () => IntelligenceAPI.getVolcanoes(50),         { maxRetries: 1, baseDelayMs: 300 }),
         withResilience('geopolitical',() => IntelligenceAPI.getGeopoliticalEvents(50),{ maxRetries: 1, baseDelayMs: 300 }),
       ]);
 
-      const [eqR, disR, newsR, vesR, volR, geoR] = settled;
+      const [eqR, disR, newsR, volR, geoR] = settled;
 
       if (eqR.status   === 'fulfilled') setEarthquakes(eqR.value.data);
       if (disR.status  === 'fulfilled') setDisasters(disR.value.data);
       if (newsR.status === 'fulfilled') setNews(newsR.value.data);
-      if (vesR.status  === 'fulfilled') setVessels(vesR.value.data);
       if (volR.status  === 'fulfilled') setVolcanoes(volR.value.data);
       if (geoR.status  === 'fulfilled') setGeopolitical(geoR.value.data);
 
@@ -259,10 +253,8 @@ function App() {
       if (newsR.status === 'fulfilled') newsR.value.data.slice(0, 8).forEach((n: NewsEvent) => tickerSeed.push(toTickerEvent('news', n)));
       if (geoR.status === 'fulfilled') geoR.value.data.slice(0, 10).forEach((g: GeopoliticalEvent) => tickerSeed.push(toTickerEvent('geopolitical', g)));
       if (volR.status === 'fulfilled') volR.value.data.slice(0, 3).forEach((v: VolcanoEvent) => tickerSeed.push(toTickerEvent('volcano', v)));
-      if (vesR.status === 'fulfilled') vesR.value.data.slice(0, 3).forEach((v: Vessel) => tickerSeed.push(toTickerEvent('vessel', v)));
       if (tickerSeed.length > 0) setTickerEvents(prev => prev.length === 0 ? tickerSeed : prev);
 
-      // Only show stale banner when withResilience actually fell back to localStorage cache
       const fulfilled = settled.filter(r => r.status === 'fulfilled') as PromiseFulfilledResult<{ data: any; stale: boolean; staleSince: string | null }>[];
       const staleResults = fulfilled.filter(r => r.value.stale && r.value.staleSince);
       const isStale = staleResults.length > 0;
@@ -326,10 +318,6 @@ function App() {
       setNews((prev) => [newsItem, ...prev].slice(0, 50));
       pushTickerEvent(toTickerEvent('news', newsItem));
       markNewEvent(newsItem.id);
-    });
-
-    IntelligenceAPI.subscribeToVessels((vessel) => {
-      setVessels((prev) => prev.map((v) => v.mmsi === vessel.mmsi ? vessel : v));
     });
 
     IntelligenceAPI.subscribeToVolcanoes((volcano) => {
@@ -576,9 +564,6 @@ function App() {
         <div role="tab" aria-selected={currentView === 'gov'} tabIndex={currentView === 'gov' ? 0 : -1} className={`view-tab ${currentView === 'gov' ? 'active' : ''}`} onClick={() => setCurrentView('gov')} style={{ color: currentView === 'gov' ? '' : '#4D9FFF99' }} onKeyDown={e => e.key === 'Enter' && setCurrentView('gov')}>
           GOV FEED
         </div>
-        <div role="tab" aria-selected={currentView === 'vessel'} tabIndex={currentView === 'vessel' ? 0 : -1} className={`view-tab ${currentView === 'vessel' ? 'active' : ''}`} onClick={() => setCurrentView('vessel')} style={{ color: currentView === 'vessel' ? '' : '#00BFFF99' }} onKeyDown={e => e.key === 'Enter' && setCurrentView('vessel')}>
-          VESSEL INTEL
-        </div>
         <div role="tab" aria-selected={currentView === 'admin'} tabIndex={currentView === 'admin' ? 0 : -1} className={`view-tab ${currentView === 'admin' ? 'active' : ''}`} onClick={() => setCurrentView('admin')} style={{ color: currentView === 'admin' ? '' : '#4D9FFF99' }} onKeyDown={e => e.key === 'Enter' && setCurrentView('admin')}>
           SYS MONITOR
         </div>
@@ -613,10 +598,6 @@ function App() {
           <span className="mvt-icon">🏛️</span>
           <span className="mvt-label">GOV</span>
         </button>
-        <button className={`mvt-btn ${currentView === 'vessel' ? 'active' : ''}`} onClick={() => setCurrentView('vessel')}>
-          <span className="mvt-icon">⚓</span>
-          <span className="mvt-label">VESSEL</span>
-        </button>
         <button className={`mvt-btn ${currentView === 'admin' ? 'active' : ''}`} onClick={() => setCurrentView('admin')}>
           <span className="mvt-icon">⚙</span>
           <span className="mvt-label">SYS</span>
@@ -637,7 +618,6 @@ function App() {
           earthquakes={earthquakes}
           disasters={disasters}
           news={news}
-          vessels={vessels}
           volcanoes={volcanoes}
           geopolitical={geopolitical}
           selectedEvent={selectedEvent}
@@ -655,7 +635,6 @@ function App() {
               earthquakes={earthquakes}
               disasters={disasters}
               news={news}
-              vessels={vessels}
               volcanoes={volcanoes}
               geopolitical={geopolitical}
               onEventSelect={handleEventSelect}
@@ -672,7 +651,6 @@ function App() {
               earthquakes={earthquakes}
               disasters={disasters}
               news={news}
-              vessels={vessels}
               volcanoes={volcanoes}
               geopolitical={geopolitical}
             />
@@ -682,7 +660,6 @@ function App() {
           {currentView === 'cyber' && <CyberView />}
           {currentView === 'infoops' && <InfoOpsView />}
           {currentView === 'gov' && <GovAnnouncementsView />}
-          {currentView === 'vessel' && <VesselView />}
           {currentView === 'admin' && <AdminDashboard />}
         </div>
 
@@ -690,7 +667,6 @@ function App() {
           earthquakes={earthquakes}
           disasters={disasters}
           news={news}
-          vessels={vessels}
           volcanoes={volcanoes}
           geopolitical={geopolitical}
           mobileOpen={mobileRightPanelOpen}

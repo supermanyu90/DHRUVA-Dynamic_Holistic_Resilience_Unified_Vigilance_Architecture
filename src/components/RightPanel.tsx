@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { Activity, AlertTriangle, FileText, Zap, Waves, Flame, Wind, Droplets, Globe, Ship, Radio } from 'lucide-react';
-import type { Earthquake, Disaster, NewsEvent, Vessel, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
+import { Activity, AlertTriangle, FileText, Zap, Waves, Flame, Wind, Droplets, Globe, Radio } from 'lucide-react';
+import type { Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
 import { AlertPriorityList } from './AlertPriorityList';
 import { FusedAlertsView } from './FusedAlertsView';
 
@@ -8,7 +8,6 @@ interface RightPanelProps {
   earthquakes: Earthquake[];
   disasters: Disaster[];
   news: NewsEvent[];
-  vessels: Vessel[];
   volcanoes: VolcanoEvent[];
   geopolitical: GeopoliticalEvent[];
   mobileOpen?: boolean;
@@ -71,7 +70,7 @@ function MetricCard({
   );
 }
 
-export function RightPanel({ earthquakes, disasters, news, vessels, volcanoes, geopolitical, mobileOpen = false }: RightPanelProps) {
+export function RightPanel({ earthquakes, disasters, news, volcanoes, geopolitical, mobileOpen = false }: RightPanelProps) {
   const m45 = useMemo(() => earthquakes.filter(e => e.magnitude >= 4.5 && e.magnitude < 5.5).length, [earthquakes]);
   const m55 = useMemo(() => earthquakes.filter(e => e.magnitude >= 5.5 && e.magnitude < 6.5).length, [earthquakes]);
   const m65 = useMemo(() => earthquakes.filter(e => e.magnitude >= 6.5).length, [earthquakes]);
@@ -299,7 +298,6 @@ export function RightPanel({ earthquakes, disasters, news, vessels, volcanoes, g
             { label: 'QUAKE', count: earthquakes.length, pct: eqPct, color: 'var(--quake)', icon: <Activity size={9} /> },
             { label: 'DISASTR', count: disasters.length, pct: disPct, color: 'var(--fire)', icon: <AlertTriangle size={9} /> },
             { label: 'INTEL', count: news.length, pct: newsPct, color: 'var(--accent)', icon: <FileText size={9} /> },
-            { label: 'VESSEL', count: vessels.length, pct: (vessels.length / total) * 100, color: '#00BFFF', icon: <Ship size={9} /> },
             { label: 'VOLCANO', count: volcanoes.length, pct: (volcanoes.length / total) * 100, color: 'var(--volcano)', icon: <Flame size={9} /> },
             { label: 'GEOPOLIT', count: geopolitical.length, pct: (geopolitical.length / total) * 100, color: 'var(--geo)', icon: <Radio size={9} /> },
           ].map(({ label, count, pct, color, icon }) => (
@@ -321,7 +319,6 @@ export function RightPanel({ earthquakes, disasters, news, vessels, volcanoes, g
             { label: 'NASA EONET HAZARDS', color: 'var(--fire)' },
             { label: 'OPEN-SOURCE RSS INTEL', color: 'var(--accent)' },
             { label: 'SMITHSONIAN GVP', color: 'var(--volcano)' },
-            { label: 'AIS VESSEL TRACKER', color: '#00BFFF' },
           ].map(({ label, color }) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
               <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: color, flexShrink: 0, display: 'inline-block' }} />
