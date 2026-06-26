@@ -1,6 +1,17 @@
 import { API_TIMEOUT_MS } from './constants';
 import { supabase } from './supabase';
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const RSS_PROXY = `${SUPABASE_URL}/functions/v1/rss-proxy`;
+
+/** Fetch a GDELT API URL via the server-side proxy to avoid browser rate-limits and CORS issues. */
+async function fetchGdelt(gdeltUrl: string, timeoutMs = API_TIMEOUT_MS): Promise<any> {
+  const proxyUrl = `${RSS_PROXY}?gdelt=${encodeURIComponent(gdeltUrl)}`;
+  const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(timeoutMs) });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 function stripHtml(raw: string): string {
   try {
     return new DOMParser().parseFromString(raw, 'text/html').body.textContent ?? '';
@@ -349,10 +360,8 @@ export class IntelligenceAPI {
 
   static async getNews(limit = 100): Promise<NewsEvent[]> {
     try {
-      const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent('world news')}&mode=ArtList&format=json&maxrecords=${Math.min(limit, 50)}&timespan=1440min&sort=DateDesc`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
-      if (!res.ok) return [];
-      const json = await res.json();
+      const gdeltUrl = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent('world news')}&mode=ArtList&format=json&maxrecords=${Math.min(limit, 50)}&timespan=1440min&sort=DateDesc`;
+      const json = await fetchGdelt(gdeltUrl);
       const items: any[] = json?.articles ?? [];
       return items.map((a: any, i: number) => ({
         id: `news-${i}-${Date.now()}`,
@@ -497,10 +506,8 @@ export class IntelligenceAPI {
       const results: GeopoliticalEvent[] = [];
       for (const q of queries) {
         if (results.length >= limit) break;
-        const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${q}&mode=ArtList&format=json&maxrecords=25&timespan=2880min&sort=DateDesc`;
-        const res = await fetch(url, { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
-        if (!res.ok) continue;
-        const json = await res.json();
+        const gdeltUrl = `https://api.gdeltproject.org/api/v2/doc/doc?query=${q}&mode=ArtList&format=json&maxrecords=25&timespan=2880min&sort=DateDesc`;
+        const json = await fetchGdelt(gdeltUrl);
         const items: any[] = json?.articles ?? [];
         for (const a of items) {
           if (!a.title) continue;
@@ -530,10 +537,9 @@ export class IntelligenceAPI {
 
     // Attempt 2: GDELT GEO PointData (less reliable but has coordinates)
     try {
-      const url = `https://api.gdeltproject.org/api/v2/geo/geo?query=conflict+military+protest&mode=PointData&format=GeoJSON&timespan=2880min&maxpoints=40`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
-      if (res.ok) {
-        const json = await res.json();
+      const gdeltGeoUrl = `https://api.gdeltproject.org/api/v2/geo/geo?query=conflict+military+protest&mode=PointData&format=GeoJSON&timespan=2880min&maxpoints=40`;
+      const json = await fetchGdelt(gdeltGeoUrl);
+      if (json) {
         const features: any[] = json?.features ?? [];
         if (features.length >= 1) {
           return features.slice(0, limit).map((f: any, i: number) => {
@@ -656,9 +662,8 @@ export class IntelligenceAPI {
           // Supplement with a GDELT query that's broader — no minimum threshold
           try {
             const gdeltSup = `https://api.gdeltproject.org/api/v2/doc/doc?query=war+OR+conflict+OR+military&mode=ArtList&format=json&maxrecords=20&timespan=1440min&sort=DateDesc`;
-            const gRes = await fetch(gdeltSup, { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
-            if (gRes.ok) {
-              const gJson = await gRes.json();
+            const gJson = await fetchGdelt(gdeltSup);
+            if (gJson) {
               const gItems: any[] = gJson?.articles ?? [];
               for (const a of gItems) {
                 if (!a.title) continue;

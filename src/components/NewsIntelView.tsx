@@ -108,8 +108,8 @@ async function fetchViaRssProxy(feeds: { url: string; source: string }[]): Promi
 async function fetchGdeltThemed(timeWindow: string): Promise<NewsArticle[]> {
   const timespan = timeWindow === '1h' ? '60min' : timeWindow === '6h' ? '360min' : timeWindow === '24h' ? '1440min' : timeWindow === '7d' ? '10080min' : '20160min';
   try {
-    const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent('sourcelang:english conflict OR crisis OR disaster OR protest OR military OR attack')}&mode=ArtList&format=json&maxrecords=75&timespan=${timespan}&sort=DateDesc`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+    const gdeltUrl = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent('sourcelang:english conflict OR crisis OR disaster OR protest OR military OR attack')}&mode=ArtList&format=json&maxrecords=75&timespan=${timespan}&sort=DateDesc`;
+    const res = await fetch(`${RSS_PROXY}?gdelt=${encodeURIComponent(gdeltUrl)}`, { signal: AbortSignal.timeout(20_000) });
     if (!res.ok) return [];
     const json = await res.json();
     const items: any[] = json?.articles ?? [];
@@ -135,8 +135,8 @@ async function fetchGdeltByDomain(domains: string[], sourceKey: string, timeWind
   const timespan = timeWindow === '1h' ? '60min' : timeWindow === '6h' ? '360min' : timeWindow === '24h' ? '1440min' : timeWindow === '7d' ? '10080min' : '20160min';
   const domainQuery = domains.map(d => `domain:${d}`).join(' OR ');
   try {
-    const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(`sourcelang:english ${domainQuery}`)}&mode=ArtList&format=json&maxrecords=15&timespan=${timespan}&sort=DateDesc`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+    const gdeltUrl = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(`sourcelang:english ${domainQuery}`)}&mode=ArtList&format=json&maxrecords=15&timespan=${timespan}&sort=DateDesc`;
+    const res = await fetch(`${RSS_PROXY}?gdelt=${encodeURIComponent(gdeltUrl)}`, { signal: AbortSignal.timeout(20_000) });
     if (!res.ok) return [];
     const json = await res.json();
     return (json?.articles ?? []).map((a: any, i: number) => ({

@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { Shield, Activity, RefreshCw } from 'lucide-react';
 import { CyberThreat } from '../lib/intelligence-api';
 
+const RSS_PROXY = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rss-proxy`;
+
 type TimeWindow = '1h' | '6h' | '24h' | '7d' | 'all';
 
 const TIME_WINDOWS: { key: TimeWindow; label: string }[] = [
@@ -38,7 +40,7 @@ export function CyberView() {
       const [feodoRes, urlhausRes, ransomRes] = await Promise.allSettled([
         fetch('https://feodotracker.abuse.ch/downloads/ipblocklist_aggressive.csv', { signal: AbortSignal.timeout(12_000) }),
         fetch('https://urlhaus.abuse.ch/feeds/csv_recent/', { signal: AbortSignal.timeout(12_000) }),
-        fetch('https://api.gdeltproject.org/api/v2/doc/doc?query=ransomware+OR+cyberattack+OR+malware+OR+%22data+breach%22&mode=ArtList&format=json&maxrecords=30&timespan=10080min&sort=DateDesc', { signal: AbortSignal.timeout(12_000) }),
+        fetch(`${RSS_PROXY}?gdelt=${encodeURIComponent('https://api.gdeltproject.org/api/v2/doc/doc?query=ransomware+OR+cyberattack+OR+malware+OR+%22data+breach%22&mode=ArtList&format=json&maxrecords=30&timespan=10080min&sort=DateDesc')}`, { signal: AbortSignal.timeout(20_000) }),
       ]);
 
       const newThreats: CyberThreat[] = [];

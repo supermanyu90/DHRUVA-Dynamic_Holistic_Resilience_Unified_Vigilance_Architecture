@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { Brain, Activity, RefreshCw } from 'lucide-react';
 import { InfoOp } from '../lib/intelligence-api';
 
+const RSS_PROXY = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rss-proxy`;
+
 type TimeWindow = '1h' | '6h' | '24h' | '7d' | 'all';
 
 const TIME_WINDOWS: { key: TimeWindow; label: string }[] = [
@@ -47,9 +49,9 @@ export function InfoOpsView() {
   const loadOps = useCallback(async () => {
     try {
       const timespan = timeWindow === '1h' ? '60min' : timeWindow === '6h' ? '360min' : timeWindow === '24h' ? '1440min' : timeWindow === '7d' ? '10080min' : '20160min';
-      const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent('disinformation OR propaganda OR "information warfare" OR "fake news" OR "influence operation" OR deepfake OR bot network OR troll farm')}&mode=ArtList&format=json&maxrecords=50&timespan=${timespan}&sort=DateDesc`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
-      if (!res.ok) throw new Error(`GDELT ${res.status}`);
+      const gdeltUrl = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent('disinformation OR propaganda OR "information warfare" OR "fake news" OR "influence operation" OR deepfake OR bot network OR troll farm')}&mode=ArtList&format=json&maxrecords=50&timespan=${timespan}&sort=DateDesc`;
+      const res = await fetch(`${RSS_PROXY}?gdelt=${encodeURIComponent(gdeltUrl)}`, { signal: AbortSignal.timeout(20_000) });
+      if (!res.ok) throw new Error(`Proxy ${res.status}`);
       const json = await res.json();
       const articles: any[] = json?.articles ?? [];
 

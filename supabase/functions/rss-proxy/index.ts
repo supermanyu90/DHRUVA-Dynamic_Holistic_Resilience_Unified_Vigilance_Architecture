@@ -100,6 +100,210 @@ function parseRSS(xml: string, sourceName: string): FeedItem[] {
   return items;
 }
 
+// In-memory GDELT response cache: key → { data, expiresAt }
+const gdeltCache = new Map<string, { data: unknown; expiresAt: number }>();
+const GDELT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function fetchGdelt(gdeltUrl: string): Promise<unknown> {
+  const now = Date.now();
+  const cached = gdeltCache.get(gdeltUrl);
+  if (cached && cached.expiresAt > now) return cached.data;
+
+  const res = await fetch(gdeltUrl, {
+    headers: { "User-Agent": "DhruvaIntelBot/1.0" },
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`GDELT upstream ${res.status} ${res.statusText}`);
+  }
+
+  const text = await res.text();
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error("GDELT returned non-JSON response");
+  }
+
+  gdeltCache.set(gdeltUrl, { data, expiresAt: now + GDELT_CACHE_TTL_MS });
+  return data;
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 200, headers: corsHeaders });
+  }
+
+  try {
+    const url = new URL(req.url);
+    const gdeltParam = url.searchParams.get("gdelt");
+    const feedUrls = url.searchParams.get("urls");
+    const singleUrl = url.searchParams.get("url");
+    const sourceName = url.searchParams.get("source") || "unknown";
+
+    // ── GDELT JSON proxy ──────────────────────────────────────────────────────
+    if (gdeltParam) {
+      // gdeltParam is the full GDELT API URL (URL-encoded)
+      let gdeltUrl: string;
+      try {
+        gdeltUrl = decodeURIComponent(gdeltParam);
+      } catch {
+        return new Response(JSON.stringify({ error: "Invalid gdelt URL encoding" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (!isDomainAllowed(gdeltUrl)) {
+        return new Response(JSON.stringify({ error: "Domain not allowed" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      try {
+        const data = await fetchGdelt(gdeltUrl);
+        return new Response(JSON.stringify(data), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err), articles: null }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // ── Single RSS feed ───────────────────────────────────────────────────────
+    if (singleUrl) {
+      if (!isDomainAllowed(singleUrl)) {
+        return new Response(JSON.stringify({ error: "Domain not allowed" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const res = await fetch(singleUrl, {
+        headers: { "User-Agent": "DhruvaIntelBot/1.0" },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok) {
+        return new Response(JSON.stringify({ items: [], error: `Upstream ${res.status}` }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const xml = await res.text();
+      const items = parseRSS(xml, sourceName);
+      return new Response(JSON.stringify({ items }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── Multiple RSS feeds ────────────────────────────────────────────────────
+    if (feedUrls) {
+      const feeds: { url: string; source: string }[] = JSON.parse(feedUrls);
+      const results = await Promise.allSettled(
+        feeds.map(async (f) => {
+          if (!isDomainAllowed(f.url)) return [];
+          const res = await fetch(f.url, {
+            headers: { "User-Agent": "DhruvaIntelBot/1.0" },
+            signal: AbortSignal.timeout(10_000),
+          });
+          if (!res.ok) return [];
+          const xml = await res.text();
+          return parseRSS(xml, f.source);
+        })
+      );
+
+      const allItems: FeedItem[] = [];
+      for (const r of results) {
+        if (r.status === "fulfilled") allItems.push(...r.value);
+      }
+      allItems.sort((a, b) => new Date(b.published).getTime() - new Date(a.published).getTime());
+
+      return new Response(JSON.stringify({ items: allItems }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({ error: "Provide ?gdelt=, ?url=, or ?urls= parameter" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
+
+
+function isDomainAllowed(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return ALLOWED_DOMAINS.some(d => parsed.hostname === d || parsed.hostname.endsWith("." + d));
+  } catch {
+    return false;
+  }
+}
+
+interface FeedItem {
+  title: string;
+  url: string;
+  published: string;
+  description: string;
+  source: string;
+}
+
+function extractTag(xml: string, tag: string): string {
+  const patterns = [
+    new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]></${tag}>`, "i"),
+    new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i"),
+  ];
+  for (const p of patterns) {
+    const m = xml.match(p);
+    if (m) return m[1].trim();
+  }
+  return "";
+}
+
+function extractLink(itemXml: string): string {
+  const atomLink = itemXml.match(/<link[^>]*href=["']([^"']+)["'][^>]*\/?\s*>/i);
+  if (atomLink) return atomLink[1];
+  return extractTag(itemXml, "link");
+}
+
+function parseRSS(xml: string, sourceName: string): FeedItem[] {
+  const items: FeedItem[] = [];
+  const isAtom = xml.includes("<feed") && xml.includes("xmlns=\"http://www.w3.org/2005/Atom\"");
+
+  const entryPattern = isAtom
+    ? /<entry[\s>]([\s\S]*?)<\/entry>/gi
+    : /<item[\s>]([\s\S]*?)<\/item>/gi;
+
+  let match: RegExpExecArray | null;
+  while ((match = entryPattern.exec(xml)) !== null && items.length < 25) {
+    const block = match[1];
+    const title = extractTag(block, "title");
+    const link = extractLink(block);
+    const pubDate = extractTag(block, "pubDate") || extractTag(block, "published") || extractTag(block, "updated") || extractTag(block, "dc:date");
+    const desc = extractTag(block, "description") || extractTag(block, "summary") || extractTag(block, "content");
+
+    if (title && link) {
+      items.push({
+        title: title.replace(/<[^>]*>/g, "").trim(),
+        url: link,
+        published: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
+        description: desc.replace(/<[^>]*>/g, "").trim().slice(0, 500),
+        source: sourceName,
+      });
+    }
+  }
+  return items;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
