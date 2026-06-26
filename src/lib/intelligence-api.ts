@@ -323,6 +323,33 @@ function usgsFeatureToEarthquake(f: USGSFeature): Earthquake {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
+/**
+ * Extract [lat, lon] from a single EONET geometry entry.
+ * Handles Point ([lon, lat]) and Polygon ([[[lon, lat], ...]]) geometry types.
+ */
+function eonetCoords(geo: any): [number | null, number | null] {
+  if (!geo) return [null, null];
+  const coords = geo.coordinates;
+  if (!coords) return [null, null];
+  if (geo.type === 'Point') {
+    const lon = typeof coords[0] === 'number' ? coords[0] : null;
+    const lat = typeof coords[1] === 'number' ? coords[1] : null;
+    return [lat, lon];
+  }
+  if (geo.type === 'Polygon') {
+    const ring: any[] = coords[0] ?? [];
+    if (ring.length === 0) return [null, null];
+    // Centroid of the first ring
+    let sumLon = 0, sumLat = 0;
+    for (const pt of ring) { sumLon += pt[0]; sumLat += pt[1]; }
+    return [sumLat / ring.length, sumLon / ring.length];
+  }
+  // Fallback: try treating as Point
+  const lon = typeof coords[0] === 'number' ? coords[0] : null;
+  const lat = typeof coords[1] === 'number' ? coords[1] : null;
+  return [lat, lon];
+}
+
 export class IntelligenceAPI {
   static async getEarthquakes(minMagnitude = 0, limit = 100): Promise<Earthquake[]> {
     const url = `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude=${minMagnitude}&orderby=time&limit=${Math.min(limit, 200)}&starttime=${new Date(Date.now() - 7 * 86_400_000).toISOString()}`;
@@ -339,15 +366,18 @@ export class IntelligenceAPI {
       const json = await res.json();
       const events: any[] = json?.events ?? [];
       return events.map((e: any, i: number) => {
-        const geo = e.geometry?.[0];
+        // Use the most recent geometry entry (last in array)
+        const geos: any[] = e.geometry ?? [];
+        const geo = geos[geos.length - 1] ?? geos[0];
         const cat = e.categories?.[0]?.title ?? 'unknown';
+        const [lat, lon] = eonetCoords(geo);
         return {
           id: `eonet-${e.id ?? i}`,
           event_id: e.id ?? `eonet-${i}`,
           title: e.title ?? 'Unknown Event',
           category: cat.toLowerCase(),
-          latitude: geo?.coordinates?.[1] ?? null,
-          longitude: geo?.coordinates?.[0] ?? null,
+          latitude: lat,
+          longitude: lon,
           event_date: geo?.date ?? new Date().toISOString(),
           closed: false,
           properties: { sources: e.sources, categories: e.categories },
@@ -452,14 +482,16 @@ export class IntelligenceAPI {
       const json = await res.json();
       const events: any[] = json?.events ?? [];
       return events.map((e: any, i: number) => {
-        const geo = e.geometry?.[0];
+        const geos: any[] = e.geometry ?? [];
+        const geo = geos[geos.length - 1] ?? geos[0];
+        const [lat, lon] = eonetCoords(geo);
         return {
           id: `eonet-volc-${i}`,
           volcano_id: e.id ?? `v-${i}`,
           name: e.title ?? 'Unknown Volcano',
           country: null,
-          latitude: geo?.coordinates?.[1] ?? null,
-          longitude: geo?.coordinates?.[0] ?? null,
+          latitude: lat,
+          longitude: lon,
           elevation: null,
           status: 'erupting' as const,
           alert_level: 'orange',
