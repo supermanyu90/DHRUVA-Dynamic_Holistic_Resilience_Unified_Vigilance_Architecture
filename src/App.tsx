@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { IntelligenceAPI, Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from './lib/intelligence-api';
 import { withResilience } from './lib/resilience';
-import { fetchImdWarnings, type ImdWarning } from './lib/imd';
 import { DataFreshnessContext, DataFreshnessState, formatStaleAge } from './lib/DataFreshnessContext';
 import {
   AUTO_SYNC_INTERVAL_MS,
@@ -15,7 +14,6 @@ import { SewaView } from './components/SewaView';
 import { CyberView } from './components/CyberView';
 import { InfoOpsView } from './components/InfoOpsView';
 import { GovAnnouncementsView } from './components/GovAnnouncementsView';
-import { ImdWarningsView } from './components/ImdWarningsView';
 import { NewsIntelView } from './components/NewsIntelView';
 import { TimelineView } from './components/TimelineView';
 import { AlertToast } from './components/AlertToast';
@@ -28,7 +26,7 @@ import { LiveEventTicker, TickerEvent } from './components/LiveEventTicker';
 import { AboutDhruva } from './components/AboutDhruva';
 import { AdminDashboard } from './components/AdminDashboard';
 
-type ViewType = 'map' | 'timeline' | 'news' | 'imd' | 'sewa' | 'cyber' | 'infoops' | 'gov' | 'admin';
+type ViewType = 'map' | 'timeline' | 'news' | 'sewa' | 'cyber' | 'infoops' | 'gov' | 'admin';
 
 function formatSyncCountdown(ms: number): string {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
@@ -92,7 +90,6 @@ function App() {
   const [news, setNews] = useState<NewsEvent[]>([]);
   const [volcanoes, setVolcanoes] = useState<VolcanoEvent[]>([]);
   const [geopolitical, setGeopolitical] = useState<GeopoliticalEvent[]>([]);
-  const [imdWarnings, setImdWarnings] = useState<ImdWarning[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [currentView, setCurrentView] = useState<ViewType>('map');
@@ -111,7 +108,6 @@ function App() {
     volcanoes: true,
     geopolitical: true,
     curfews: true,
-    imd: true,
   });
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try {
@@ -249,12 +245,6 @@ function App() {
       if (newsR.status === 'fulfilled') setNews(newsR.value.data);
       if (volR.status  === 'fulfilled') setVolcanoes(volR.value.data);
       if (geoR.status  === 'fulfilled') setGeopolitical(geoR.value.data);
-
-      // IMD Orange/Red district warnings — fetched independently so a failure
-      // (or missing credentials) never blocks the core sources or the map.
-      fetchImdWarnings().then((imd) => {
-        if (imd.ok) setImdWarnings(imd.warnings ?? []);
-      });
 
       // Seed ticker with initial data from all sources
       const tickerSeed: TickerEvent[] = [];
@@ -562,9 +552,6 @@ function App() {
         <div role="tab" aria-selected={currentView === 'news'} tabIndex={currentView === 'news' ? 0 : -1} className={`view-tab ${currentView === 'news' ? 'active' : ''}`} onClick={() => setCurrentView('news')} onKeyDown={e => e.key === 'Enter' && setCurrentView('news')}>
           NEWS INTEL
         </div>
-        <div role="tab" aria-selected={currentView === 'imd'} tabIndex={currentView === 'imd' ? 0 : -1} className={`view-tab ${currentView === 'imd' ? 'active' : ''}`} onClick={() => setCurrentView('imd')} style={{ color: currentView === 'imd' ? '' : '#FFA50099' }} onKeyDown={e => e.key === 'Enter' && setCurrentView('imd')}>
-          IMD WARNINGS
-        </div>
         <div role="tab" aria-selected={currentView === 'sewa'} tabIndex={currentView === 'sewa' ? 0 : -1} className={`view-tab ${currentView === 'sewa' ? 'active' : ''}`} onClick={() => setCurrentView('sewa')} onKeyDown={e => e.key === 'Enter' && setCurrentView('sewa')}>
           BANK SEWA
         </div>
@@ -594,10 +581,6 @@ function App() {
         <button className={`mvt-btn ${currentView === 'news' ? 'active' : ''}`} onClick={() => setCurrentView('news')}>
           <span className="mvt-icon">📡</span>
           <span className="mvt-label">NEWS</span>
-        </button>
-        <button className={`mvt-btn ${currentView === 'imd' ? 'active' : ''}`} onClick={() => setCurrentView('imd')}>
-          <span className="mvt-icon">🌧️</span>
-          <span className="mvt-label">IMD</span>
         </button>
         <button className={`mvt-btn ${currentView === 'sewa' ? 'active' : ''}`} onClick={() => setCurrentView('sewa')}>
           <span className="mvt-icon">🏦</span>
@@ -654,7 +637,6 @@ function App() {
               news={news}
               volcanoes={volcanoes}
               geopolitical={geopolitical}
-              imdWarnings={imdWarnings}
               onEventSelect={handleEventSelect}
               layersEnabled={layersEnabled}
               timeFilter={timeFilter}
@@ -674,7 +656,6 @@ function App() {
             />
           )}
           {currentView === 'news' && <NewsIntelView />}
-          {currentView === 'imd' && <ImdWarningsView />}
           {currentView === 'sewa' && <SewaView />}
           {currentView === 'cyber' && <CyberView />}
           {currentView === 'infoops' && <InfoOpsView />}
