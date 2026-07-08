@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
+import { ImdWarning } from '../lib/imd';
 import { WorldMapSVG } from './WorldMapSVG';
 import { Globe3D } from './Globe3D';
 import { Globe, Map, Tag } from 'lucide-react';
@@ -10,6 +11,7 @@ interface MapViewProps {
   news: NewsEvent[];
   volcanoes: VolcanoEvent[];
   geopolitical: GeopoliticalEvent[];
+  imdWarnings: ImdWarning[];
   onEventSelect: (id: string, type: string) => void;
   layersEnabled: {
     earthquakes: boolean;
@@ -23,6 +25,7 @@ interface MapViewProps {
     volcanoes: boolean;
     geopolitical: boolean;
     curfews: boolean;
+    imd: boolean;
   };
   timeFilter: string;
   onTimeFilterChange: (filter: string) => void;
@@ -48,6 +51,7 @@ export function MapView({
   news,
   volcanoes,
   geopolitical,
+  imdWarnings,
   onEventSelect,
   layersEnabled,
   timeFilter,
@@ -105,6 +109,7 @@ export function MapView({
             news={news}
             volcanoes={volcanoes}
             geopolitical={geopolitical}
+            imdWarnings={imdWarnings}
             onEventSelect={onEventSelect}
             layersEnabled={layersEnabled}
             showTooltip={showTooltip}
@@ -121,6 +126,7 @@ export function MapView({
             news={news}
             volcanoes={volcanoes}
             geopolitical={geopolitical}
+            imdWarnings={imdWarnings}
             onEventSelect={onEventSelect}
             layersEnabled={layersEnabled}
             showTooltip={showTooltip}

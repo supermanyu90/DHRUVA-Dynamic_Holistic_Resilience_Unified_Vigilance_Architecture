@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { IntelligenceAPI, Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from './lib/intelligence-api';
 import { withResilience } from './lib/resilience';
+import { fetchImdWarnings, type ImdWarning } from './lib/imd';
 import { DataFreshnessContext, DataFreshnessState, formatStaleAge } from './lib/DataFreshnessContext';
 import {
   AUTO_SYNC_INTERVAL_MS,
@@ -91,6 +92,7 @@ function App() {
   const [news, setNews] = useState<NewsEvent[]>([]);
   const [volcanoes, setVolcanoes] = useState<VolcanoEvent[]>([]);
   const [geopolitical, setGeopolitical] = useState<GeopoliticalEvent[]>([]);
+  const [imdWarnings, setImdWarnings] = useState<ImdWarning[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [currentView, setCurrentView] = useState<ViewType>('map');
@@ -109,6 +111,7 @@ function App() {
     volcanoes: true,
     geopolitical: true,
     curfews: true,
+    imd: true,
   });
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try {
@@ -246,6 +249,12 @@ function App() {
       if (newsR.status === 'fulfilled') setNews(newsR.value.data);
       if (volR.status  === 'fulfilled') setVolcanoes(volR.value.data);
       if (geoR.status  === 'fulfilled') setGeopolitical(geoR.value.data);
+
+      // IMD Orange/Red district warnings — fetched independently so a failure
+      // (or missing credentials) never blocks the core sources or the map.
+      fetchImdWarnings().then((imd) => {
+        if (imd.ok) setImdWarnings(imd.warnings ?? []);
+      });
 
       // Seed ticker with initial data from all sources
       const tickerSeed: TickerEvent[] = [];
@@ -645,6 +654,7 @@ function App() {
               news={news}
               volcanoes={volcanoes}
               geopolitical={geopolitical}
+              imdWarnings={imdWarnings}
               onEventSelect={handleEventSelect}
               layersEnabled={layersEnabled}
               timeFilter={timeFilter}

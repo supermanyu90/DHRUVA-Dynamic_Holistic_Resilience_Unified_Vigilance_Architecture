@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
+import { ImdWarning } from '../lib/imd';
 import { UNDERSEA_CABLES, CHOKEPOINTS, MILITARY_BASES, NUCLEAR_SITES } from '../lib/cable-data';
 import { INDIA_OUTER_BOUNDARY, INDIA_NORTHERN_TERRITORY, INDIA_DISCLAIMER } from '../lib/india-boundary';
 
@@ -20,6 +21,7 @@ interface WorldMapSVGProps {
   news: NewsEvent[];
   volcanoes: VolcanoEvent[];
   geopolitical: GeopoliticalEvent[];
+  imdWarnings: ImdWarning[];
   onEventSelect: (id: string, type: string) => void;
   layersEnabled: {
     earthquakes: boolean;
@@ -33,6 +35,7 @@ interface WorldMapSVGProps {
     volcanoes: boolean;
     geopolitical: boolean;
     curfews: boolean;
+    imd: boolean;
   };
   showTooltip: (x: number, y: number, content: string) => void;
   hideTooltip: () => void;
@@ -75,6 +78,7 @@ export function WorldMapSVG({
   news,
   volcanoes,
   geopolitical,
+  imdWarnings,
   onEventSelect,
   layersEnabled,
   showTooltip,
@@ -1056,6 +1060,37 @@ export function WorldMapSVG({
                 <text x={x + 4} y={y + 1.5} fill={color} fontSize="3" fontFamily="Share Tech Mono" opacity="0.85" pointerEvents="none">
                   {g.title.toUpperCase().slice(0, 16)}
                 </text>
+              </g>
+            );
+          })}
+
+        {layersEnabled.imd &&
+          imdWarnings.map((w) => {
+            if (w.latitude == null || w.longitude == null) return null;
+            const x = lonToX(w.longitude);
+            const y = latToY(w.latitude);
+            const color = w.worstSeverity === 'red' ? '#FF0000' : '#FFA500';
+            const top = w.days[0];
+            const tip = `IMD ${w.worstSeverity.toUpperCase()} — ${w.district}${top ? ` · ${top.label} (D${top.day})` : ''}`;
+            return (
+              <g key={`imd-${w.objId ?? w.district}`} style={{ cursor: 'pointer' }}>
+                <circle cx={x} cy={y} r="7" fill={color} opacity="0.08" />
+                {w.worstSeverity === 'red' && (
+                  <circle cx={x} cy={y} r="7" fill="none" stroke={color} strokeWidth="0.5" opacity="0.5" className="pulse-ring" />
+                )}
+                {/* diamond marker distinguishes weather warnings from circular event markers */}
+                <rect
+                  x={x - 2.6}
+                  y={y - 2.6}
+                  width="5.2"
+                  height="5.2"
+                  fill={color}
+                  opacity="0.92"
+                  transform={`rotate(45 ${x} ${y})`}
+                  filter="url(#glow)"
+                  onMouseEnter={(e) => handleMarkerHover(e, tip)}
+                  onMouseLeave={hideTooltip}
+                />
               </g>
             );
           })}

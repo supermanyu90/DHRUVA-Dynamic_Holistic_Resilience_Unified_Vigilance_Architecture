@@ -1,5 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, RefreshCw, MapPin, Activity } from 'lucide-react';
+import {
+  fetchImdWarnings,
+  IMD_SEV_COLOR as SEV_COLOR,
+  IMD_SEV_LABEL as SEV_LABEL,
+  type ImdWarning as DistrictWarning,
+  type ImdSeverity as Severity,
+} from '../lib/imd';
 
 /**
  * ImdWarningsView
@@ -14,40 +21,6 @@ import { AlertTriangle, RefreshCw, MapPin, Activity } from 'lucide-react';
  * proxied server-side).
  */
 
-const IMD_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-imd-warnings`;
-
-type Severity = 'red' | 'orange';
-
-interface DayWarning {
-  day: number;
-  severity: Severity;
-  colorHex: string;
-  code: string;
-  label: string;
-}
-
-interface DistrictWarning {
-  objId: string | number | null;
-  district: string;
-  date: string | null;
-  utc: string | null;
-  worstSeverity: Severity;
-  days: DayWarning[];
-}
-
-interface ImdResponse {
-  ok: boolean;
-  error?: string;
-  message?: string;
-  counts?: { red: number; orange: number };
-  total?: number;
-  fetchedAt?: string;
-  warnings: DistrictWarning[];
-}
-
-const SEV_COLOR: Record<Severity, string> = { red: '#FF0000', orange: '#FFA500' };
-const SEV_LABEL: Record<Severity, string> = { red: 'RED', orange: 'ORANGE' };
-
 type Status = 'loading' | 'live' | 'error' | 'not_configured';
 
 export function ImdWarningsView() {
@@ -61,44 +34,30 @@ export function ImdWarningsView() {
   const load = useCallback(async () => {
     setStatus('loading');
     setMessage('');
-    try {
-      const resp = await fetch(IMD_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        signal: AbortSignal.timeout(30_000),
-      });
-      const data: ImdResponse = await resp.json().catch(() => ({ ok: false, warnings: [] }));
+    const data = await fetchImdWarnings();
 
-      if (data.ok) {
-        setWarnings(data.warnings ?? []);
-        setCounts(data.counts ?? { red: 0, orange: 0 });
-        setFetchedAt(data.fetchedAt ?? new Date().toISOString());
-        setStatus('live');
-        return;
-      }
+    if (data.ok) {
+      setWarnings(data.warnings ?? []);
+      setCounts(data.counts ?? { red: 0, orange: 0 });
+      setFetchedAt(data.fetchedAt ?? new Date().toISOString());
+      setStatus('live');
+      return;
+    }
 
-      // Non-OK: surface a helpful reason.
-      setWarnings([]);
-      setCounts({ red: 0, orange: 0 });
-      if (data.error === 'not_configured') {
-        setStatus('not_configured');
-        setMessage(data.message ?? 'IMD credentials are not configured.');
-      } else {
-        setStatus('error');
-        setMessage(
-          data.message ??
-            (data.error === 'auth_failed'
-              ? 'IMD rejected the credentials. The token may have expired.'
-              : 'Could not reach the IMD warning service.'),
-        );
-      }
-    } catch (err) {
-      setWarnings([]);
+    // Non-OK: surface a helpful reason.
+    setWarnings([]);
+    setCounts({ red: 0, orange: 0 });
+    if (data.error === 'not_configured') {
+      setStatus('not_configured');
+      setMessage(data.message ?? 'IMD credentials are not configured.');
+    } else {
       setStatus('error');
-      setMessage(err instanceof Error ? err.message : 'Network error contacting IMD service.');
+      setMessage(
+        data.message ??
+          (data.error === 'auth_failed'
+            ? 'IMD rejected the credentials. The token may have expired.'
+            : 'Could not reach the IMD warning service.'),
+      );
     }
   }, []);
 

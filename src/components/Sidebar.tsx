@@ -32,6 +32,7 @@ interface SidebarProps {
     volcanoes: boolean;
     geopolitical: boolean;
     curfews: boolean;
+    imd: boolean;
   };
   onLayerToggle: (layer: keyof SidebarProps['layersEnabled']) => void;
   mobileOpen?: boolean;
@@ -197,6 +198,16 @@ export function Sidebar({
         >
           <span className="ldot" style={{ background: '#CC3300' }} aria-hidden="true"></span>
           CURFEWS
+        </button>
+        <button
+          className={`lbtn ${layersEnabled.imd ? 'active' : ''}`}
+          onClick={() => onLayerToggle('imd')}
+          aria-pressed={layersEnabled.imd}
+          aria-label="Toggle IMD weather warnings layer"
+          style={{ borderColor: '#FFA500', color: '#FFA500' }}
+        >
+          <span className="ldot" style={{ background: '#FFA500' }} aria-hidden="true"></span>
+          IMD WX
         </button>
         <button
           className={`lbtn lbtn-cab ${layersEnabled.cables ? 'active' : ''}`}

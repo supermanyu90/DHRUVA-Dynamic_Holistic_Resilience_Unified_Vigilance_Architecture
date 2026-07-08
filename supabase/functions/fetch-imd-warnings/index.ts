@@ -27,7 +27,13 @@
  *
  * This function returns ONLY Orange and Red warnings — every green/yellow
  * value is dropped server-side, so the client never receives them.
+ *
+ * Coordinates: districtwarning has no lat/lon, so each district is geocoded
+ * against the `india_locations` centroid table (the same reference data the
+ * normalize-location service uses) so the client can plot them on the map.
  */
+
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -82,6 +88,8 @@ interface DistrictWarning {
   utc: string | null;
   worstSeverity: 'red' | 'orange';
   days: DayWarning[];   // only the orange/red days, ordered by day
+  latitude: number | null;
+  longitude: number | null;
 }
 
 // Read a field case-insensitively (IMD casing has been observed to drift).
@@ -133,7 +141,49 @@ function toDistrictWarning(row: Record<string, unknown>): DistrictWarning | null
     utc: (pick(row, 'UTC', 'utc') as string | null) ?? null,
     worstSeverity,
     days,
+    latitude: null,
+    longitude: null,
   };
+}
+
+/**
+ * Geocode each warning by matching its district name against the
+ * india_locations centroid table (district names are stored lowercase/trimmed).
+ * Best-effort: any district that fails to match keeps null coords and simply
+ * won't be plotted. DB errors are swallowed so warnings still return without coords.
+ */
+async function enrichCoordinates(warnings: DistrictWarning[]): Promise<void> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl || !serviceKey || warnings.length === 0) return;
+
+  const keys = [...new Set(warnings.map((w) => w.district.trim().toLowerCase()).filter(Boolean))];
+  if (keys.length === 0) return;
+
+  try {
+    const supabase = createClient(supabaseUrl, serviceKey);
+    const { data, error } = await supabase
+      .from('india_locations')
+      .select('district, latitude, longitude')
+      .eq('level', 'district')
+      .in('district', keys);
+    if (error || !data) return;
+
+    const byDistrict = new Map<string, { latitude: number; longitude: number }>();
+    for (const row of data as { district: string; latitude: number; longitude: number }[]) {
+      byDistrict.set(row.district.trim().toLowerCase(), { latitude: row.latitude, longitude: row.longitude });
+    }
+
+    for (const w of warnings) {
+      const hit = byDistrict.get(w.district.trim().toLowerCase());
+      if (hit) {
+        w.latitude = hit.latitude;
+        w.longitude = hit.longitude;
+      }
+    }
+  } catch {
+    // Geocoding is best-effort; leave coords null on any failure.
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -209,9 +259,13 @@ Deno.serve(async (req: Request) => {
         return a.district.localeCompare(b.district);
       });
 
+    // Attach centroid lat/lon so the client can plot the districts on the map.
+    await enrichCoordinates(warnings);
+
     const counts = {
       red: warnings.filter((w) => w.worstSeverity === 'red').length,
       orange: warnings.filter((w) => w.worstSeverity === 'orange').length,
+      geocoded: warnings.filter((w) => w.latitude != null && w.longitude != null).length,
     };
 
     return new Response(
