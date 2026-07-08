@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
-import { ImdWarning } from '../lib/imd';
+import { ImdWarning, IMD_SEV_COLOR } from '../lib/imd';
 import { WorldMapSVG } from './WorldMapSVG';
 import { Globe3D } from './Globe3D';
 import { Globe, Map, Tag } from 'lucide-react';
@@ -69,6 +69,11 @@ export function MapView({
   };
 
   const totalEvents = earthquakes.length + disasters.length + news.length + volcanoes.length + geopolitical.length;
+
+  // Only warnings that actually resolved to coordinates appear as diamonds.
+  const imdPlotted = imdWarnings.filter((w) => w.latitude != null && w.longitude != null);
+  const imdRed = imdPlotted.filter((w) => w.worstSeverity === 'red').length;
+  const imdOrange = imdPlotted.filter((w) => w.worstSeverity === 'orange').length;
 
   return (
     <div className="view active" id="view-map">
@@ -174,6 +179,45 @@ export function MapView({
           {viewMode === '2d' ? 'EQUIRECTANGULAR PROJECTION' : '3D GLOBE VIEW'}
         </div>
         <div className="map-credits">DHRUVA GLOBAL INTELLIGENCE • {viewMode === '2d' ? 'SVG MAP' : 'WEBGL RENDERING'}</div>
+
+        {layersEnabled.imd && imdPlotted.length > 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '10px',
+              left: '10px',
+              zIndex: 36,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+              padding: '7px 9px',
+              background: 'rgba(2, 5, 12, 0.82)',
+              border: '1px solid rgba(255, 165, 0, 0.35)',
+              borderRadius: '3px',
+              backdropFilter: 'blur(4px)',
+              pointerEvents: 'none',
+              fontFamily: "'Share Tech Mono', monospace",
+            }}
+            aria-label="IMD weather warning map legend"
+          >
+            <div style={{ fontSize: '9px', letterSpacing: '1.5px', color: 'var(--dim)', marginBottom: '1px' }}>
+              IMD WX WARNINGS
+            </div>
+            {([['red', 'RED', imdRed], ['orange', 'ORANGE', imdOrange]] as const).map(([sev, label, count]) => (
+              <div key={sev} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true" style={{ flexShrink: 0 }}>
+                  <rect x="3" y="3" width="6" height="6" transform="rotate(45 6 6)" fill={IMD_SEV_COLOR[sev]} />
+                </svg>
+                <span style={{ fontSize: '9px', letterSpacing: '1px', color: IMD_SEV_COLOR[sev] }}>
+                  {label}
+                </span>
+                <span style={{ fontSize: '9px', color: 'var(--dim)', marginLeft: 'auto', paddingLeft: '8px' }}>
+                  {count}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {viewMode === '2d' && (
           <div className="regional-bar">
