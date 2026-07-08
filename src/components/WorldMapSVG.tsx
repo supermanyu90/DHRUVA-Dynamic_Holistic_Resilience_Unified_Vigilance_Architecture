@@ -1109,8 +1109,8 @@ export function WorldMapSVG({
                 onMouseEnter={e => showTooltip(e.clientX, e.clientY, n.title?.slice(0, 80) || 'News')}
                 onMouseLeave={hideTooltip}
               >
-                {isNew && <circle cx={cx} cy={cy} r={8} fill="none" stroke="#4D9FFF" strokeWidth={1} opacity={0.5} className="pulse-ring" />}
-                <circle cx={cx} cy={cy} r={3} fill="#4D9FFF" opacity={0.75} />
+                {isNew && <circle cx={cx} cy={cy} r={8} fill="none" stroke="#00D4A0" strokeWidth={1} opacity={0.5} className="pulse-ring" />}
+                <circle cx={cx} cy={cy} r={3} fill="#00D4A0" opacity={0.75} />
               </g>
             );
           })
