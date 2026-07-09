@@ -37,9 +37,11 @@ export function CyberView() {
 
   const loadThreats = useCallback(async () => {
     try {
+      // abuse.ch feeds send no CORS headers, so they are routed through the
+      // rss-proxy raw passthrough (both domains are allowlisted there).
       const [feodoRes, urlhausRes, ransomRes] = await Promise.allSettled([
-        fetch('https://feodotracker.abuse.ch/downloads/ipblocklist_aggressive.csv', { signal: AbortSignal.timeout(12_000) }),
-        fetch('https://urlhaus.abuse.ch/feeds/csv_recent/', { signal: AbortSignal.timeout(12_000) }),
+        fetch(`${RSS_PROXY}?raw=${encodeURIComponent('https://feodotracker.abuse.ch/downloads/ipblocklist_aggressive.csv')}`, { signal: AbortSignal.timeout(15_000) }),
+        fetch(`${RSS_PROXY}?raw=${encodeURIComponent('https://urlhaus.abuse.ch/downloads/csv_recent/')}`, { signal: AbortSignal.timeout(20_000) }),
         fetch(`${RSS_PROXY}?gdelt=${encodeURIComponent('https://api.gdeltproject.org/api/v2/doc/doc?query=ransomware+OR+cyberattack+OR+malware+OR+%22data+breach%22&mode=ArtList&format=json&maxrecords=30&timespan=10080min&sort=DateDesc')}`, { signal: AbortSignal.timeout(20_000) }),
       ]);
 
