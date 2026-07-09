@@ -578,7 +578,7 @@ function App() {
           GOV FEED
         </div>
         <div role="tab" aria-selected={currentView === 'admin'} tabIndex={currentView === 'admin' ? 0 : -1} className={`view-tab ${currentView === 'admin' ? 'active' : ''}`} onClick={() => setCurrentView('admin')} style={{ color: currentView === 'admin' ? '' : '#4D9FFF99' }} onKeyDown={e => e.key === 'Enter' && setCurrentView('admin')}>
-          SYS MONITOR
+          SOURCE HEALTH
         </div>
       </div>
 

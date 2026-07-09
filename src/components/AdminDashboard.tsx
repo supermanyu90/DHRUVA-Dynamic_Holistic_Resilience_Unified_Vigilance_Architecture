@@ -1,311 +1,157 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Activity, AlertTriangle, CheckCircle, XCircle, Clock, RefreshCw,
-  Database, Zap, Copy, TrendingUp, TrendingDown, Minus, Shield,
-  Radio, BarChart2, Archive,
-} from 'lucide-react';
-import {
-  IntelligenceAPI,
-  PollState, PollLogEntry, IngestionStat, SystemMetric, LifecycleCounts,
-} from '../lib/intelligence-api';
+import { RefreshCw, Activity } from 'lucide-react';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+/**
+ * AdminDashboard — Live Source Health
+ *
+ * Monitors the data sources the app actually uses (direct live APIs + the
+ * Supabase edge functions), not the orphaned DB ingestion pipeline. Each probe
+ * does a lightweight request and reports status, latency, and item count.
+ */
 
-function fmtTime(iso: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  const now = Date.now();
-  const ms = now - d.getTime();
-  if (ms < 60_000)     return `${Math.floor(ms / 1_000)}s ago`;
-  if (ms < 3_600_000)  return `${Math.floor(ms / 60_000)}m ago`;
-  if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h ago`;
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const RSS_PROXY = `${SUPABASE_URL}/functions/v1/rss-proxy`;
+
+type Health = 'ok' | 'degraded' | 'down';
+
+interface ProbeOutcome {
+  health: Health;
+  status: string;      // "200", "429", "timeout"…
+  count: number | null;
 }
 
-function fmtDuration(ms: number | null): string {
-  if (ms === null) return '—';
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
+interface Probe {
+  name: string;
+  category: 'Live API' | 'Edge function';
+  detail: string;
+  run: (signal: AbortSignal) => Promise<ProbeOutcome>;
 }
 
-function pct(n: number | null): string {
-  if (n === null) return '—';
-  return `${(n * 100).toFixed(1)}%`;
+interface ProbeResult extends ProbeOutcome {
+  name: string;
+  category: Probe['category'];
+  detail: string;
+  latencyMs: number;
+  checkedAt: number;
 }
 
-// Sum metric values over a window
-function sumMetric(rows: SystemMetric[], name: string, src?: string): number {
-  return rows
-    .filter(r => r.metric_name === name && (src === undefined || r.source === src))
-    .reduce((s, r) => s + Number(r.value), 0);
+const HEALTH_COLOR: Record<Health, string> = {
+  ok: '#00D4A0',
+  degraded: '#FFB800',
+  down: '#FF0040',
+};
+
+async function edgeJson(path: string, signal: AbortSignal) {
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ANON}`, 'Content-Type': 'application/json' },
+    signal,
+  });
+  const body = r.ok ? await r.json().catch(() => null) : null;
+  return { status: r.status, ok: r.ok, body };
 }
 
-// ─── Tiny spark bar ───────────────────────────────────────────────────────────
+const PROBES: Probe[] = [
+  {
+    name: 'USGS Earthquakes', category: 'Live API', detail: 'earthquake.usgs.gov',
+    run: async (s) => {
+      const r = await fetch('https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=1&minmagnitude=4', { signal: s });
+      const j = r.ok ? await r.json().catch(() => null) : null;
+      return { health: r.ok ? 'ok' : 'down', status: String(r.status), count: j?.features?.length ?? null };
+    },
+  },
+  {
+    name: 'NASA EONET', category: 'Live API', detail: 'eonet.gsfc.nasa.gov (disasters + volcanoes)',
+    run: async (s) => {
+      const r = await fetch('https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=1', { signal: s });
+      const j = r.ok ? await r.json().catch(() => null) : null;
+      return { health: r.ok ? 'ok' : 'down', status: String(r.status), count: j?.events?.length ?? null };
+    },
+  },
+  {
+    name: 'ReliefWeb', category: 'Live API', detail: 'api.reliefweb.int (disaster fallback)',
+    run: async (s) => {
+      // Same endpoint the app uses, so this reflects the real integration.
+      const r = await fetch('https://api.reliefweb.int/v1/disasters?appname=dhruva-intel&profile=list&preset=latest&slim=1&limit=1', { signal: s });
+      const j = r.ok ? await r.json().catch(() => null) : null;
+      return { health: r.ok ? 'ok' : 'down', status: String(r.status), count: Array.isArray(j?.data) ? j.data.length : null };
+    },
+  },
+  {
+    name: 'RSS Proxy — feeds', category: 'Edge function', detail: 'rss-proxy · News / Gov RSS',
+    run: async (s) => {
+      const r = await fetch(`${RSS_PROXY}?url=${encodeURIComponent('https://feeds.bbci.co.uk/news/world/rss.xml')}&source=health`, { signal: s });
+      const j = r.ok ? await r.json().catch(() => null) : null;
+      const n = j?.items?.length ?? 0;
+      return { health: r.ok && n > 0 ? 'ok' : r.ok ? 'degraded' : 'down', status: String(r.status), count: n };
+    },
+  },
+  {
+    name: 'GDELT — via proxy', category: 'Edge function', detail: 'rss-proxy · News / Info Ops / Cyber',
+    run: async (s) => {
+      const r = await fetch(`${RSS_PROXY}?gdelt=${encodeURIComponent('https://api.gdeltproject.org/api/v2/doc/doc?query=conflict&mode=ArtList&format=json&maxrecords=3&timespan=60min&sort=DateDesc')}`, { signal: s });
+      const j = r.ok ? await r.json().catch(() => null) : null;
+      const n = Array.isArray(j?.articles) ? j.articles.length : null;
+      // GDELT rate-limits aggressively — treat a non-200 or empty as degraded, not down.
+      return { health: r.ok && n ? 'ok' : 'degraded', status: String(r.status), count: n };
+    },
+  },
+  {
+    name: 'abuse.ch — raw proxy', category: 'Edge function', detail: 'rss-proxy · Cyber Watch',
+    run: async (s) => {
+      const r = await fetch(`${RSS_PROXY}?raw=${encodeURIComponent('https://feodotracker.abuse.ch/downloads/ipblocklist_aggressive.csv')}`, { signal: s });
+      const t = r.ok ? await r.text() : '';
+      const n = t ? t.split('\n').filter((l) => l && !l.startsWith('#')).length : 0;
+      return { health: r.ok && n > 0 ? 'ok' : r.ok ? 'degraded' : 'down', status: String(r.status), count: n };
+    },
+  },
+  {
+    name: 'Weather Alerts — GDACS', category: 'Edge function', detail: 'fetch-weather-alerts',
+    run: async (s) => {
+      const { status, ok, body } = await edgeJson('fetch-weather-alerts', s);
+      return { health: body?.ok ? 'ok' : ok ? 'degraded' : 'down', status: String(status), count: body?.total ?? null };
+    },
+  },
+  {
+    name: 'Bank SEWA', category: 'Edge function', detail: 'fetch-sewa-data',
+    run: async (s) => {
+      const { status, ok, body } = await edgeJson('fetch-sewa-data', s);
+      const n = body?.banks?.length ?? null;
+      return { health: n ? 'ok' : ok ? 'degraded' : 'down', status: String(status), count: n };
+    },
+  },
+];
 
-function SparkBar({ value, max, color }: { value: number; max: number; color: string }) {
-  const w = max > 0 ? Math.round((value / max) * 100) : 0;
-  return (
-    <div style={{ flex: 1, height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden' }}>
-      <div style={{ width: `${w}%`, height: '100%', background: color, borderRadius: 2, transition: 'width 0.4s' }} />
-    </div>
-  );
-}
-
-// ─── Status dot ───────────────────────────────────────────────────────────────
-
-function StatusDot({ ok, pulsing = false }: { ok: boolean | null; pulsing?: boolean }) {
-  const color = ok === null ? '#F59E0B' : ok ? '#00D4A0' : '#EF4444';
-  return (
-    <span style={{
-      display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
-      background: color, flexShrink: 0,
-      animation: pulsing ? 'statusPulse 1.5s ease-in-out infinite' : 'none',
-    }} />
-  );
-}
-
-// ─── Stat tile ────────────────────────────────────────────────────────────────
-
-interface StatTileProps {
-  label: string;
-  value: string | number;
-  sub?: string;
-  color?: string;
-  icon: React.ReactNode;
-  trend?: 'up' | 'down' | 'flat';
-}
-
-function StatTile({ label, value, sub, color = '#00D4A0', icon, trend }: StatTileProps) {
-  return (
-    <div className="adm-tile">
-      <div className="adm-tile-icon" style={{ color }}>{icon}</div>
-      <div className="adm-tile-body">
-        <div className="adm-tile-value" style={{ color }}>{value}</div>
-        <div className="adm-tile-label">{label}</div>
-        {sub && <div className="adm-tile-sub">{sub}</div>}
-      </div>
-      {trend && (
-        <div className="adm-tile-trend">
-          {trend === 'up'   && <TrendingUp size={12}  color="#00D4A0" />}
-          {trend === 'down' && <TrendingDown size={12} color="#EF4444" />}
-          {trend === 'flat' && <Minus size={12}        color="#6A8AAA" />}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Source health card ───────────────────────────────────────────────────────
-
-function SourceCard({ state, todayStat }: { state: PollState; todayStat: IngestionStat | undefined }) {
-  const isHealthy = state.consecutive_failures === 0;
-  const isBackoff  = state.consecutive_failures > 0;
-  const color = isHealthy ? '#00D4A0' : isBackoff ? '#EF4444' : '#F59E0B';
-  const successRate = todayStat?.success_rate ?? null;
-
-  return (
-    <div className="adm-source-card" style={{ borderColor: color }}>
-      <div className="adm-source-header">
-        <StatusDot ok={isHealthy} pulsing={isHealthy} />
-        <span className="adm-source-name" style={{ color }}>{state.source}</span>
-        <span className="adm-source-status" style={{
-          color, background: isHealthy ? 'rgba(0,212,160,0.1)' : 'rgba(239,68,68,0.1)',
-          border: `1px solid ${color}40`,
-        }}>
-          {isHealthy ? 'HEALTHY' : `${state.consecutive_failures} FAIL${state.consecutive_failures > 1 ? 'S' : ''}`}
-        </span>
-      </div>
-
-      <div className="adm-source-rows">
-        <div className="adm-source-row">
-          <span className="adm-src-lbl">Last fetch</span>
-          <span className="adm-src-val">{fmtTime(state.last_fetch_at)}</span>
-        </div>
-        <div className="adm-source-row">
-          <span className="adm-src-lbl">Last success</span>
-          <span className="adm-src-val" style={{ color: '#00D4A0' }}>{fmtTime(state.last_success_at)}</span>
-        </div>
-        <div className="adm-source-row">
-          <span className="adm-src-lbl">Next retry</span>
-          <span className="adm-src-val">{fmtTime(state.next_retry_at)}</span>
-        </div>
-        <div className="adm-source-row">
-          <span className="adm-src-lbl">Today success</span>
-          <span className="adm-src-val" style={{ color: (successRate ?? 1) >= 0.9 ? '#00D4A0' : '#F59E0B' }}>
-            {pct(successRate)}
-          </span>
-        </div>
-        <div className="adm-source-row">
-          <span className="adm-src-lbl">Today alerts</span>
-          <span className="adm-src-val">{todayStat?.total_alerts_written ?? 0}</span>
-        </div>
-        <div className="adm-source-row">
-          <span className="adm-src-lbl">Avg duration</span>
-          <span className="adm-src-val">{fmtDuration(todayStat?.avg_duration_ms ?? null)}</span>
-        </div>
-        <div className="adm-source-row">
-          <span className="adm-src-lbl">Lifetime fetches</span>
-          <span className="adm-src-val">{(state.total_fetches ?? 0).toLocaleString()}</span>
-        </div>
-        <div className="adm-source-row">
-          <span className="adm-src-lbl">Lifetime changes</span>
-          <span className="adm-src-val">{(state.total_changes ?? 0).toLocaleString()}</span>
-        </div>
-      </div>
-
-      {state.last_error && (
-        <div className="adm-source-error">
-          <XCircle size={9} />
-          <span>{state.last_error.slice(0, 120)}</span>
-        </div>
-      )}
-
-      {/* Today success rate bar */}
-      <div className="adm-source-bar-row">
-        <span className="adm-src-lbl">Success rate</span>
-        <SparkBar
-          value={Math.round((successRate ?? 0) * (todayStat?.total_fetches ?? 0))}
-          max={todayStat?.total_fetches ?? 1}
-          color={color}
-        />
-      </div>
-    </div>
-  );
-}
-
-// ─── Poll log table ───────────────────────────────────────────────────────────
-
-function PollLogTable({ entries }: { entries: PollLogEntry[] }) {
-  if (!entries.length) return (
-    <div className="adm-empty">No log entries yet.</div>
-  );
-
-  return (
-    <div className="adm-log-wrap">
-      <table className="adm-log-table">
-        <thead>
-          <tr>
-            <th>TIME</th>
-            <th>SOURCE</th>
-            <th>RESULT</th>
-            <th>CHANGED</th>
-            <th>ALERTS</th>
-            <th>DURATION</th>
-            <th>ERROR</th>
-          </tr>
-        </thead>
-        <tbody>
-          {entries.slice(0, 50).map(e => (
-            <tr key={e.id} style={{ opacity: e.success ? 1 : 0.7 }}>
-              <td style={{ color: 'var(--dim)' }}>{fmtTime(e.fetched_at)}</td>
-              <td>
-                <span className="adm-log-src">{e.source}</span>
-              </td>
-              <td>
-                {e.success
-                  ? <span className="adm-log-ok"><CheckCircle size={9} />OK</span>
-                  : <span className="adm-log-fail"><XCircle size={9} />FAIL</span>}
-              </td>
-              <td style={{ color: e.changed ? '#00D4A0' : 'rgba(139,175,200,0.3)' }}>
-                {e.changed ? 'YES' : 'no'}
-              </td>
-              <td>{e.alerts_written > 0 ? e.alerts_written : '—'}</td>
-              <td style={{ color: 'var(--dim)' }}>{fmtDuration(e.duration_ms)}</td>
-              <td className="adm-log-err">{e.error ? e.error.slice(0, 60) : '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// ─── 24-hour metric chart (simple bar histogram) ──────────────────────────────
-
-function MetricBars({ metrics, name, color, label }: {
-  metrics: SystemMetric[]; name: string; color: string; label: string;
-}) {
-  // Bucket into 24 hourly slots
-  const now = Date.now();
-  const HOURS = 24;
-  const buckets = Array.from({ length: HOURS }, (_, i) => ({
-    hour: HOURS - 1 - i,
-    count: 0,
-  }));
-
-  for (const m of metrics) {
-    if (m.metric_name !== name) continue;
-    const ageH = (now - new Date(m.recorded_at).getTime()) / 3_600_000;
-    const idx = Math.floor(ageH);
-    if (idx >= 0 && idx < HOURS) buckets[HOURS - 1 - idx].count += Number(m.value);
+async function runProbe(p: Probe): Promise<ProbeResult> {
+  const start = performance.now();
+  try {
+    const r = await p.run(AbortSignal.timeout(15_000));
+    return { name: p.name, category: p.category, detail: p.detail, ...r, latencyMs: Math.round(performance.now() - start), checkedAt: Date.now() };
+  } catch (err) {
+    const timedOut = err instanceof DOMException && (err.name === 'TimeoutError' || err.name === 'AbortError');
+    return { name: p.name, category: p.category, detail: p.detail, health: 'down', status: timedOut ? 'timeout' : 'error', count: null, latencyMs: Math.round(performance.now() - start), checkedAt: Date.now() };
   }
-
-  const maxVal = Math.max(...buckets.map(b => b.count), 1);
-
-  return (
-    <div className="adm-metric-chart">
-      <div className="adm-metric-title">
-        <span style={{ color }}>{label}</span>
-        <span className="adm-metric-total" style={{ color }}>
-          {buckets.reduce((s, b) => s + b.count, 0).toLocaleString()} total (24h)
-        </span>
-      </div>
-      <div className="adm-metric-bars">
-        {buckets.map((b, i) => (
-          <div key={i} className="adm-metric-bar-col" title={`${b.count} ${HOURS - 1 - b.hour}h ago`}>
-            <div
-              className="adm-metric-bar"
-              style={{
-                height: `${Math.round((b.count / maxVal) * 100)}%`,
-                background: color,
-                opacity: b.count === 0 ? 0.12 : 0.75 + (b.count / maxVal) * 0.25,
-              }}
-            />
-          </div>
-        ))}
-      </div>
-      <div className="adm-metric-axis">
-        <span>24h ago</span>
-        <span>now</span>
-      </div>
-    </div>
-  );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+function fmtAge(ts: number): string {
+  const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  if (s < 60) return `${s}s ago`;
+  return `${Math.floor(s / 60)}m ago`;
+}
 
 export function AdminDashboard() {
-  const [pollStates, setPollStates]       = useState<PollState[]>([]);
-  const [pollLog, setPollLog]             = useState<PollLogEntry[]>([]);
-  const [ingestionStats, setIngestionStats] = useState<IngestionStat[]>([]);
-  const [metrics, setMetrics]             = useState<SystemMetric[]>([]);
-  const [lifecycle, setLifecycle]         = useState<LifecycleCounts>({ active: 0, updated: 0, expired: 0 });
-  const [loading, setLoading]             = useState(true);
-  const [lastRefresh, setLastRefresh]     = useState<Date>(new Date());
-  const [refreshing, setRefreshing]       = useState(false);
+  const [results, setResults] = useState<ProbeResult[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [lastRun, setLastRun] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
-    try {
-      const [states, log, stats, mets, lc] = await Promise.all([
-        IntelligenceAPI.getPollState(),
-        IntelligenceAPI.getPollLog(100),
-        IntelligenceAPI.getIngestionStats(7),
-        IntelligenceAPI.getSystemMetrics(['alerts_ingested', 'duplicates_detected', 'notifications_sent'], 24),
-        IntelligenceAPI.getAlertLifecycleCounts(),
-      ]);
-      setPollStates(states);
-      setPollLog(log);
-      setIngestionStats(stats);
-      setMetrics(mets);
-      setLifecycle(lc);
-      setLastRefresh(new Date());
-    } catch (e) {
-      console.error('Admin dashboard load error:', e);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    setLoading(true);
+    const settled = await Promise.all(PROBES.map(runProbe));
+    setResults(settled);
+    setLastRun(Date.now());
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -314,149 +160,83 @@ export function AdminDashboard() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [load]);
 
-  const handleRefresh = () => { setRefreshing(true); load(); };
+  const okN = results.filter((r) => r.health === 'ok').length;
+  const degN = results.filter((r) => r.health === 'degraded').length;
+  const downN = results.filter((r) => r.health === 'down').length;
+  const avgLatency = results.length ? Math.round(results.reduce((a, r) => a + r.latencyMs, 0) / results.length) : 0;
 
-  // Derived stats
-  const todayStats = ingestionStats.filter(s => {
-    const dayMs = Date.now() - new Date(s.day).getTime();
-    return dayMs < 86_400_000;
-  });
-  const todayBySource = (src: string) => todayStats.find(s => s.source === src);
-
-  const totalIngested24h   = sumMetric(metrics, 'alerts_ingested');
-  const totalDuplicates24h = sumMetric(metrics, 'duplicates_detected');
-  const totalNotifs24h     = sumMetric(metrics, 'notifications_sent');
-
-  const gdacsOk   = pollStates.find(s => s.source === 'GDACS')?.consecutive_failures === 0;
-  const sachetOk  = pollStates.find(s => s.source === 'SACHET')?.consecutive_failures === 0;
-  const systemOk  = gdacsOk !== false && sachetOk !== false;
-
-  const overallSuccessRate = (() => {
-    const total = todayStats.reduce((s, r) => s + (r.total_fetches ?? 0), 0);
-    const ok    = todayStats.reduce((s, r) => s + (r.successful_fetches ?? 0), 0);
-    return total > 0 ? ok / total : null;
-  })();
-
-  if (loading) {
-    return (
-      <div className="adm-loading">
-        <Activity size={16} style={{ animation: 'spin 1s linear infinite' }} />
-        LOADING SYSTEM TELEMETRY…
-      </div>
-    );
-  }
+  const tiles: [string, number, string][] = [
+    ['HEALTHY', okN, HEALTH_COLOR.ok],
+    ['DEGRADED', degN, HEALTH_COLOR.degraded],
+    ['DOWN', downN, HEALTH_COLOR.down],
+    ['AVG LATENCY', avgLatency, 'var(--dim)'],
+  ];
 
   return (
-    <div className="adm-root">
-      {/* ── Header bar ── */}
-      <div className="adm-topbar">
-        <div className="adm-topbar-left">
-          <Shield size={14} color="#4D9FFF" />
-          <span className="adm-topbar-title">SYSTEM MONITOR</span>
-          <StatusDot ok={systemOk ?? null} pulsing={systemOk === true} />
-          <span className="adm-topbar-status" style={{ color: systemOk ? '#00D4A0' : '#EF4444' }}>
-            {systemOk ? 'ALL SYSTEMS OPERATIONAL' : 'INGESTION DEGRADED'}
-          </span>
+    <div className="view active" style={{ padding: '16px', overflowY: 'auto' }}>
+      <div style={{ marginBottom: '14px' }}>
+        <div style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '0.5px', color: 'var(--text)' }}>
+          LIVE SOURCE HEALTH
         </div>
-        <div className="adm-topbar-right">
-          <span className="adm-refresh-time">
-            <Clock size={9} /> refreshed {fmtTime(lastRefresh.toISOString())}
-          </span>
-          <button className={`adm-refresh-btn ${refreshing ? 'spinning' : ''}`} onClick={handleRefresh}>
-            <RefreshCw size={11} />
-            REFRESH
-          </button>
+        <div style={{ fontSize: '11px', color: 'var(--dim)', marginTop: '2px' }}>
+          Real-time status of the data sources the app fetches · auto-refresh every 30s
         </div>
       </div>
 
-      <div className="adm-body">
-
-        {/* ── Summary tiles ── */}
-        <div className="adm-tiles">
-          <StatTile
-            label="ALERTS INGESTED (24H)"
-            value={totalIngested24h.toLocaleString()}
-            color="#00D4A0"
-            icon={<Database size={14} />}
-          />
-          <StatTile
-            label="DUPLICATES DETECTED (24H)"
-            value={totalDuplicates24h.toLocaleString()}
-            sub={totalIngested24h > 0 ? `${((totalDuplicates24h / totalIngested24h) * 100).toFixed(1)}% dup rate` : undefined}
-            color="#F59E0B"
-            icon={<Copy size={14} />}
-          />
-          <StatTile
-            label="NOTIFICATIONS SENT (24H)"
-            value={totalNotifs24h.toLocaleString()}
-            color="#4D9FFF"
-            icon={<Radio size={14} />}
-          />
-          <StatTile
-            label="TODAY SUCCESS RATE"
-            value={pct(overallSuccessRate)}
-            color={overallSuccessRate === null || overallSuccessRate >= 0.9 ? '#00D4A0' : '#EF4444'}
-            icon={<BarChart2 size={14} />}
-          />
-          <StatTile
-            label="ACTIVE ALERTS"
-            value={lifecycle.active.toLocaleString()}
-            color="#00D4A0"
-            icon={<Zap size={14} />}
-          />
-          <StatTile
-            label="UPDATED ALERTS"
-            value={lifecycle.updated.toLocaleString()}
-            color="#F59E0B"
-            icon={<RefreshCw size={14} />}
-          />
-          <StatTile
-            label="EXPIRED ALERTS"
-            value={lifecycle.expired.toLocaleString()}
-            color="#6A8AAA"
-            icon={<Archive size={14} />}
-          />
-          <StatTile
-            label="TOTAL IN DB"
-            value={(lifecycle.active + lifecycle.updated + lifecycle.expired).toLocaleString()}
-            color="#8BA8C0"
-            icon={<Database size={14} />}
-          />
-        </div>
-
-        {/* ── Source health cards ── */}
-        <div className="adm-section-title">
-          <Activity size={11} />
-          SOURCE HEALTH
-        </div>
-        <div className="adm-source-grid">
-          {pollStates.map(s => (
-            <SourceCard key={s.source} state={s} todayStat={todayBySource(s.source)} />
-          ))}
-          {pollStates.length === 0 && (
-            <div className="adm-empty">No poll state data yet. Trigger an ingestion run first.</div>
-          )}
-        </div>
-
-        {/* ── 24h metric charts ── */}
-        <div className="adm-section-title">
-          <TrendingUp size={11} />
-          INGESTION METRICS (24H HOURLY)
-        </div>
-        <div className="adm-charts-row">
-          <MetricBars metrics={metrics} name="alerts_ingested"     color="#00D4A0" label="Alerts Ingested" />
-          <MetricBars metrics={metrics} name="duplicates_detected" color="#F59E0B" label="Duplicates Detected" />
-          <MetricBars metrics={metrics} name="notifications_sent"  color="#4D9FFF" label="Notifications Sent" />
-        </div>
-
-        {/* ── 7-day ingestion table ── */}
-        <div className="adm-section-title">
-          <Database size={11} />
-          INGESTION LOG (LAST 100 POLLS)
-        </div>
-        <PollLogTable entries={pollLog} />
-
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
+        <button
+          onClick={load}
+          disabled={loading}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', color: 'var(--accent)', background: 'transparent', border: '1px solid var(--border)' }}
+        >
+          {loading
+            ? <><Activity size={12} style={{ animation: 'spin 0.8s linear infinite' }} /> CHECKING…</>
+            : <><RefreshCw size={12} /> RE-CHECK</>}
+        </button>
+        <span style={{ fontSize: '11px', color: 'var(--dim)' }}>
+          {lastRun ? `Last checked ${fmtAge(lastRun)}` : 'Checking…'}
+        </span>
       </div>
+
+      {/* Summary tiles */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '10px', marginBottom: '16px' }}>
+        {tiles.map(([label, val, color]) => (
+          <div key={label} style={{ padding: '12px 14px', borderRadius: '8px', background: 'var(--panel)', border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '26px', fontWeight: 800, color, lineHeight: 1 }}>
+              {val}{label === 'AVG LATENCY' ? <span style={{ fontSize: '12px', color: 'var(--dim)' }}>ms</span> : ''}
+            </div>
+            <div style={{ fontSize: '11px', letterSpacing: '1px', color: 'var(--dim)', marginTop: '4px' }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Source rows */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '10px' }}>
+        {results.map((r) => {
+          const color = HEALTH_COLOR[r.health];
+          return (
+            <div key={r.name} style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderLeft: `4px solid ${color}`, borderRadius: '8px', padding: '11px 13px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0, boxShadow: `0 0 6px ${color}` }} />
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</span>
+                </div>
+                <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.5px', color }}>{r.health.toUpperCase()}</span>
+              </div>
+              <div style={{ fontSize: '10px', color: 'var(--dim)', marginTop: '4px' }}>{r.category} · {r.detail}</div>
+              <div style={{ display: 'flex', gap: '14px', marginTop: '9px', fontSize: '10px', color: 'var(--dim)' }}>
+                <span>STATUS <strong style={{ color: 'var(--text)' }}>{r.status}</strong></span>
+                <span>LATENCY <strong style={{ color: 'var(--text)' }}>{r.latencyMs}ms</strong></span>
+                <span>ITEMS <strong style={{ color: 'var(--text)' }}>{r.count ?? '—'}</strong></span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {loading && results.length === 0 && (
+        <div className="news-loading"><div className="spinner" />CHECKING SOURCES…</div>
+      )}
     </div>
   );
 }
