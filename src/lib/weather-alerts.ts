@@ -1,10 +1,10 @@
 /**
  * Weather alerts client.
  *
- * Talks to the `fetch-weather-alerts` edge function, which proxies GDACS (a
- * free, no-key global alert feed), filters to ONLY Orange/Red severities, and
- * scopes to weather/climate hazards. GDACS ships coordinates, so alerts plot
- * directly. Shared by WeatherAlertsView (the tab) and App (the map layer).
+ * Talks to the `fetch-weather-alerts` edge function, which proxies SACHET
+ * (India's NDMA official CAP alert portal), filters to ONLY Orange/Red
+ * severities, and drops expired alerts. SACHET ships a centroid per alert, so
+ * they plot directly. Shared by WeatherAlertsView (the tab) and App (the map).
  */
 
 const WX_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-weather-alerts`;
@@ -13,8 +13,8 @@ export type WxSeverity = 'red' | 'orange';
 
 export interface WeatherAlert {
   id: string;
-  eventType: string;   // GDACS code: TC | FL | DR | WF
-  eventLabel: string;  // e.g. "Tropical Cyclone"
+  eventType: string;   // SACHET disaster type, e.g. "Extremely Heavy Rain"
+  eventLabel: string;  // human-readable hazard label (same as eventType)
   title: string;
   country: string;
   severity: WxSeverity;

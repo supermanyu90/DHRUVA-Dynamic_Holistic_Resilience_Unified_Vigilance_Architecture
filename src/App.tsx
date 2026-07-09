@@ -250,7 +250,7 @@ function App() {
       if (volR.status  === 'fulfilled') setVolcanoes(volR.value.data);
       if (geoR.status  === 'fulfilled') setGeopolitical(geoR.value.data);
 
-      // Orange/Red weather alerts (GDACS) — fetched independently so a failure
+      // Orange/Red weather alerts (SACHET) — fetched independently so a failure
       // never blocks the core sources or the map.
       fetchWeatherAlerts().then((wx) => {
         if (wx.ok) setWeatherAlerts(wx.alerts ?? []);

@@ -107,7 +107,7 @@ const PROBES: Probe[] = [
     },
   },
   {
-    name: 'Weather Alerts — GDACS', category: 'Edge function', detail: 'fetch-weather-alerts',
+    name: 'Weather Alerts — SACHET', category: 'Edge function', detail: 'fetch-weather-alerts',
     run: async (s) => {
       const { status, ok, body } = await edgeJson('fetch-weather-alerts', s);
       return { health: body?.ok ? 'ok' : ok ? 'degraded' : 'down', status: String(status), count: body?.total ?? null };

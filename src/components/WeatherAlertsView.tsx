@@ -11,16 +11,24 @@ import {
 /**
  * WeatherAlertsView
  *
- * Shows free global weather/climate alerts (GDACS) filtered to ONLY Orange and
- * Red severities. Green is dropped server-side by the fetch-weather-alerts edge
- * function, so it never reaches the browser. No API key required.
+ * Shows official India weather alerts (SACHET / NDMA) filtered to ONLY Orange
+ * and Red severities. Green/yellow are dropped server-side by the
+ * fetch-weather-alerts edge function, so they never reach the browser. No key.
  */
 
 type Status = 'loading' | 'live' | 'error';
 
-const EVENT_ICON: Record<string, string> = {
-  TC: '🌀', FL: '🌊', DR: '☀️', WF: '🔥',
-};
+/** Pick an icon from the SACHET disaster-type text. */
+function eventIcon(label: string): string {
+  const l = label.toLowerCase();
+  if (l.includes('thunder') || l.includes('lightning')) return '⛈️';
+  if (l.includes('flood')) return '🌊';
+  if (l.includes('rain')) return '🌧️';
+  if (l.includes('wind') || l.includes('cyclone') || l.includes('storm')) return '🌀';
+  if (l.includes('heat')) return '🔥';
+  if (l.includes('cold') || l.includes('snow')) return '❄️';
+  return '⚠️';
+}
 
 function fmtDate(d: string | null): string {
   if (!d) return '';
@@ -78,7 +86,7 @@ export function WeatherAlertsView() {
           WEATHER ALERTS — ORANGE &amp; RED
         </div>
         <div style={{ fontSize: '11px', color: 'var(--dim)', marginTop: '2px' }}>
-          GDACS · global cyclone / flood / drought / wildfire alerts · lower severities hidden
+          SACHET / NDMA · official India IMD &amp; state alerts · lower severities hidden
         </div>
       </div>
 
@@ -172,7 +180,7 @@ export function WeatherAlertsView() {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                    <span aria-hidden="true">{EVENT_ICON[a.eventType] ?? '⚠'}</span>
+                    <span aria-hidden="true">{eventIcon(a.eventLabel)}</span>
                     <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', color: accent, whiteSpace: 'nowrap' }}>
                       {a.eventLabel.toUpperCase()}
                     </span>
@@ -215,7 +223,7 @@ export function WeatherAlertsView() {
                       rel="noopener noreferrer"
                       style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10px', color: accent, marginLeft: 'auto' }}
                     >
-                      <ExternalLink size={10} /> GDACS
+                      <ExternalLink size={10} /> SACHET
                     </a>
                   )}
                 </div>
