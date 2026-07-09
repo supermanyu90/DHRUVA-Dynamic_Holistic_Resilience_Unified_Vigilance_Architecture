@@ -38,6 +38,59 @@ function getPlatformStyle(platform: string) {
   return PLATFORM_STYLES[platform.toLowerCase()] || PLATFORM_STYLES.x;
 }
 
+// ── Shared mapping + fallback config ────────────────────────────────────────
+const PLATFORM_KW: Record<string, string[]> = {
+  x: ['twitter', 'x.com', 'tweet'], fb: ['facebook', 'meta', 'instagram'],
+  tg: ['telegram'], yt: ['youtube'], wa: ['whatsapp'],
+  rt: ['rt.com', 'russia today', 'sputnik'], ig: ['instagram'],
+};
+const OP_COUNTRIES = ['Russia', 'China', 'Iran', 'North Korea'];
+
+// Keywords used to filter general news feeds down to influence-operations items
+// when GDELT is unavailable (it rate-limits aggressively with HTTP 429).
+const INFO_OPS_KEYWORDS = [
+  'disinformation', 'misinformation', 'propaganda', 'influence operation',
+  'information warfare', 'info war', 'fake news', 'deepfake', 'troll farm',
+  'bot network', 'foreign interference', 'election interference', 'state media',
+];
+const FALLBACK_FEEDS = [
+  { url: 'https://feeds.bbci.co.uk/news/world/rss.xml', source: 'BBC' },
+  { url: 'https://www.theguardian.com/world/rss', source: 'Guardian' },
+  { url: 'https://www.aljazeera.com/xml/rss/all.xml', source: 'Al Jazeera' },
+];
+
+function gdeltDate(seendate?: string): string {
+  if (!seendate) return new Date().toISOString();
+  return new Date(seendate.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')).toISOString();
+}
+
+function makeInfoOp(title: string, sourceLabel: string, dateISO: string, i: number): InfoOp {
+  const lower = title.toLowerCase();
+  let platform = 'x';
+  for (const [p, kws] of Object.entries(PLATFORM_KW)) {
+    if (kws.some((kw) => lower.includes(kw))) { platform = p; break; }
+  }
+  let country = 'Unknown';
+  for (const c of OP_COUNTRIES) {
+    if (lower.includes(c.toLowerCase())) { country = c; break; }
+  }
+  return {
+    id: `infoop-${i}-${Date.now()}`,
+    campaign_id: `camp-${i}`,
+    title: title.slice(0, 150),
+    description: `Source: ${sourceLabel || 'unknown'} — ${title}`,
+    platform,
+    origin_country: country,
+    is_active: true,
+    first_detected: dateISO,
+  };
+}
+
+type OpsSource = 'gdelt' | 'rss' | 'none';
+
+interface GdeltArticle { title?: string; domain?: string; seendate?: string }
+interface RssItem { title?: string; description?: string; source?: string; published?: string }
+
 export function InfoOpsView() {
   const [operations, setOperations] = useState<InfoOp[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,55 +98,52 @@ export function InfoOpsView() {
   const [filter, setFilter] = useState<string>('all');
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [timeWindow, setTimeWindow] = useState<TimeWindow>('7d');
+  const [sourceUsed, setSourceUsed] = useState<OpsSource>('none');
 
   const loadOps = useCallback(async () => {
+    const timespan = timeWindow === '1h' ? '60min' : timeWindow === '6h' ? '360min' : timeWindow === '24h' ? '1440min' : timeWindow === '7d' ? '10080min' : '20160min';
+    let ops: InfoOp[] = [];
+    let src: OpsSource = 'none';
+
+    // Primary source: GDELT (via proxy).
     try {
-      const timespan = timeWindow === '1h' ? '60min' : timeWindow === '6h' ? '360min' : timeWindow === '24h' ? '1440min' : timeWindow === '7d' ? '10080min' : '20160min';
       const gdeltUrl = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent('disinformation OR propaganda OR "information warfare" OR "fake news" OR "influence operation" OR deepfake OR bot network OR troll farm')}&mode=ArtList&format=json&maxrecords=50&timespan=${timespan}&sort=DateDesc`;
       const res = await fetch(`${RSS_PROXY}?gdelt=${encodeURIComponent(gdeltUrl)}`, { signal: AbortSignal.timeout(20_000) });
-      if (!res.ok) throw new Error(`Proxy ${res.status}`);
-      const json = await res.json();
-      const articles: any[] = json?.articles ?? [];
-
-      const PLATFORM_KW: Record<string, string[]> = {
-        x: ['twitter', 'x.com', 'tweet'], fb: ['facebook', 'meta', 'instagram'],
-        tg: ['telegram'], yt: ['youtube'], wa: ['whatsapp'],
-        rt: ['rt.com', 'russia today', 'sputnik'], ig: ['instagram'],
-      };
-      const COUNTRIES = ['Russia', 'China', 'Iran', 'North Korea', 'Unknown'];
-
-      const ops: InfoOp[] = articles.map((a: any, i: number) => {
-        const title = a.title ?? '';
-        const lower = title.toLowerCase();
-        let platform = 'x';
-        for (const [p, kws] of Object.entries(PLATFORM_KW)) {
-          if (kws.some(kw => lower.includes(kw))) { platform = p; break; }
-        }
-        let country = 'Unknown';
-        for (const c of COUNTRIES) {
-          if (lower.includes(c.toLowerCase())) { country = c; break; }
-        }
-
-        return {
-          id: `infoop-${i}-${Date.now()}`,
-          campaign_id: `camp-${i}`,
-          title: title.slice(0, 150),
-          description: `Source: ${a.domain ?? 'unknown'} — ${title}`,
-          platform,
-          origin_country: country,
-          is_active: true,
-          first_detected: a.seendate ? new Date(a.seendate.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')).toISOString() : new Date().toISOString(),
-        };
-      });
-
-      setOperations(ops);
-      setLastUpdated(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      if (res.ok) {
+        const json = await res.json();
+        const articles = (json?.articles ?? []) as GdeltArticle[];
+        ops = articles.map((a, i) => makeInfoOp(a.title ?? '', a.domain ?? '', gdeltDate(a.seendate), i));
+        if (ops.length > 0) src = 'gdelt';
+      }
     } catch (err) {
-      console.error('Load info ops failed:', err);
-      setOperations([]);
-    } finally {
-      setLoading(false);
+      console.warn('Info ops GDELT source failed, trying RSS fallback:', err);
     }
+
+    // Fallback: filter general world-news RSS feeds for influence-ops keywords.
+    // GDELT rate-limits (HTTP 429) and Info Ops has no other primary source.
+    if (ops.length === 0) {
+      try {
+        const feeds = encodeURIComponent(JSON.stringify(FALLBACK_FEEDS));
+        const res = await fetch(`${RSS_PROXY}?urls=${feeds}`, { signal: AbortSignal.timeout(20_000) });
+        if (res.ok) {
+          const json = await res.json();
+          const items = (json?.items ?? []) as RssItem[];
+          const matched = items.filter((it) => {
+            const hay = `${it.title ?? ''} ${it.description ?? ''}`.toLowerCase();
+            return INFO_OPS_KEYWORDS.some((kw) => hay.includes(kw));
+          });
+          ops = matched.map((it, i) => makeInfoOp(it.title ?? '', it.source ?? 'RSS', it.published ?? new Date().toISOString(), i));
+          if (ops.length > 0) src = 'rss';
+        }
+      } catch (err) {
+        console.error('Info ops RSS fallback failed:', err);
+      }
+    }
+
+    setOperations(ops);
+    setSourceUsed(src);
+    setLastUpdated(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    setLoading(false);
   }, [timeWindow]);
 
   const handleRefresh = useCallback(async () => {
@@ -146,7 +196,13 @@ export function InfoOpsView() {
           }
         </button>
         <div className="infoops-status">
-          {loading ? 'LOADING...' : lastUpdated ? `Last analysis: ${lastUpdated}` : 'No data loaded'}
+          {loading
+            ? 'LOADING...'
+            : sourceUsed === 'rss'
+              ? `RSS fallback (GDELT rate-limited) · ${lastUpdated}`
+              : sourceUsed === 'gdelt'
+                ? `GDELT · ${lastUpdated}`
+                : lastUpdated ? `No results · ${lastUpdated}` : 'No data loaded'}
         </div>
       </div>
 

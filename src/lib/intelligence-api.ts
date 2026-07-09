@@ -1,5 +1,6 @@
 import { API_TIMEOUT_MS } from './constants';
 import { supabase } from './supabase';
+import { centroidForCountry } from './country-centroids';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const RSS_PROXY = `${SUPABASE_URL}/functions/v1/rss-proxy`;
@@ -647,48 +648,48 @@ export class IntelligenceAPI {
       );
     }
 
-    // Attempt 4: ReliefWeb API (UNOCHA) — completely free, no key required
-    // Covers active humanitarian crises, conflicts, disasters with country + coordinates
+    // Attempt 4: ReliefWeb (UNOCHA) — free, no key. The v1/v2 JSON API now
+    // requires a registered appname, so we use the public RSS feed via the
+    // proxy and geocode by country name. Titles look like "Country: Type - Mon YYYY".
     try {
-      const rwUrl = 'https://api.reliefweb.int/v1/disasters?appname=dhruva-intel&profile=list&preset=latest&slim=1&limit=50' +
-        '&fields[include][]=name&fields[include][]=primary_country&fields[include][]=date&fields[include][]=primary_type&fields[include][]=status';
-      const rwRes = await fetch(rwUrl, { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
+      const rwFeed = 'https://reliefweb.int/disasters/rss.xml';
+      const rwRes = await fetch(`${RSS_PROXY}?url=${encodeURIComponent(rwFeed)}&source=ReliefWeb`, { signal: AbortSignal.timeout(API_TIMEOUT_MS) });
       if (rwRes.ok) {
         const rwJson = await rwRes.json();
-        const items: any[] = rwJson?.data ?? [];
+        const items: any[] = rwJson?.items ?? [];
         if (items.length > 0) {
-          // Fetch country coordinates from a second ReliefWeb call for countries
           const events: GeopoliticalEvent[] = items.map((item: any, i: number) => {
-            const f = item.fields ?? {};
-            const typeName: string = (f.primary_type?.name ?? '').toLowerCase();
-            const name: string = f.name ?? 'Unknown Crisis';
-            const country: string | null = f.primary_country?.name ?? null;
-            const status: string = (f.status ?? '').toLowerCase();
+            const rawTitle: string = item.title ?? 'Unknown Crisis';
+            const colon = rawTitle.indexOf(':');
+            const country: string | null = colon > 0 ? rawTitle.slice(0, colon).trim() : null;
+            const rest = colon > 0 ? rawTitle.slice(colon + 1) : rawTitle;
+            // Strip the trailing " - Mon YYYY" to isolate the disaster type.
+            const typeName = rest.replace(/\s*-\s*[A-Za-z]{3,9}\s+\d{4}\s*$/, '').trim().toLowerCase();
+            const [lat, lon] = centroidForCountry(country) ?? [null, null];
             const category: GeopoliticalEvent['category'] =
               typeName.includes('conflict') || typeName.includes('civil') || typeName.includes('war') ? 'conflict'
-              : typeName.includes('epidemic') || typeName.includes('health') ? 'crisis'
-              : typeName.includes('political') ? 'crisis'
+              : typeName.includes('epidemic') || typeName.includes('outbreak') || typeName.includes('cholera') || typeName.includes('health') ? 'crisis'
               : 'geopolitical';
             const severity: GeopoliticalEvent['severity'] =
-              status === 'alert' ? 'critical'
-              : status === 'ongoing' ? 'high'
-              : typeName.includes('conflict') ? 'high'
+              typeName.includes('conflict') || typeName.includes('war') ? 'high'
+              : typeName.includes('outbreak') || typeName.includes('epidemic') || typeName.includes('cholera') ? 'high'
               : 'medium';
+            const when = item.published ? new Date(item.published).toISOString() : new Date().toISOString();
             return {
-              id: `rw-${item.id ?? i}-${ts}`,
-              event_id: `rw-${item.id ?? i}`,
-              title: name.slice(0, 150),
+              id: `rw-${i}-${ts}`,
+              event_id: `rw-${i}`,
+              title: rawTitle.slice(0, 150),
               category,
-              country,
-              latitude: f.primary_country?.location?.lat ?? null,
-              longitude: f.primary_country?.location?.lon ?? null,
-              description: name,
+              country: country && country.toLowerCase() !== 'world' ? country : null,
+              latitude: lat,
+              longitude: lon,
+              description: rawTitle,
               severity,
-              is_active: status !== 'past',
-              started_at: f.date?.created ? new Date(f.date.created).toISOString() : new Date().toISOString(),
+              is_active: true,
+              started_at: when,
               source: 'ReliefWeb (UNOCHA)',
-              properties: { reliefweb_id: item.id, status, type: typeName, href: item.href },
-              updated_at: f.date?.changed ? new Date(f.date.changed).toISOString() : new Date().toISOString(),
+              properties: { url: item.url },
+              updated_at: when,
             };
           });
           // Supplement with a GDELT query that's broader — no minimum threshold
