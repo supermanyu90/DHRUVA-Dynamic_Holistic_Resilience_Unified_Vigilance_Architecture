@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { IntelligenceAPI, Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from './lib/intelligence-api';
 import { withResilience } from './lib/resilience';
+import { fetchWeatherAlerts, type WeatherAlert } from './lib/weather-alerts';
 import { DataFreshnessContext, DataFreshnessState, formatStaleAge } from './lib/DataFreshnessContext';
 import {
   AUTO_SYNC_INTERVAL_MS,
@@ -14,6 +15,7 @@ import { SewaView } from './components/SewaView';
 import { CyberView } from './components/CyberView';
 import { InfoOpsView } from './components/InfoOpsView';
 import { GovAnnouncementsView } from './components/GovAnnouncementsView';
+import { WeatherAlertsView } from './components/WeatherAlertsView';
 import { NewsIntelView } from './components/NewsIntelView';
 import { TimelineView } from './components/TimelineView';
 import { AlertToast } from './components/AlertToast';
@@ -26,7 +28,7 @@ import { LiveEventTicker, TickerEvent } from './components/LiveEventTicker';
 import { AboutDhruva } from './components/AboutDhruva';
 import { AdminDashboard } from './components/AdminDashboard';
 
-type ViewType = 'map' | 'timeline' | 'news' | 'sewa' | 'cyber' | 'infoops' | 'gov' | 'admin';
+type ViewType = 'map' | 'timeline' | 'news' | 'wx' | 'sewa' | 'cyber' | 'infoops' | 'gov' | 'admin';
 
 function formatSyncCountdown(ms: number): string {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
@@ -90,6 +92,7 @@ function App() {
   const [news, setNews] = useState<NewsEvent[]>([]);
   const [volcanoes, setVolcanoes] = useState<VolcanoEvent[]>([]);
   const [geopolitical, setGeopolitical] = useState<GeopoliticalEvent[]>([]);
+  const [weatherAlerts, setWeatherAlerts] = useState<WeatherAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [currentView, setCurrentView] = useState<ViewType>('map');
@@ -108,6 +111,7 @@ function App() {
     volcanoes: true,
     geopolitical: true,
     curfews: true,
+    wx: true,
   });
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try {
@@ -245,6 +249,12 @@ function App() {
       if (newsR.status === 'fulfilled') setNews(newsR.value.data);
       if (volR.status  === 'fulfilled') setVolcanoes(volR.value.data);
       if (geoR.status  === 'fulfilled') setGeopolitical(geoR.value.data);
+
+      // Orange/Red weather alerts (GDACS) — fetched independently so a failure
+      // never blocks the core sources or the map.
+      fetchWeatherAlerts().then((wx) => {
+        if (wx.ok) setWeatherAlerts(wx.alerts ?? []);
+      });
 
       // Seed ticker with initial data from all sources
       const tickerSeed: TickerEvent[] = [];
@@ -552,6 +562,9 @@ function App() {
         <div role="tab" aria-selected={currentView === 'news'} tabIndex={currentView === 'news' ? 0 : -1} className={`view-tab ${currentView === 'news' ? 'active' : ''}`} onClick={() => setCurrentView('news')} onKeyDown={e => e.key === 'Enter' && setCurrentView('news')}>
           NEWS INTEL
         </div>
+        <div role="tab" aria-selected={currentView === 'wx'} tabIndex={currentView === 'wx' ? 0 : -1} className={`view-tab ${currentView === 'wx' ? 'active' : ''}`} onClick={() => setCurrentView('wx')} style={{ color: currentView === 'wx' ? '' : '#FFA50099' }} onKeyDown={e => e.key === 'Enter' && setCurrentView('wx')}>
+          WEATHER ALERTS
+        </div>
         <div role="tab" aria-selected={currentView === 'sewa'} tabIndex={currentView === 'sewa' ? 0 : -1} className={`view-tab ${currentView === 'sewa' ? 'active' : ''}`} onClick={() => setCurrentView('sewa')} onKeyDown={e => e.key === 'Enter' && setCurrentView('sewa')}>
           BANK SEWA
         </div>
@@ -581,6 +594,10 @@ function App() {
         <button className={`mvt-btn ${currentView === 'news' ? 'active' : ''}`} onClick={() => setCurrentView('news')}>
           <span className="mvt-icon">📡</span>
           <span className="mvt-label">NEWS</span>
+        </button>
+        <button className={`mvt-btn ${currentView === 'wx' ? 'active' : ''}`} onClick={() => setCurrentView('wx')}>
+          <span className="mvt-icon">🌩️</span>
+          <span className="mvt-label">WX</span>
         </button>
         <button className={`mvt-btn ${currentView === 'sewa' ? 'active' : ''}`} onClick={() => setCurrentView('sewa')}>
           <span className="mvt-icon">🏦</span>
@@ -637,6 +654,7 @@ function App() {
               news={news}
               volcanoes={volcanoes}
               geopolitical={geopolitical}
+              weatherAlerts={weatherAlerts}
               onEventSelect={handleEventSelect}
               layersEnabled={layersEnabled}
               timeFilter={timeFilter}
@@ -656,6 +674,7 @@ function App() {
             />
           )}
           {currentView === 'news' && <NewsIntelView />}
+          {currentView === 'wx' && <WeatherAlertsView />}
           {currentView === 'sewa' && <SewaView />}
           {currentView === 'cyber' && <CyberView />}
           {currentView === 'infoops' && <InfoOpsView />}

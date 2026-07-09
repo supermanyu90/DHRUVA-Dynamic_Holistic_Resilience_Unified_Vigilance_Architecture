@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
+import { WeatherAlert } from '../lib/weather-alerts';
 import { UNDERSEA_CABLES, CHOKEPOINTS, MILITARY_BASES, NUCLEAR_SITES } from '../lib/cable-data';
 import { INDIA_OUTER_BOUNDARY, LINE_OF_CONTROL, LINE_OF_ACTUAL_CONTROL } from '../lib/india-boundary';
 
@@ -10,6 +11,7 @@ interface Globe3DProps {
   news: NewsEvent[];
   volcanoes: VolcanoEvent[];
   geopolitical: GeopoliticalEvent[];
+  weatherAlerts: WeatherAlert[];
   onEventSelect: (id: string, type: string) => void;
   layersEnabled: {
     earthquakes: boolean;
@@ -23,6 +25,7 @@ interface Globe3DProps {
     volcanoes: boolean;
     geopolitical: boolean;
     curfews: boolean;
+    wx: boolean;
   };
   showTooltip: (x: number, y: number, content: string) => void;
   hideTooltip: () => void;
@@ -85,6 +88,7 @@ export function Globe3D({
   news,
   volcanoes,
   geopolitical,
+  weatherAlerts,
   onEventSelect,
   layersEnabled,
   showTooltip,
@@ -479,7 +483,26 @@ export function Globe3D({
         markersRef.current?.add(mesh);
       });
     }
-  }, [earthquakes, disasters, news, volcanoes, geopolitical, layersEnabled]);
+
+    if (layersEnabled.wx) {
+      weatherAlerts.forEach((w) => {
+        if (w.latitude == null || w.longitude == null) return;
+        const pos = latLonToVec3(w.latitude, w.longitude, GLOBE_RADIUS + 1);
+        const col = w.severity === 'red' ? 0xff0000 : 0xffa500;
+        // Octahedron reads as a "diamond" — distinct from the spherical event markers.
+        const geo = new THREE.OctahedronGeometry(2.0, 0);
+        const mat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(pos);
+        mesh.userData = {
+          type: 'wx',
+          id: w.id,
+          name: `WX ${w.severity.toUpperCase()} — ${w.eventLabel}: ${w.title}`,
+        };
+        markersRef.current?.add(mesh);
+      });
+    }
+  }, [earthquakes, disasters, news, volcanoes, geopolitical, weatherAlerts, layersEnabled]);
 
   useEffect(() => {
     if (!nightOverlayRef.current || !layersEnabled.daynight) {

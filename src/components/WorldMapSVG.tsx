@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
+import { WeatherAlert } from '../lib/weather-alerts';
 import { UNDERSEA_CABLES, CHOKEPOINTS, MILITARY_BASES, NUCLEAR_SITES } from '../lib/cable-data';
 import { INDIA_OUTER_BOUNDARY, INDIA_NORTHERN_TERRITORY, INDIA_DISCLAIMER } from '../lib/india-boundary';
 
@@ -20,6 +21,7 @@ interface WorldMapSVGProps {
   news: NewsEvent[];
   volcanoes: VolcanoEvent[];
   geopolitical: GeopoliticalEvent[];
+  weatherAlerts: WeatherAlert[];
   onEventSelect: (id: string, type: string) => void;
   layersEnabled: {
     earthquakes: boolean;
@@ -33,6 +35,7 @@ interface WorldMapSVGProps {
     volcanoes: boolean;
     geopolitical: boolean;
     curfews: boolean;
+    wx: boolean;
   };
   showTooltip: (x: number, y: number, content: string) => void;
   hideTooltip: () => void;
@@ -75,6 +78,7 @@ export function WorldMapSVG({
   news,
   volcanoes,
   geopolitical,
+  weatherAlerts,
   onEventSelect,
   layersEnabled,
   showTooltip,
@@ -1060,6 +1064,36 @@ export function WorldMapSVG({
             );
           })}
 
+        {layersEnabled.wx &&
+          weatherAlerts.map((w) => {
+            if (w.latitude == null || w.longitude == null) return null;
+            const x = lonToX(w.longitude);
+            const y = latToY(w.latitude);
+            const color = w.severity === 'red' ? '#FF0000' : '#FFA500';
+            const tip = `WX ${w.severity.toUpperCase()} — ${w.eventLabel}: ${w.title}`;
+            return (
+              <g key={`wx-${w.id}`} style={{ cursor: 'pointer' }}>
+                <circle cx={x} cy={y} r="7" fill={color} opacity="0.08" />
+                {w.severity === 'red' && (
+                  <circle cx={x} cy={y} r="7" fill="none" stroke={color} strokeWidth="0.5" opacity="0.5" className="pulse-ring" />
+                )}
+                {/* diamond marker distinguishes weather warnings from circular event markers */}
+                <rect
+                  x={x - 2.6}
+                  y={y - 2.6}
+                  width="5.2"
+                  height="5.2"
+                  fill={color}
+                  opacity="0.92"
+                  transform={`rotate(45 ${x} ${y})`}
+                  filter="url(#glow)"
+                  onMouseEnter={(e) => handleMarkerHover(e, tip)}
+                  onMouseLeave={hideTooltip}
+                />
+              </g>
+            );
+          })}
+
         {layersEnabled.news && news
           .filter(n => n.latitude != null && n.longitude != null)
           .slice(0, 40)
@@ -1074,8 +1108,8 @@ export function WorldMapSVG({
                 onMouseEnter={e => showTooltip(e.clientX, e.clientY, n.title?.slice(0, 80) || 'News')}
                 onMouseLeave={hideTooltip}
               >
-                {isNew && <circle cx={cx} cy={cy} r={8} fill="none" stroke="#4D9FFF" strokeWidth={1} opacity={0.5} className="pulse-ring" />}
-                <circle cx={cx} cy={cy} r={3} fill="#4D9FFF" opacity={0.75} />
+                {isNew && <circle cx={cx} cy={cy} r={8} fill="none" stroke="#00D4A0" strokeWidth={1} opacity={0.5} className="pulse-ring" />}
+                <circle cx={cx} cy={cy} r={3} fill="#00D4A0" opacity={0.75} />
               </g>
             );
           })

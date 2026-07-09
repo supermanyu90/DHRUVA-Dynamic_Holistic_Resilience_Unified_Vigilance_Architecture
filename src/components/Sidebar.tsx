@@ -32,6 +32,7 @@ interface SidebarProps {
     volcanoes: boolean;
     geopolitical: boolean;
     curfews: boolean;
+    wx: boolean;
   };
   onLayerToggle: (layer: keyof SidebarProps['layersEnabled']) => void;
   mobileOpen?: boolean;
@@ -197,6 +198,16 @@ export function Sidebar({
         >
           <span className="ldot" style={{ background: '#CC3300' }} aria-hidden="true"></span>
           CURFEWS
+        </button>
+        <button
+          className={`lbtn ${layersEnabled.wx ? 'active' : ''}`}
+          onClick={() => onLayerToggle('wx')}
+          aria-pressed={layersEnabled.wx}
+          aria-label="Toggle weather alerts layer"
+          style={{ borderColor: '#FFA500', color: '#FFA500' }}
+        >
+          <span className="ldot" style={{ background: '#FFA500' }} aria-hidden="true"></span>
+          WX ALERTS
         </button>
         <button
           className={`lbtn lbtn-cab ${layersEnabled.cables ? 'active' : ''}`}

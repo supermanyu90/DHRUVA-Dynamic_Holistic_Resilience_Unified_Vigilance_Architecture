@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from '../lib/intelligence-api';
+import { WeatherAlert, WX_SEV_COLOR } from '../lib/weather-alerts';
 import { WorldMapSVG } from './WorldMapSVG';
 import { Globe3D } from './Globe3D';
 import { Globe, Map, Tag } from 'lucide-react';
@@ -10,6 +11,7 @@ interface MapViewProps {
   news: NewsEvent[];
   volcanoes: VolcanoEvent[];
   geopolitical: GeopoliticalEvent[];
+  weatherAlerts: WeatherAlert[];
   onEventSelect: (id: string, type: string) => void;
   layersEnabled: {
     earthquakes: boolean;
@@ -23,12 +25,36 @@ interface MapViewProps {
     volcanoes: boolean;
     geopolitical: boolean;
     curfews: boolean;
+    wx: boolean;
   };
   timeFilter: string;
   onTimeFilterChange: (filter: string) => void;
   showTooltip: (x: number, y: number, content: string) => void;
   hideTooltip: () => void;
   newEventIds?: Set<string>;
+}
+
+type LegendGlyphShape = 'circle' | 'triangle' | 'ring' | 'diamond';
+
+interface LegendItem {
+  key: string;
+  on: boolean;
+  count: number;
+  label: string;
+  color: string;
+  glyph: LegendGlyphShape;
+}
+
+/** Small SVG glyph matching the corresponding map marker shape. */
+function LegendGlyph({ glyph, color }: { glyph: LegendGlyphShape; color: string }) {
+  return (
+    <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true" style={{ flexShrink: 0 }}>
+      {glyph === 'circle' && <circle cx="6" cy="6" r="4" fill={color} />}
+      {glyph === 'triangle' && <polygon points="6,2 10.5,10 1.5,10" fill={color} />}
+      {glyph === 'ring' && <circle cx="6" cy="6" r="3.6" fill="none" stroke={color} strokeWidth="1.6" />}
+      {glyph === 'diamond' && <rect x="3" y="3" width="6" height="6" transform="rotate(45 6 6)" fill={color} />}
+    </svg>
+  );
 }
 
 const REGION_PRESETS = [
@@ -48,6 +74,7 @@ export function MapView({
   news,
   volcanoes,
   geopolitical,
+  weatherAlerts,
   onEventSelect,
   layersEnabled,
   timeFilter,
@@ -65,6 +92,31 @@ export function MapView({
   };
 
   const totalEvents = earthquakes.length + disasters.length + news.length + volcanoes.length + geopolitical.length;
+
+  // Legend counts reflect only markers that actually have coordinates (i.e. what
+  // is plotted), so the legend stays in sync with what's on the map.
+  const wxRed = weatherAlerts.filter((w) => w.latitude != null && w.longitude != null && w.severity === 'red').length;
+  const wxOrange = weatherAlerts.filter((w) => w.latitude != null && w.longitude != null && w.severity === 'orange').length;
+  const quakeN = earthquakes.filter((e) => e.latitude != null && e.longitude != null).length;
+  const disasterN = disasters.filter((d) => d.latitude != null && d.longitude != null).length;
+  const newsN = news.filter((n) => n.latitude != null && n.longitude != null).length;
+  const volcanoN = volcanoes.filter((v) => v.latitude != null && v.longitude != null).length;
+  const geoN = geopolitical.filter((g) => g.category !== 'curfew' && g.latitude != null && g.longitude != null).length;
+  const curfewN = geopolitical.filter((g) => g.category === 'curfew' && g.latitude != null && g.longitude != null).length;
+
+  // Colours/shapes mirror the actual markers in WorldMapSVG / Globe3D and the
+  // Sidebar layer key. Entries are shown only for enabled layers that have
+  // something plotted, most-severe first.
+  const legendItems = [
+    { key: 'earthquakes',  on: layersEnabled.earthquakes,  count: quakeN,    label: 'QUAKES',     color: '#4D9FFF',            glyph: 'circle' },
+    { key: 'disasters',    on: layersEnabled.disasters,    count: disasterN, label: 'DISASTERS',  color: '#FF6B00',            glyph: 'circle' },
+    { key: 'news',         on: layersEnabled.news,         count: newsN,     label: 'INTEL',      color: '#00D4A0',            glyph: 'circle' },
+    { key: 'volcanoes',    on: layersEnabled.volcanoes,    count: volcanoN,  label: 'VOLCANOES',  color: '#FF4500',            glyph: 'triangle' },
+    { key: 'geopolitical', on: layersEnabled.geopolitical, count: geoN,      label: 'GEO-POL',    color: '#FF2255',            glyph: 'circle' },
+    { key: 'curfews',      on: layersEnabled.curfews,      count: curfewN,   label: 'CURFEWS',    color: '#CC3300',            glyph: 'ring' },
+    { key: 'wx-red',       on: layersEnabled.wx,           count: wxRed,     label: 'WX RED',     color: WX_SEV_COLOR.red,     glyph: 'diamond' },
+    { key: 'wx-orange',    on: layersEnabled.wx,           count: wxOrange,  label: 'WX ORANGE',  color: WX_SEV_COLOR.orange,  glyph: 'diamond' },
+  ].filter((i) => i.on && i.count > 0) as LegendItem[];
 
   return (
     <div className="view active" id="view-map">
@@ -105,6 +157,7 @@ export function MapView({
             news={news}
             volcanoes={volcanoes}
             geopolitical={geopolitical}
+            weatherAlerts={weatherAlerts}
             onEventSelect={onEventSelect}
             layersEnabled={layersEnabled}
             showTooltip={showTooltip}
@@ -121,6 +174,7 @@ export function MapView({
             news={news}
             volcanoes={volcanoes}
             geopolitical={geopolitical}
+            weatherAlerts={weatherAlerts}
             onEventSelect={onEventSelect}
             layersEnabled={layersEnabled}
             showTooltip={showTooltip}
@@ -168,6 +222,43 @@ export function MapView({
           {viewMode === '2d' ? 'EQUIRECTANGULAR PROJECTION' : '3D GLOBE VIEW'}
         </div>
         <div className="map-credits">DHRUVA GLOBAL INTELLIGENCE • {viewMode === '2d' ? 'SVG MAP' : 'WEBGL RENDERING'}</div>
+
+        {legendItems.length > 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '10px',
+              left: '10px',
+              zIndex: 36,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '3px',
+              padding: '7px 9px',
+              background: 'rgba(2, 5, 12, 0.82)',
+              border: '1px solid rgba(0, 212, 160, 0.28)',
+              borderRadius: '3px',
+              backdropFilter: 'blur(4px)',
+              pointerEvents: 'none',
+              fontFamily: "'Share Tech Mono', monospace",
+            }}
+            aria-label="Map marker legend"
+          >
+            <div style={{ fontSize: '9px', letterSpacing: '1.5px', color: 'var(--dim)', marginBottom: '2px' }}>
+              MAP LEGEND
+            </div>
+            {legendItems.map((item) => (
+              <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <LegendGlyph glyph={item.glyph} color={item.color} />
+                <span style={{ fontSize: '9px', letterSpacing: '1px', color: item.color }}>
+                  {item.label}
+                </span>
+                <span style={{ fontSize: '9px', color: 'var(--dim)', marginLeft: 'auto', paddingLeft: '10px' }}>
+                  {item.count}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {viewMode === '2d' && (
           <div className="regional-bar">
