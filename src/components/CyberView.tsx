@@ -1,19 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Shield, Activity, RefreshCw, Share2 } from 'lucide-react';
+import { Shield, Activity, RefreshCw } from 'lucide-react';
 import { CyberThreat } from '../lib/intelligence-api';
-import { ShareMenu } from './ShareMenu';
-import type { SharePayload } from '../lib/share';
 
 const RSS_PROXY = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rss-proxy`;
-
-/** Compose a shareable payload for a cyber threat (no per-threat link → app URL). */
-function buildCyberShare(t: CyberThreat): SharePayload {
-  const appUrl = typeof window !== 'undefined' ? window.location.origin : 'https://dhruva.app';
-  const sev = (t.severity || 'low').toUpperCase();
-  const type = (t.threat_type || 'threat').replace(/_/g, ' ');
-  const text = `⚠️ DHRUVA CYBER THREAT [${sev}]: ${t.title} · ${type} — live intelligence & vigilance`;
-  return { title: `DHRUVA CYBER: ${t.title}`, text, url: appUrl };
-}
 
 type TimeWindow = '1h' | '6h' | '24h' | '7d' | 'all';
 
@@ -45,7 +34,6 @@ export function CyberView() {
   const [filter, setFilter] = useState<string>('all');
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [timeWindow, setTimeWindow] = useState<TimeWindow>('7d');
-  const [shareId, setShareId] = useState<string | null>(null);
 
   const loadThreats = useCallback(async () => {
     try {
@@ -243,7 +231,7 @@ export function CyberView() {
             </div>
           ) : (
             filteredThreats.map(threat => (
-              <div key={threat.id} className={`cyber-card sev-${threat.severity}`} style={{ position: 'relative' }}>
+              <div key={threat.id} className={`cyber-card sev-${threat.severity}`}>
                 <div className="cyber-card-head">
                   <div className="cyber-card-type">{threat.threat_type?.toUpperCase() || 'UNKNOWN'}</div>
                   <div className="cyber-card-age">{formatAge(threat.first_seen)} ago</div>
@@ -255,30 +243,7 @@ export function CyberView() {
                   {!threat.is_active && (
                     <div className="cyber-tag" style={{ color: '#8BAFC8' }}>RESOLVED</div>
                   )}
-                  <button
-                    onClick={() => setShareId(id => (id === threat.id ? null : threat.id))}
-                    aria-label="Share this alert"
-                    aria-haspopup="menu"
-                    aria-expanded={shareId === threat.id}
-                    style={{
-                      marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '4px',
-                      fontFamily: "'Share Tech Mono', monospace", fontSize: '9px', letterSpacing: '0.5px',
-                      cursor: 'pointer', color: shareId === threat.id ? 'var(--accent)' : 'var(--dim)',
-                      background: shareId === threat.id ? 'rgba(0,212,160,0.12)' : 'transparent',
-                      border: `1px solid ${shareId === threat.id ? 'rgba(0,212,160,0.4)' : 'rgba(255,255,255,0.12)'}`,
-                      borderRadius: '3px', padding: '3px 7px',
-                    }}
-                  >
-                    <Share2 size={10} /> SHARE
-                  </button>
                 </div>
-                {shareId === threat.id && (
-                  <ShareMenu
-                    payload={buildCyberShare(threat)}
-                    anchorStyle={{ top: 'auto', bottom: '10px', right: '10px' }}
-                    onClose={() => setShareId(null)}
-                  />
-                )}
               </div>
             ))
           )}
