@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, X, Plus, Trash2, ChevronDown } from 'lucide-react';
+import { Bell, X, Plus, Trash2 } from 'lucide-react';
 import type { NotificationPreferences } from '../lib/useNotificationPreferences';
 
 const ALL_EVENT_TYPES = [

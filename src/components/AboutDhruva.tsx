@@ -59,7 +59,7 @@ const TECH_STACK = [
   { label: 'SECURITY', value: 'Row Level Security (RLS) on all tables, API key isolation via Edge Functions' },
 ];
 
-export function AboutDhruva({ onClose, theme }: AboutDhruvaProps) {
+export function AboutDhruva({ onClose }: AboutDhruvaProps) {
   return (
     <div className="about-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="about-modal">
