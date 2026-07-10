@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import {
   Twitter, MessageCircle, Send, Linkedin, Facebook, Mail,
   Share2, Copy, Check, Smartphone,
@@ -19,9 +19,11 @@ const ICONS: Record<ShareTarget['icon'], typeof Twitter> = {
 interface Props {
   payload: SharePayload;
   onClose: () => void;
+  /** Override the menu's position (defaults to top-right, tuned for the detail drawer). */
+  anchorStyle?: CSSProperties;
 }
 
-export function ShareMenu({ payload, onClose }: Props) {
+export function ShareMenu({ payload, onClose, anchorStyle }: Props) {
   const [copied, setCopied] = useState(false);
   const targets = buildShareTargets(payload);
   const canNativeShare = hasNativeShare();
@@ -55,6 +57,7 @@ export function ShareMenu({ payload, onClose }: Props) {
           border: '1px solid rgba(0,212,160,0.3)', borderRadius: '5px',
           boxShadow: '0 8px 32px rgba(0,0,0,0.7)', padding: '10px',
           display: 'flex', flexDirection: 'column', gap: '8px',
+          ...anchorStyle,
         }}
       >
         <div style={{

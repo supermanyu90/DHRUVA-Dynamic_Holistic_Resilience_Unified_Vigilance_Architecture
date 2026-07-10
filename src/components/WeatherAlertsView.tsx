@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, MapPin, Activity, ExternalLink } from 'lucide-react';
+import { RefreshCw, MapPin, Activity, ExternalLink, Share2 } from 'lucide-react';
 import {
   fetchWeatherAlerts,
   WX_SEV_COLOR as SEV_COLOR,
@@ -7,6 +7,17 @@ import {
   type WeatherAlert,
   type WxSeverity,
 } from '../lib/weather-alerts';
+import { ShareMenu } from './ShareMenu';
+import type { SharePayload } from '../lib/share';
+
+/** Compose a shareable payload for a SACHET weather alert. */
+function buildWeatherShare(a: WeatherAlert): SharePayload {
+  const appUrl = typeof window !== 'undefined' ? window.location.origin : 'https://dhruva.app';
+  const sev = a.severity === 'red' ? 'RED' : 'ORANGE';
+  const headline = `${a.eventLabel || a.eventType} — ${a.title}`;
+  const text = `⚠️ DHRUVA WEATHER ALERT [${sev}]: ${headline}${a.country ? ` (${a.country})` : ''} — SACHET/NDMA · live intelligence & vigilance`;
+  return { title: `DHRUVA WEATHER: ${headline}`, text, url: a.url || appUrl };
+}
 
 /**
  * WeatherAlertsView
@@ -43,6 +54,7 @@ export function WeatherAlertsView() {
   const [message, setMessage] = useState('');
   const [fetchedAt, setFetchedAt] = useState('');
   const [filter, setFilter] = useState<'all' | WxSeverity>('all');
+  const [shareId, setShareId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setStatus('loading');
@@ -171,6 +183,7 @@ export function WeatherAlertsView() {
               <div
                 key={a.id}
                 style={{
+                  position: 'relative',
                   background: 'var(--panel)',
                   border: '1px solid var(--border)',
                   borderLeft: `4px solid ${accent}`,
@@ -216,17 +229,43 @@ export function WeatherAlertsView() {
                   {dateRange && (
                     <span style={{ fontSize: '10px', color: 'var(--dim)' }}>{dateRange}</span>
                   )}
-                  {a.url && (
-                    <a
-                      href={a.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10px', color: accent, marginLeft: 'auto' }}
+                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {a.url && (
+                      <a
+                        href={a.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10px', color: accent }}
+                      >
+                        <ExternalLink size={10} /> SACHET
+                      </a>
+                    )}
+                    <button
+                      onClick={() => setShareId(id => (id === a.id ? null : a.id))}
+                      aria-label="Share this alert"
+                      aria-haspopup="menu"
+                      aria-expanded={shareId === a.id}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '4px',
+                        fontSize: '10px', letterSpacing: '0.5px', cursor: 'pointer',
+                        color: shareId === a.id ? 'var(--accent)' : 'var(--dim)',
+                        background: shareId === a.id ? 'rgba(0,212,160,0.12)' : 'transparent',
+                        border: `1px solid ${shareId === a.id ? 'rgba(0,212,160,0.4)' : 'var(--border)'}`,
+                        borderRadius: '4px', padding: '3px 7px',
+                      }}
                     >
-                      <ExternalLink size={10} /> SACHET
-                    </a>
-                  )}
+                      <Share2 size={11} /> SHARE
+                    </button>
+                  </div>
                 </div>
+
+                {shareId === a.id && (
+                  <ShareMenu
+                    payload={buildWeatherShare(a)}
+                    anchorStyle={{ top: 'auto', bottom: '10px', right: '10px' }}
+                    onClose={() => setShareId(null)}
+                  />
+                )}
               </div>
             );
           })}
