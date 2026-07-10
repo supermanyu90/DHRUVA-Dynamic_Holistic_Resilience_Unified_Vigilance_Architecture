@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { IntelligenceAPI, Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from './lib/intelligence-api';
 import { withResilience } from './lib/resilience';
 import { fetchWeatherAlerts, type WeatherAlert } from './lib/weather-alerts';
@@ -27,6 +27,10 @@ import type { AppNotification } from './lib/useAlertNotifier';
 import { LiveEventTicker, TickerEvent } from './components/LiveEventTicker';
 import { AboutDhruva } from './components/AboutDhruva';
 import { AdminDashboard } from './components/AdminDashboard';
+import { WatchlistPanel } from './components/WatchlistPanel';
+import { useWatchlist } from './lib/useWatchlist';
+import { normalizeEvents, watchedEvents } from './lib/watchlist';
+import { exportSituationReport } from './lib/situation-report';
 
 type ViewType = 'map' | 'timeline' | 'news' | 'wx' | 'sewa' | 'cyber' | 'infoops' | 'gov' | 'admin';
 
@@ -129,6 +133,7 @@ function App() {
   const [newEventIds, setNewEventIds] = useState<Set<string>>(new Set());
   const [showAbout, setShowAbout] = useState(false);
   const [showNotifPrefs, setShowNotifPrefs] = useState(false);
+  const [showWatchlist, setShowWatchlist] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
   const [dataFreshness, setDataFreshness] = useState<DataFreshnessState>({
@@ -139,6 +144,7 @@ function App() {
   const stalenessTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { prefs, update: updatePrefs } = useNotificationPreferences();
+  const { watchlist, addRegion, removeRegion, addKeyword, removeKeyword, clear: clearWatchlist } = useWatchlist();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mobileRightPanelOpen, setMobileRightPanelOpen] = useState(false);
 
@@ -502,6 +508,16 @@ function App() {
       .slice(0, 4),
   };
 
+  const normalizedEvents = useMemo(
+    () => normalizeEvents({ earthquakes, disasters, news, volcanoes, geopolitical, weatherAlerts }),
+    [earthquakes, disasters, news, volcanoes, geopolitical, weatherAlerts],
+  );
+  const watched = useMemo(() => watchedEvents(normalizedEvents, watchlist), [normalizedEvents, watchlist]);
+
+  const handleExportSitrep = useCallback(() => {
+    exportSituationReport({ events: normalizedEvents, watchlist, indiaScore: Math.round(indiaScore) });
+  }, [normalizedEvents, watchlist, indiaScore]);
+
   if (loading) {
     return (
       <div id="loading">
@@ -544,6 +560,8 @@ function App() {
         syncing={syncing}
         soundEnabled={soundEnabled}
         onToggleSound={() => setSoundEnabled(!soundEnabled)}
+        watchedCount={watched.length}
+        onOpenWatchlist={() => setShowWatchlist(true)}
         theme={theme}
         onThemeToggle={handleThemeToggle}
         onToggleSidebar={() => setMobileSidebarOpen(o => !o)}
@@ -736,6 +754,24 @@ function App() {
             )}
           </button>
         </div>
+        <div>
+          <button
+            className={`notif-bell-btn ${watched.length > 0 ? 'active' : ''}`}
+            onClick={handleExportSitrep}
+            aria-label="Export situation report as PDF"
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <path d="M14 2v6h6"/>
+              <path d="M12 18v-6"/>
+              <path d="M9 15l3 3 3-3"/>
+            </svg>
+            SITREP
+            {watched.length > 0 && (
+              <span className="notif-bell-badge" aria-hidden="true">{watched.length}</span>
+            )}
+          </button>
+        </div>
         <div className="about-link-wrap">
           <button className="about-link-btn" onClick={() => setShowAbout(true)} aria-label="About DHRUVA">
             ABOUT DHRUVA
@@ -761,6 +797,19 @@ function App() {
           prefs={prefs}
           onUpdate={updatePrefs}
           onClose={() => setShowNotifPrefs(false)}
+        />
+      )}
+      {showWatchlist && (
+        <WatchlistPanel
+          watchlist={watchlist}
+          watched={watched}
+          onAddRegion={addRegion}
+          onRemoveRegion={removeRegion}
+          onAddKeyword={addKeyword}
+          onRemoveKeyword={removeKeyword}
+          onClear={clearWatchlist}
+          onExport={handleExportSitrep}
+          onClose={() => setShowWatchlist(false)}
         />
       )}
       {tooltip && <Tooltip x={tooltip.x} y={tooltip.y} content={tooltip.content} />}

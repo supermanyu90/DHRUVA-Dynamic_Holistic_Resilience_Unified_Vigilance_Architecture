@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Activity, Menu, BarChart2, X, WifiOff } from 'lucide-react';
+import { Activity, Menu, BarChart2, X, WifiOff, Star } from 'lucide-react';
 import { useDataFreshness } from '../lib/DataFreshnessContext';
 
 interface HeaderProps {
@@ -16,6 +16,8 @@ interface HeaderProps {
   syncing: boolean;
   soundEnabled: boolean;
   onToggleSound: () => void;
+  watchedCount: number;
+  onOpenWatchlist: () => void;
   theme: 'dark' | 'light';
   onThemeToggle: () => void;
   onToggleSidebar: () => void;
@@ -33,6 +35,8 @@ export function Header({
   syncing,
   soundEnabled,
   onToggleSound,
+  watchedCount,
+  onOpenWatchlist,
   theme,
   onThemeToggle,
   onToggleSidebar,
@@ -171,6 +175,15 @@ export function Header({
       </div>
 
       <div className="hdr-right">
+        <button
+          className={`watch-btn ${watchedCount > 0 ? 'has-matches' : ''}`}
+          onClick={onOpenWatchlist}
+          aria-label={`Watchlist${watchedCount > 0 ? `, ${watchedCount} matching events` : ''}`}
+        >
+          <Star size={12} style={{ display: 'inline', marginRight: '4px' }} fill={watchedCount > 0 ? 'currentColor' : 'none'} />
+          WATCH
+          {watchedCount > 0 && <span className="watch-btn-badge">{watchedCount}</span>}
+        </button>
         <button className="theme-btn" onClick={onThemeToggle}>
           {theme === 'dark' ? '☀️ LIGHT' : '🌙 DARK'}
         </button>
