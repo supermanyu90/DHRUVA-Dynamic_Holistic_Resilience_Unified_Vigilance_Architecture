@@ -1,7 +1,9 @@
-import { ExternalLink, X, Radio, Globe, Tag, Clock, TrendingUp, TrendingDown, Minus, AlertTriangle, Activity, MapPin, Layers, Shield, Zap, Anchor } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { ExternalLink, X, Radio, Globe, Tag, Clock, TrendingUp, TrendingDown, Minus, AlertTriangle, Activity, MapPin, Layers, Shield, Zap, Anchor, Share2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from '../../lib/intelligence-api';
 import { Vessel } from '../../lib/intelligence-api';
+import { ShareMenu } from '../ShareMenu';
+import type { SharePayload } from '../../lib/share';
 
 function safeHostname(url: string): string {
   try { return new URL(url).hostname; } catch { return url.slice(0, 30); }
@@ -421,8 +423,63 @@ function GeopoliticalDrawer({ data, isCurfew }: { data: GeopoliticalEvent; isCur
   );
 }
 
+const SHARE_LABEL: Record<DrawerEvent['type'], string> = {
+  news: 'INTEL',
+  earthquake: 'SEISMIC',
+  disaster: 'DISASTER',
+  volcano: 'VOLCANO',
+  vessel: 'VESSEL',
+  geopolitical: 'GEOPOLITICAL',
+  curfew: 'CURFEW',
+};
+
+/** Build a shareable payload (headline, message, source link) for any drawer event. */
+function eventToShare(event: DrawerEvent): SharePayload {
+  const appUrl = typeof window !== 'undefined' ? window.location.origin : 'https://dhruva.app';
+  const label = SHARE_LABEL[event.type];
+  let headline = '';
+  let url = appUrl;
+  let severity = '';
+
+  switch (event.type) {
+    case 'news':
+      headline = event.data.title;
+      url = event.data.url || appUrl;
+      break;
+    case 'earthquake':
+      headline = `M${event.data.magnitude?.toFixed(1) ?? '?'} — ${event.data.location}`;
+      url = (event.data.properties?.url as string) || `https://earthquake.usgs.gov/earthquakes/eventpage/${event.data.event_id}`;
+      break;
+    case 'disaster':
+      headline = event.data.title;
+      url = (event.data.properties?.url as string) || `https://www.gdacs.org/report.aspx?eventtype=${event.data.category}&eventid=${event.data.event_id}`;
+      break;
+    case 'volcano':
+      headline = `${event.data.name}${event.data.country ? ` — ${event.data.country}` : ''}`;
+      url = event.data.source || `https://volcano.si.edu/volcano.cfm?vn=${event.data.volcano_id}`;
+      severity = event.data.status === 'erupting' ? 'ERUPTING' : '';
+      break;
+    case 'vessel':
+      headline = `${event.data.name}${event.data.type ? ` (${event.data.type})` : ''}`;
+      url = `https://www.marinetraffic.com/en/ais/details/ships/mmsi:${event.data.mmsi}`;
+      break;
+    case 'geopolitical':
+    case 'curfew':
+      headline = event.data.title;
+      url = (event.data.properties?.url as string) || appUrl;
+      severity = (event.data.severity || '').toUpperCase();
+      break;
+  }
+
+  const sevSuffix = severity ? ` [${severity}]` : '';
+  const text = `⚠️ DHRUVA ${label} ALERT: ${headline}${sevSuffix} — live intelligence & vigilance`;
+
+  return { title: `DHRUVA ${label}: ${headline}`, text, url };
+}
+
 export function EventDetailDrawer({ event, onClose }: EventDetailDrawerProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const [showShare, setShowShare] = useState(false);
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -462,15 +519,38 @@ export function EventDetailDrawer({ event, onClose }: EventDetailDrawerProps) {
             {titleMap[event.type] || 'EVENT DETAILS'}
           </span>
         </div>
-        <button
-          ref={closeRef}
-          onClick={onClose}
-          aria-label="Close event details"
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dim)', padding: '2px', lineHeight: 1 }}
-        >
-          <X size={13} aria-hidden="true" />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <button
+            onClick={() => setShowShare(s => !s)}
+            aria-label="Share this alert"
+            aria-haspopup="menu"
+            aria-expanded={showShare}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '4px',
+              background: showShare ? 'rgba(0,212,160,0.14)' : 'none',
+              border: `1px solid ${showShare ? 'rgba(0,212,160,0.4)' : 'var(--border)'}`,
+              borderRadius: '3px', cursor: 'pointer',
+              color: showShare ? 'var(--accent)' : 'var(--dim)', padding: '3px 7px', lineHeight: 1,
+              fontFamily: "'Bebas Neue', sans-serif", fontSize: '10px', letterSpacing: '1.5px',
+            }}
+          >
+            <Share2 size={11} aria-hidden="true" />
+            SHARE
+          </button>
+          <button
+            ref={closeRef}
+            onClick={onClose}
+            aria-label="Close event details"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dim)', padding: '2px', lineHeight: 1 }}
+          >
+            <X size={13} aria-hidden="true" />
+          </button>
+        </div>
       </div>
+
+      {showShare && (
+        <ShareMenu payload={eventToShare(event)} onClose={() => setShowShare(false)} />
+      )}
 
       <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
         {event.type === 'news' && <NewsDrawer data={event.data} />}
