@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { ExternalLink, RefreshCw, Globe, Search, X, Radio, Filter, Clock } from 'lucide-react';
+import { ExternalLink, RefreshCw, Globe, Search, X, Radio, Filter, Clock, Share2 } from 'lucide-react';
+import { ShareMenu } from './ShareMenu';
+import type { SharePayload } from '../lib/share';
 
 type TimeWindow = '1h' | '6h' | '24h' | '7d' | 'all';
 
@@ -51,9 +53,17 @@ const CATEGORY_COLORS: Record<string, string> = {
 const ALL_REGIONS = ['All Regions', 'Americas', 'Europe', 'South Asia', 'Asia-Pacific', 'Middle East', 'International', 'Europe/Asia'];
 const ALL_CATEGORIES = ['All', 'Executive', 'Diplomatic', 'Defense', 'Government', 'Health', 'Security', 'Nuclear', 'International'];
 
+/** Compose a shareable payload for a government announcement (uses the source link). */
+function buildGovShare(item: GovAnnouncement): SharePayload {
+  const appUrl = typeof window !== 'undefined' ? window.location.origin : 'https://dhruva.app';
+  const text = `📢 DHRUVA GOV [${item.category}]: ${item.title} — ${item.source} · ${item.country} · live intelligence & vigilance`;
+  return { title: `DHRUVA GOV: ${item.title}`, text, url: item.url || appUrl };
+}
+
 function AnnouncementCard({ item, searchQuery }: { item: GovAnnouncement; searchQuery: string }) {
   const regionColor = REGION_COLORS[item.region] || '#4D9FFF';
   const categoryColor = CATEGORY_COLORS[item.category] || '#00D4A0';
+  const [showShare, setShowShare] = useState(false);
   const age = Math.round((Date.now() - new Date(item.published_at).getTime()) / 60000);
   const ageLabel = age < 60 ? `${age}m ago` : age < 1440 ? `${Math.floor(age / 60)}h ago` : `${Math.floor(age / 1440)}d ago`;
 
@@ -69,6 +79,7 @@ function AnnouncementCard({ item, searchQuery }: { item: GovAnnouncement; search
 
   return (
     <div style={{
+      position: 'relative',
       background: 'rgba(4,12,24,0.92)',
       border: '1px solid rgba(255,255,255,0.07)',
       borderLeft: `3px solid ${categoryColor}`,
@@ -147,7 +158,31 @@ function AnnouncementCard({ item, searchQuery }: { item: GovAnnouncement; search
         <span style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: '8px', color: 'var(--dim)', opacity: 0.6 }}>
           {new Date(item.published_at).toLocaleString()}
         </span>
+        <button
+          onClick={e => { e.stopPropagation(); setShowShare(s => !s); }}
+          aria-label="Share this alert"
+          aria-haspopup="menu"
+          aria-expanded={showShare}
+          style={{
+            marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '4px',
+            fontFamily: "'Share Tech Mono', monospace", fontSize: '8px', letterSpacing: '0.5px',
+            cursor: 'pointer', color: showShare ? 'var(--accent)' : 'var(--dim)',
+            background: showShare ? 'rgba(0,212,160,0.12)' : 'transparent',
+            border: `1px solid ${showShare ? 'rgba(0,212,160,0.4)' : 'rgba(255,255,255,0.12)'}`,
+            borderRadius: '2px', padding: '2px 6px',
+          }}
+        >
+          <Share2 size={9} /> SHARE
+        </button>
       </div>
+
+      {showShare && (
+        <ShareMenu
+          payload={buildGovShare(item)}
+          anchorStyle={{ top: 'auto', bottom: '10px', right: '10px' }}
+          onClose={() => setShowShare(false)}
+        />
+      )}
     </div>
   );
 }

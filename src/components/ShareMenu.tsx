@@ -41,9 +41,9 @@ export function ShareMenu({ payload, onClose, anchorStyle }: Props) {
 
   return (
     <>
-      {/* Outside-click catcher */}
+      {/* Outside-click catcher (stopPropagation so it never triggers a clickable card behind it) */}
       <div
-        onClick={onClose}
+        onClick={e => { e.stopPropagation(); onClose(); }}
         style={{ position: 'fixed', inset: 0, zIndex: 55, background: 'transparent' }}
         aria-hidden="true"
       />
