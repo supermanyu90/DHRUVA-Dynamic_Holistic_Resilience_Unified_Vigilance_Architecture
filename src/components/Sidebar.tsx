@@ -128,7 +128,7 @@ export function Sidebar({
   }
 
   return (
-    <div className={`sidebar${mobileOpen ? ' mobile-open' : ''}`} style={{ position: 'relative' }}>
+    <div className={`sidebar${mobileOpen ? ' mobile-open' : ''}`}>
       {drawerEvent && (
         <EventDetailDrawer event={drawerEvent} onClose={() => setDrawerEvent(null)} />
       )}

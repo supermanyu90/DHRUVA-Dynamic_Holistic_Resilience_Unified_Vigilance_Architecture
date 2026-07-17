@@ -535,22 +535,6 @@ function App() {
     <DataFreshnessContext.Provider value={dataFreshness}>
     <div className="dhruva-app" onTouchStart={handleSwipeTouchStart} onTouchEnd={handleSwipeTouchEnd}>
       <a href="#main-content" className="skip-link">Skip to main content</a>
-      <div className="portrait-overlay" aria-hidden="true">
-        <div className="portrait-overlay-inner">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="5" y="2" width="14" height="20" rx="2" />
-            <path d="M12 18h.01" />
-          </svg>
-          <div className="portrait-overlay-arrow">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 3L3 9l6 6" />
-              <path d="M3 9h13a5 5 0 0 1 0 10h-1" />
-            </svg>
-          </div>
-          <div className="portrait-overlay-title">ROTATE DEVICE</div>
-          <div className="portrait-overlay-sub">Landscape mode recommended for the best experience</div>
-        </div>
-      </div>
       <Header
         totalEvents={earthquakes.length + disasters.length + news.length}
         criticalEvents={criticalEvents}
