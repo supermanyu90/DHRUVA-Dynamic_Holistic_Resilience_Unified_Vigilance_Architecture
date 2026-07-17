@@ -5722,3 +5722,65 @@ header,
 }
 .wl-export-btn:hover { filter: brightness(1.1); box-shadow: 0 0 16px rgba(0, 212, 160, 0.35); }
 .wl-export-btn:active { transform: translateY(1px); }
+
+/* ── Mobile content-size (zoom) control ──────────────────────────────
+   Scales the scrollable feeds/cards/lists for readability on phones,
+   while the header, tabs, ticker and status bar stay at their fixed
+   size. The main views are zoomed inline via .center; the event-feed
+   drawer follows the same --content-zoom set on .dhruva-app. */
+.content-zoom-ctl { display: none; }
+
+@media (max-width: 768px) {
+  .content-zoom-ctl {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    position: fixed;
+    right: max(10px, env(safe-area-inset-right));
+    bottom: calc(34px + env(safe-area-inset-bottom));
+    z-index: 90;
+    background: rgba(4, 12, 20, 0.94);
+    border: 1px solid rgba(0, 212, 160, 0.4);
+    border-radius: 22px;
+    padding: 3px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+  }
+
+  .czb {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    color: var(--accent);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 21px;
+    line-height: 1;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background 0.15s;
+  }
+  .czb:active { background: rgba(0, 212, 160, 0.18); }
+  .czb:disabled { color: rgba(255, 255, 255, 0.22); cursor: default; }
+
+  .czb-val {
+    min-width: 48px;
+    height: 36px;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .czb-val:active { color: var(--accent); }
+
+  /* Event-feed drawer scales together with the main content views. */
+  .ev-list { zoom: var(--content-zoom, 1); }
+}

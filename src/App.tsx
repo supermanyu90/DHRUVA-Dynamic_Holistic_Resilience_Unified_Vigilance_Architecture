@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { IntelligenceAPI, Earthquake, Disaster, NewsEvent, VolcanoEvent, GeopoliticalEvent } from './lib/intelligence-api';
 import { withResilience } from './lib/resilience';
 import { fetchWeatherAlerts, type WeatherAlert } from './lib/weather-alerts';
@@ -33,6 +33,11 @@ import { normalizeEvents, watchedEvents } from './lib/watchlist';
 import { exportSituationReport } from './lib/situation-report';
 
 type ViewType = 'map' | 'timeline' | 'news' | 'wx' | 'sewa' | 'cyber' | 'infoops' | 'gov' | 'admin';
+
+// Mobile content-zoom bounds (scales feeds/cards/lists, not the fixed chrome).
+const CONTENT_ZOOM_MIN = 0.8;
+const CONTENT_ZOOM_MAX = 1.5;
+const CONTENT_ZOOM_STEP = 0.1;
 
 function formatSyncCountdown(ms: number): string {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
@@ -147,6 +152,16 @@ function App() {
   const { watchlist, addRegion, removeRegion, addKeyword, removeKeyword, clear: clearWatchlist } = useWatchlist();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mobileRightPanelOpen, setMobileRightPanelOpen] = useState(false);
+  const [contentZoom, setContentZoom] = useState<number>(() => {
+    if (typeof localStorage === 'undefined') return 1;
+    const n = parseFloat(localStorage.getItem('dhruva:contentZoom') || '1');
+    return isNaN(n) ? 1 : Math.min(CONTENT_ZOOM_MAX, Math.max(CONTENT_ZOOM_MIN, n));
+  });
+  useEffect(() => {
+    localStorage.setItem('dhruva:contentZoom', String(contentZoom));
+  }, [contentZoom]);
+  const adjustZoom = (delta: number) =>
+    setContentZoom(z => Math.min(CONTENT_ZOOM_MAX, Math.max(CONTENT_ZOOM_MIN, Math.round((z + delta) * 10) / 10)));
 
   const autoSyncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -533,7 +548,12 @@ function App() {
 
   return (
     <DataFreshnessContext.Provider value={dataFreshness}>
-    <div className="dhruva-app" onTouchStart={handleSwipeTouchStart} onTouchEnd={handleSwipeTouchEnd}>
+    <div
+      className="dhruva-app"
+      onTouchStart={handleSwipeTouchStart}
+      onTouchEnd={handleSwipeTouchEnd}
+      style={{ '--content-zoom': String(contentZoom) } as CSSProperties}
+    >
       <a href="#main-content" className="skip-link">Skip to main content</a>
       <Header
         totalEvents={earthquakes.length + disasters.length + news.length}
@@ -648,7 +668,10 @@ function App() {
           mobileOpen={mobileSidebarOpen}
         />
 
-        <div className="center">
+        <div
+          className="center"
+          style={currentView === 'map' ? undefined : { zoom: contentZoom }}
+        >
           {currentView === 'map' && (
             <MapView
               earthquakes={earthquakes}
@@ -693,6 +716,35 @@ function App() {
           mobileOpen={mobileRightPanelOpen}
         />
       </div>
+
+      {currentView !== 'map' && (
+        <div className="content-zoom-ctl" role="group" aria-label="Content size">
+          <button
+            className="czb"
+            onClick={() => adjustZoom(-CONTENT_ZOOM_STEP)}
+            disabled={contentZoom <= CONTENT_ZOOM_MIN}
+            aria-label="Decrease content size"
+          >
+            &minus;
+          </button>
+          <button
+            className="czb-val"
+            onClick={() => setContentZoom(1)}
+            title="Reset to 100%"
+            aria-label={`Content size ${Math.round(contentZoom * 100)} percent. Tap to reset to 100%.`}
+          >
+            {Math.round(contentZoom * 100)}%
+          </button>
+          <button
+            className="czb"
+            onClick={() => adjustZoom(CONTENT_ZOOM_STEP)}
+            disabled={contentZoom >= CONTENT_ZOOM_MAX}
+            aria-label="Increase content size"
+          >
+            +
+          </button>
+        </div>
+      )}
 
       <div className="status-bar" role="status" aria-label="System status">
         <div>
