@@ -28,6 +28,66 @@ const TIME_WINDOWS: { key: TimeWindow; label: string }[] = [
 
 const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low'] as const;
 
+// Botnet families whose live C2s warrant a critical rating.
+const HIGH_IMPACT_MALWARE = /dridex|emotet|qakbot|qbot|icedid|trickbot|pikabot|bumblebee|gozi|bazar|conti|lockbit|blackcat|cobalt.?strike/i;
+
+/** Extract quoted fields from a CSV row (abuse.ch feeds quote every field). */
+function parseQuotedCsv(line: string): string[] {
+  const m = line.match(/"([^"]*)"/g);
+  if (m) return m.map((s) => s.slice(1, -1));
+  return line.split(',').map((s) => s.trim());
+}
+
+function isIPv4(s: string): boolean {
+  return /^(\d{1,3}\.){3}\d{1,3}$/.test(s);
+}
+
+function hostFromUrl(url: string): string {
+  try { return new URL(url).host; } catch { /* fall through */ }
+  const m = url.match(/^https?:\/\/([^/?#]+)/i);
+  return m ? m[1] : url.slice(0, 40);
+}
+
+/** "2021-01-17 07:30:05" (UTC) → ISO. Returns now() on anything unparseable. */
+function parseSpaceDate(s?: string): string {
+  if (s) {
+    const d = new Date(s.trim().replace(' ', 'T') + 'Z');
+    if (!isNaN(d.getTime())) return d.toISOString();
+  }
+  return new Date().toISOString();
+}
+
+/**
+ * Read only the first `wantedDataLines` non-comment lines of a (potentially
+ * multi-MB) response, then cancel — so URLhaus's newest-first dump costs a few
+ * KB instead of downloading and parsing the whole file.
+ */
+async function readLeadingLines(res: Response, wantedDataLines: number): Promise<string[]> {
+  const reader = res.body?.getReader();
+  if (!reader) return (await res.text()).split('\n');
+  const decoder = new TextDecoder();
+  const out: string[] = [];
+  let buf = '';
+  let data = 0;
+  try {
+    while (data < wantedDataLines) {
+      const { done, value } = await reader.read();
+      if (value) buf += decoder.decode(value, { stream: true });
+      let nl: number;
+      while ((nl = buf.indexOf('\n')) >= 0 && data < wantedDataLines) {
+        const line = buf.slice(0, nl);
+        buf = buf.slice(nl + 1);
+        out.push(line);
+        if (line && !line.startsWith('#')) data++;
+      }
+      if (done) break;
+    }
+  } finally {
+    reader.cancel().catch(() => {});
+  }
+  return out;
+}
+
 function getSeverityColor(severity: string) {
   switch (severity) {
     case 'critical': return '#FF0040';
@@ -52,73 +112,120 @@ export function CyberView() {
       // abuse.ch feeds send no CORS headers, so they are routed through the
       // rss-proxy raw passthrough (both domains are allowlisted there).
       const [feodoRes, urlhausRes, ransomRes] = await Promise.allSettled([
-        fetch(`${RSS_PROXY}?raw=${encodeURIComponent('https://feodotracker.abuse.ch/downloads/ipblocklist_aggressive.csv')}`, { signal: AbortSignal.timeout(15_000) }),
-        fetch(`${RSS_PROXY}?raw=${encodeURIComponent('https://urlhaus.abuse.ch/downloads/csv_recent/')}`, { signal: AbortSignal.timeout(20_000) }),
+        // Recommended blocklist (small, current C2s) — not the 600 KB aggressive list.
+        fetch(`${RSS_PROXY}?raw=${encodeURIComponent('https://feodotracker.abuse.ch/downloads/ipblocklist.csv')}`, { signal: AbortSignal.timeout(20_000) }),
+        fetch(`${RSS_PROXY}?raw=${encodeURIComponent('https://urlhaus.abuse.ch/downloads/csv_online/')}`, { signal: AbortSignal.timeout(30_000) }),
         fetch(`${RSS_PROXY}?gdelt=${encodeURIComponent('https://api.gdeltproject.org/api/v2/doc/doc?query=ransomware+OR+cyberattack+OR+malware+OR+%22data+breach%22&mode=ArtList&format=json&maxrecords=30&timespan=10080min&sort=DateDesc')}`, { signal: AbortSignal.timeout(20_000) }),
       ]);
 
       const newThreats: CyberThreat[] = [];
       let idx = 0;
 
-      if (feodoRes.status === 'fulfilled' && feodoRes.value.ok) {
+      // ── abuse.ch Feodo Tracker: live botnet command-and-control servers ──
+      // Columns: first_seen_utc, dst_ip, dst_port, c2_status, last_online, malware
+      if (feodoRes.status === 'fulfilled' && feodoRes.value.ok) try {
         const text = await feodoRes.value.text();
-        const lines = text.split('\n').filter((l: string) => l && !l.startsWith('#') && l.trim());
-        for (const line of lines.slice(0, 40)) {
-          const parts = line.split(',');
-          if (parts.length >= 2) {
-            const ip = parts[0]?.trim();
-            const port = parts[1]?.trim() || '?';
-            newThreats.push({
-              id: `feodo-${idx++}`, threat_id: `feodo-${ip}`,
-              title: `C2 Server: ${ip}`,
-              description: `Botnet C2 infrastructure — Port ${port}`,
-              severity: 'high', threat_type: 'c2_server', is_active: true,
-              first_seen: new Date().toISOString(),
-              last_seen: new Date().toISOString(),
-            });
-          }
+        const feodo: CyberThreat[] = [];
+        for (const line of text.split('\n')) {
+          if (!line || line.startsWith('#')) continue;
+          const f = parseQuotedCsv(line);
+          const [firstSeen, ip, port, status, , malware] = f;
+          if (!isIPv4(ip || '')) continue; // skips the header row and any stray line
+          const online = (status || '').toLowerCase() === 'online';
+          const fam = (malware || '').trim();
+          const critical = HIGH_IMPACT_MALWARE.test(fam);
+          const severity: CyberThreat['severity'] = critical ? (online ? 'critical' : 'high') : online ? 'high' : 'medium';
+          feodo.push({
+            id: `feodo-${idx++}`, threat_id: `feodo-${ip}`,
+            category: 'Botnet C2',
+            title: fam
+              ? `${fam} botnet controller ${online ? 'is live' : 'detected'}`
+              : `Botnet command server ${online ? 'online' : 'seen'}`,
+            description: online
+              ? `A ${fam || 'botnet'} command-and-control server is active and directing infected machines. Any device on your network reaching it is very likely compromised.`
+              : `A ${fam || 'botnet'} command-and-control server has been flagged malicious. It is offline right now but may return.`,
+            indicator: `${ip}:${port || '—'}`,
+            malwareFamily: fam || undefined,
+            source: 'abuse.ch · Feodo Tracker',
+            action: `Block ${ip} at the firewall and hunt for internal hosts beaconing to it.`,
+            severity, threat_type: 'c2_server', is_active: online,
+            first_seen: parseSpaceDate(firstSeen),
+            last_seen: new Date().toISOString(),
+          });
         }
-      }
+        // The aggressive list is huge and mostly historical — surface live &
+        // most-recent controllers first, then cap.
+        feodo.sort((a, b) => (Number(b.is_active) - Number(a.is_active)) || b.first_seen.localeCompare(a.first_seen));
+        newThreats.push(...feodo.slice(0, 30));
+      } catch { /* one bad feed shouldn't sink the others */ }
 
-      if (urlhausRes.status === 'fulfilled' && urlhausRes.value.ok) {
-        const text = await urlhausRes.value.text();
-        const lines = text.split('\n').filter((l: string) => l && !l.startsWith('#') && !l.startsWith('"id"'));
-        for (const line of lines.slice(0, 30)) {
-          const parts = line.split('","').map((p: string) => p.replace(/^"|"$/g, ''));
-          if (parts.length >= 4) {
-            const severity: 'critical' | 'high' | 'medium' | 'low' = parts[5]?.includes('malware_download') ? 'critical' : 'medium';
-            newThreats.push({
-              id: `urlhaus-${idx++}`, threat_id: `urlhaus-${parts[0] || idx}`,
-              title: `Malware Host: ${(parts[2] || 'Unknown URL').slice(0, 60)}`,
-              description: `${parts[4] || 'Malware distribution'} — ${parts[5] || ''}`,
-              severity, threat_type: 'malware_host', is_active: true,
-              first_seen: parts[1] || new Date().toISOString(),
-              last_seen: new Date().toISOString(),
-            });
-          }
+      // ── abuse.ch URLhaus: URLs actively serving malware (currently online) ──
+      // Columns: id, dateadded, url, url_status, last_online, threat, tags, link, reporter
+      if (urlhausRes.status === 'fulfilled' && urlhausRes.value.ok) try {
+        // Dump is multi-MB and newest-first — stream just the leading rows.
+        const lines = await readLeadingLines(urlhausRes.value, 30);
+        for (const line of lines) {
+          if (!line || line.startsWith('#')) continue;
+          const f = parseQuotedCsv(line);
+          const [, dateadded, url, urlStatus, , threat] = f;
+          if (!/^https?:\/\//i.test(url || '')) continue; // skips header/invalid
+          const host = hostFromUrl(url);
+          const online = (urlStatus || '').toLowerCase() === 'online';
+          const payload = threat === 'malware_download' ? 'a malware payload' : (threat || 'malware').replace(/_/g, ' ');
+          // Live malware hosts are serious (high); critical is reserved for active
+          // high-impact botnet C2s and confirmed data breaches.
+          const severity: CyberThreat['severity'] = online ? 'high' : 'medium';
+          newThreats.push({
+            id: `urlhaus-${idx++}`, threat_id: `urlhaus-${host}-${idx}`,
+            category: 'Malware Host',
+            title: `Malware served from ${host}`,
+            description: `A ${online ? 'live' : 'recently-seen'} link on ${host} is distributing ${payload}. Opening or fetching it can infect a device on contact.`,
+            indicator: url.length > 84 ? url.slice(0, 84) + '…' : url,
+            source: 'abuse.ch · URLhaus',
+            action: `Block ${host} and this URL; scan any device that reached it.`,
+            severity, threat_type: 'malware_host', is_active: online,
+            first_seen: parseSpaceDate(dateadded),
+            last_seen: new Date().toISOString(),
+          });
         }
-      }
+      } catch { /* one bad feed shouldn't sink the others */ }
 
-      if (ransomRes.status === 'fulfilled' && ransomRes.value.ok) {
+      // ── GDELT: open-source cyber news (breaches, ransomware, attacks) ──
+      if (ransomRes.status === 'fulfilled' && ransomRes.value.ok) try {
         const json = await ransomRes.value.json();
         const articles: any[] = json?.articles ?? [];
         for (const a of articles) {
-          const title = (a.title ?? '') as string;
+          const title = ((a.title ?? '') as string).trim();
+          if (!title) continue;
           const lower = title.toLowerCase();
-          const severity: 'critical' | 'high' | 'medium' | 'low' = lower.includes('critical') || lower.includes('breach') ? 'critical'
-            : lower.includes('ransomware') || lower.includes('attack') ? 'high' : 'medium';
+          const isBreach = /breach|leak|stolen|exposed|data.?theft/.test(lower);
+          const isRansom = /ransomware|ransom\b/.test(lower);
+          const isPhish = /phish/.test(lower);
+          const severity: CyberThreat['severity'] = isBreach ? 'critical'
+            : isRansom || /attack|hacked|exploit|zero.?day/.test(lower) ? 'high' : 'medium';
+          const category = isBreach ? 'Data Breach' : isRansom ? 'Ransomware' : isPhish ? 'Phishing' : 'Cyber Incident';
           newThreats.push({
             id: `cyber-news-${idx++}`, threat_id: `cyber-gdelt-${idx}`,
-            title: title.slice(0, 120),
-            description: `Source: ${a.domain ?? 'unknown'} — ${title}`,
-            severity, threat_type: lower.includes('ransomware') ? 'ransomware' : lower.includes('phish') ? 'phishing' : 'apt',
+            category,
+            title: title.length > 130 ? title.slice(0, 130) + '…' : title,
+            description: `Open-source cyber report picked up from ${a.domain ?? 'the news wire'}.`,
+            source: a.domain ?? 'GDELT news',
+            severity,
+            threat_type: isRansom ? 'ransomware' : isPhish ? 'phishing' : isBreach ? 'breach' : 'apt',
             is_active: true,
             first_seen: a.seendate ? new Date(a.seendate.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')).toISOString() : new Date().toISOString(),
             last_seen: new Date().toISOString(),
           });
         }
-      }
+      } catch { /* one bad feed shouldn't sink the others */ }
 
+      // Most urgent first: severity, then live before inactive, then freshest.
+      const sevRank: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+      newThreats.sort((a, b) =>
+        (sevRank[a.severity] - sevRank[b.severity]) ||
+        (Number(b.is_active) - Number(a.is_active)) ||
+        b.first_seen.localeCompare(a.first_seen)
+      );
       setThreats(newThreats);
       setLastUpdated(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     } catch (err) {
@@ -245,15 +352,37 @@ export function CyberView() {
             filteredThreats.map(threat => (
               <div key={threat.id} className={`cyber-card sev-${threat.severity}`} style={{ position: 'relative' }}>
                 <div className="cyber-card-head">
-                  <div className="cyber-card-type">{threat.threat_type?.toUpperCase() || 'UNKNOWN'}</div>
+                  <div className="cyber-card-head-l">
+                    <div
+                      className="cyber-card-type"
+                      style={{ color: getSeverityColor(threat.severity), borderColor: `${getSeverityColor(threat.severity)}55` }}
+                    >
+                      {(threat.category || threat.threat_type || 'THREAT').toUpperCase()}
+                    </div>
+                    {threat.source && <div className="cyber-card-source">{threat.source}</div>}
+                  </div>
                   <div className="cyber-card-age">{formatAge(threat.first_seen)} ago</div>
                 </div>
                 <div className="cyber-card-title">{threat.title}</div>
                 <div className="cyber-card-desc">{threat.description}</div>
+                {threat.indicator && (
+                  <div className="cyber-ioc">
+                    <span className="cyber-ioc-lbl">IOC</span>
+                    <code>{threat.indicator}</code>
+                  </div>
+                )}
+                {threat.action && (
+                  <div className="cyber-action">
+                    <span aria-hidden="true">▸</span> {threat.action}
+                  </div>
+                )}
                 <div className="cyber-card-footer">
                   <div className={`cyber-sev-badge ${threat.severity}`}>{threat.severity.toUpperCase()}</div>
+                  {threat.malwareFamily && (
+                    <div className="cyber-malware-chip">{threat.malwareFamily}</div>
+                  )}
                   {!threat.is_active && (
-                    <div className="cyber-tag" style={{ color: '#8BAFC8' }}>RESOLVED</div>
+                    <div className="cyber-tag" style={{ color: '#8BAFC8' }}>INACTIVE</div>
                   )}
                   <button
                     onClick={() => setShareId(id => (id === threat.id ? null : threat.id))}

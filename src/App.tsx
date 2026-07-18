@@ -31,6 +31,8 @@ import { WatchlistPanel } from './components/WatchlistPanel';
 import { useWatchlist } from './lib/useWatchlist';
 import { normalizeEvents, watchedEvents } from './lib/watchlist';
 import { exportSituationReport } from './lib/situation-report';
+import { isNative, openExternal, initNativeShell } from './lib/native';
+import { TutorialOverlay } from './components/TutorialOverlay';
 
 type ViewType = 'map' | 'timeline' | 'news' | 'wx' | 'sewa' | 'cyber' | 'infoops' | 'gov' | 'admin';
 
@@ -152,6 +154,19 @@ function App() {
   const { watchlist, addRegion, removeRegion, addKeyword, removeKeyword, clear: clearWatchlist } = useWatchlist();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mobileRightPanelOpen, setMobileRightPanelOpen] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
+  // Auto-launch the guided tour on first visit; it's replayable from the header ? button.
+  useEffect(() => {
+    if (typeof localStorage === 'undefined') return;
+    if (!localStorage.getItem('dhruva:tutorial-seen')) {
+      const t = setTimeout(() => setShowTutorial(true), 1400);
+      return () => clearTimeout(t);
+    }
+  }, []);
+  const closeTutorial = useCallback(() => {
+    setShowTutorial(false);
+    try { localStorage.setItem('dhruva:tutorial-seen', '1'); } catch { /* ignore */ }
+  }, []);
   const [contentZoom, setContentZoom] = useState<number>(() => {
     if (typeof localStorage === 'undefined') return 1;
     const n = parseFloat(localStorage.getItem('dhruva:contentZoom') || '1');
@@ -162,6 +177,43 @@ function App() {
   }, [contentZoom]);
   const adjustZoom = (delta: number) =>
     setContentZoom(z => Math.min(CONTENT_ZOOM_MAX, Math.max(CONTENT_ZOOM_MIN, Math.round((z + delta) * 10) / 10)));
+
+  // Latest handler for the Android hardware back button (kept fresh via a ref so
+  // the once-registered native listener always sees current state).
+  const backHandlerRef = useRef<() => boolean>(() => false);
+  backHandlerRef.current = () => {
+    if (showWatchlist) { setShowWatchlist(false); return true; }
+    if (showNotifPrefs) { setShowNotifPrefs(false); return true; }
+    if (mobileRightPanelOpen) { setMobileRightPanelOpen(false); return true; }
+    if (mobileSidebarOpen) { setMobileSidebarOpen(false); return true; }
+    if (currentView !== 'map') { setCurrentView('map'); return true; }
+    return false;
+  };
+
+  // Native (Capacitor) shell: hide splash, style status bar, wire the back
+  // button, and route external links to the system browser. All no-ops on web.
+  useEffect(() => {
+    let disposeShell: (() => void) | undefined;
+    initNativeShell(() => backHandlerRef.current()).then(fn => { disposeShell = fn; });
+
+    let onDocClick: ((e: MouseEvent) => void) | undefined;
+    if (isNative()) {
+      onDocClick = (e: MouseEvent) => {
+        const anchor = (e.target as HTMLElement | null)?.closest?.('a') as HTMLAnchorElement | null;
+        if (!anchor || !anchor.href) return;
+        if (!/^https?:/i.test(anchor.href)) return;        // mailto:/tel:/in-app → leave alone
+        if (anchor.host === window.location.host) return;   // internal navigation → leave alone
+        e.preventDefault();
+        openExternal(anchor.href);
+      };
+      document.addEventListener('click', onDocClick, true);
+    }
+
+    return () => {
+      disposeShell?.();
+      if (onDocClick) document.removeEventListener('click', onDocClick, true);
+    };
+  }, []);
 
   const autoSyncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -566,6 +618,7 @@ function App() {
         onToggleSound={() => setSoundEnabled(!soundEnabled)}
         watchedCount={watched.length}
         onOpenWatchlist={() => setShowWatchlist(true)}
+        onOpenTutorial={() => setShowTutorial(true)}
         theme={theme}
         onThemeToggle={handleThemeToggle}
         onToggleSidebar={() => setMobileSidebarOpen(o => !o)}
@@ -850,6 +903,7 @@ function App() {
       )}
       {tooltip && <Tooltip x={tooltip.x} y={tooltip.y} content={tooltip.content} />}
       {showAbout && <AboutDhruva onClose={() => setShowAbout(false)} theme={theme} />}
+      {showTutorial && <TutorialOverlay onClose={closeTutorial} />}
     </div>
     </DataFreshnessContext.Provider>
   );

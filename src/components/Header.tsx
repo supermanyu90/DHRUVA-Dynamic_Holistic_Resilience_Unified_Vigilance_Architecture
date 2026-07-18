@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Activity, Menu, BarChart2, X, WifiOff, Star } from 'lucide-react';
+import { Activity, Menu, BarChart2, X, WifiOff, Star, HelpCircle } from 'lucide-react';
 import { useDataFreshness } from '../lib/DataFreshnessContext';
 
 interface HeaderProps {
@@ -18,6 +18,7 @@ interface HeaderProps {
   onToggleSound: () => void;
   watchedCount: number;
   onOpenWatchlist: () => void;
+  onOpenTutorial: () => void;
   theme: 'dark' | 'light';
   onThemeToggle: () => void;
   onToggleSidebar: () => void;
@@ -37,6 +38,7 @@ export function Header({
   onToggleSound,
   watchedCount,
   onOpenWatchlist,
+  onOpenTutorial,
   theme,
   onThemeToggle,
   onToggleSidebar,
@@ -175,6 +177,14 @@ export function Header({
       </div>
 
       <div className="hdr-right">
+        <button
+          className="help-btn"
+          onClick={onOpenTutorial}
+          aria-label="Open the DHRUVA tutorial and guide"
+          title="Tutorial & guide"
+        >
+          <HelpCircle size={15} />
+        </button>
         <button
           className={`watch-btn ${watchedCount > 0 ? 'has-matches' : ''}`}
           onClick={onOpenWatchlist}

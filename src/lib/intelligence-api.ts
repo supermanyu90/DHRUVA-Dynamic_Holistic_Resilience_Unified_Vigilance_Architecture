@@ -119,6 +119,12 @@ export interface CyberThreat {
   is_active: boolean;
   first_seen: string;
   last_seen: string;
+  // Optional, human-friendly context for the Cyber Watch cards.
+  category?: string;       // plain-language kind, e.g. "Botnet C2", "Malware Host"
+  source?: string;         // where it came from, e.g. "abuse.ch · Feodo Tracker"
+  indicator?: string;      // the raw IOC (ip:port, host/url) — shown as secondary detail
+  malwareFamily?: string;  // e.g. "Dridex"
+  action?: string;         // one-line recommended response
 }
 
 export interface BankEvent {

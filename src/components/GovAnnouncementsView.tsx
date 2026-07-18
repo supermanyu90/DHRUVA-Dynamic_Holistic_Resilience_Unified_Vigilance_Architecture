@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ExternalLink, RefreshCw, Globe, Search, X, Radio, Filter, Clock, Share2 } from 'lucide-react';
 import { ShareMenu } from './ShareMenu';
 import type { SharePayload } from '../lib/share';
+import { openExternal } from '../lib/native';
 
 type TimeWindow = '1h' | '6h' | '24h' | '7d' | 'all';
 
@@ -99,7 +100,7 @@ function AnnouncementCard({ item, searchQuery }: { item: GovAnnouncement; search
       (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.07)';
       (e.currentTarget as HTMLDivElement).style.background = 'rgba(4,12,24,0.92)';
     }}
-    onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
+    onClick={() => openExternal(item.url)}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', flex: 1 }}>

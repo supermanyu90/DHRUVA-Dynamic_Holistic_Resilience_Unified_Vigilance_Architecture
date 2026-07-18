@@ -1,4 +1,5 @@
 import { SOURCE_CONFIG, type NewsArticle } from '../NewsIntelView';
+import { openExternal } from '../../lib/native';
 
 function fmtAge(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -78,8 +79,8 @@ export function NewsCard({ article, index, searchQuery }: NewsCardProps) {
       }}
       role="article"
       tabIndex={0}
-      onClick={() => article.url && window.open(article.url, '_blank', 'noopener')}
-      onKeyDown={e => { if (e.key === 'Enter' && article.url) window.open(article.url, '_blank', 'noopener'); }}
+      onClick={() => article.url && openExternal(article.url)}
+      onKeyDown={e => { if (e.key === 'Enter' && article.url) openExternal(article.url); }}
     >
       <div className="nc-top-row">
         <div className="nc-type" style={{ color: cfg.color }}>

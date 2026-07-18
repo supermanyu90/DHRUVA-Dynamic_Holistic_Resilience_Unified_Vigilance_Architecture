@@ -11,6 +11,7 @@ import {
   NormalizedEvent, Watchlist, EventKind, Severity,
   isWatchlistEmpty, watchedEvents, SEVERITY_ORDER,
 } from './watchlist';
+import { isNative } from './native';
 
 export interface SitrepInput {
   events: NormalizedEvent[];
@@ -262,9 +263,38 @@ export function generateSituationReportHTML(input: SitrepInput): string {
 </html>`;
 }
 
+/** Write the SITREP to the device cache and hand it to the native share sheet. */
+async function exportSituationReportNative(html: string): Promise<void> {
+  try {
+    const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
+    const { Share } = await import('@capacitor/share');
+    const fileName = `DHRUVA-SITREP-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}Z.html`;
+    const res = await Filesystem.writeFile({
+      path: fileName,
+      data: html,
+      directory: Directory.Cache,
+      encoding: Encoding.UTF8,
+    });
+    await Share.share({
+      title: 'DHRUVA Situation Report',
+      text: 'DHRUVA situation report',
+      url: res.uri,
+      dialogTitle: 'Export Situation Report',
+    });
+  } catch {
+    /* best-effort native export */
+  }
+}
+
 /** Open the SITREP in a new window and trigger print. Falls back to a download if popups are blocked. */
 export function exportSituationReport(input: SitrepInput): void {
   const html = generateSituationReportHTML(input);
+  // Packaged app: save the report to the device and open the OS share sheet
+  // (save to Files / print / mail) — WebViews can't print or download like a browser.
+  if (isNative()) {
+    void exportSituationReportNative(html);
+    return;
+  }
   const win = window.open('', '_blank');
   if (win && win.document) {
     win.document.open();
