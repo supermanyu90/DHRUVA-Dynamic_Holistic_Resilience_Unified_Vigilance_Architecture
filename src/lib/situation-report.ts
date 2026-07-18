@@ -11,7 +11,7 @@ import {
   NormalizedEvent, Watchlist, EventKind, Severity,
   isWatchlistEmpty, watchedEvents, SEVERITY_ORDER,
 } from './watchlist';
-import { isNative } from './native';
+import { isNative, nativeFileShare } from './native';
 
 export interface SitrepInput {
   events: NormalizedEvent[];
@@ -266,14 +266,14 @@ export function generateSituationReportHTML(input: SitrepInput): string {
 /** Write the SITREP to the device cache and hand it to the native share sheet. */
 async function exportSituationReportNative(html: string): Promise<void> {
   try {
-    const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
-    const { Share } = await import('@capacitor/share');
+    const { Filesystem, Share } = nativeFileShare();
+    if (!Filesystem?.writeFile || !Share?.share) return;
     const fileName = `DHRUVA-SITREP-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}Z.html`;
     const res = await Filesystem.writeFile({
       path: fileName,
       data: html,
-      directory: Directory.Cache,
-      encoding: Encoding.UTF8,
+      directory: 'CACHE', // Directory.Cache
+      encoding: 'utf8',   // Encoding.UTF8
     });
     await Share.share({
       title: 'DHRUVA Situation Report',

@@ -10,6 +10,22 @@ behavior is guarded by `isNative()` so the web build is unchanged.
 - `android/` — Gradle project (build in Android Studio)
 - `ios/` — Xcode project using **Swift Package Manager** (no CocoaPods needed)
 
+> ⚠️ **The Capacitor packages are NOT in `package.json`.** They were removed so
+> the web deploy (Bolt) — whose build environment can't install them — builds
+> cleanly. The app source has **no build-time dependency** on `@capacitor/*`; it
+> reaches the native bridge through the runtime `window.Capacitor` global. Before
+> building the native app, reinstall the deps:
+>
+> ```bash
+> npm i @capacitor/core @capacitor/app @capacitor/browser @capacitor/filesystem \
+>       @capacitor/keyboard @capacitor/network @capacitor/share \
+>       @capacitor/splash-screen @capacitor/status-bar
+> npm i -D @capacitor/cli @capacitor/android @capacitor/ios
+> npm run build && npx cap sync
+> ```
+> (Do this on a local/native branch — don't commit those deps back to the branch
+> Bolt deploys, or its build breaks again.)
+
 ---
 
 ## 1. Prerequisites

@@ -6,7 +6,7 @@
  * clipboard copy. No backend, no SDKs, no tracking.
  */
 
-import { isNative } from './native';
+import { isNative, nativeSharePlugin } from './native';
 
 export interface SharePayload {
   /** Short headline (used as the native-share title + email subject). */
@@ -73,16 +73,19 @@ export type NativeShareResult = 'shared' | 'cancelled' | 'unsupported' | 'error'
 
 /** Invoke the native share sheet. Resolves with a status rather than throwing. */
 export async function nativeShare(p: SharePayload): Promise<NativeShareResult> {
-  // Packaged app: use the real OS share sheet via the Capacitor plugin.
+  // Packaged app: use the real OS share sheet via the native plugin registry.
   if (isNative()) {
-    try {
-      const { Share } = await import('@capacitor/share');
-      await Share.share({ title: p.title, text: p.text, url: p.url, dialogTitle: p.title });
-      return 'shared';
-    } catch (err) {
-      if (err instanceof Error && /cancel/i.test(err.message)) return 'cancelled';
-      return 'error';
+    const Share = nativeSharePlugin();
+    if (Share?.share) {
+      try {
+        await Share.share({ title: p.title, text: p.text, url: p.url, dialogTitle: p.title });
+        return 'shared';
+      } catch (err) {
+        if (err instanceof Error && /cancel/i.test(err.message)) return 'cancelled';
+        return 'error';
+      }
     }
+    return 'unsupported';
   }
   // Web: Web Share API where supported.
   if (typeof navigator === 'undefined' || typeof navigator.share !== 'function') return 'unsupported';
